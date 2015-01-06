@@ -1,0 +1,9 @@
+This is a modified version of JSON-C library.
+
+The initial version was obtained from here, https://github.com/json-c/json-c/releases
+numbered 0.12-20140410.
+
+It has been modified to support
+     * Optimized, homogenously typed, multi-dimensional arrays. That is, the
+       array 
+
