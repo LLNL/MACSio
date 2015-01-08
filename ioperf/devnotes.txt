@@ -1,0 +1,52 @@
+* design to work on windows, Mac and Linux/Unix variants
+* plugin design achieved by simply listing plugins to include on link for main executable
+* options for top-level driver as well as I/O library specific options
+* parallel logging to single shared file via posix writes to separate, processor specific portions of an ascii file
+* low-level array interface supports asynch and synch i/o
+* produce *real* files of meshes visualizable in VisIt (for some i/o libs, may special VisIt plugin)
+
+FlexIOBench
+Flexsioapp
+
+R
+appscallion
+
+Flexscallion
+
+Scalion
+
+RailGun
+
+Data (application data 
+
+Flexible
+Scalable
+Application-Oriented Centric
+Parallel
+I/O
+Tool Suite Framework Benchmark WorkBench Toolbox
+
+F S A P I/O B AC AO T Scal Flex App Bench
+
+Psionics
+
+Psionara
+
+psilosis (falling out of hair)
+
+Aopsion
+
+ScalAOPio
+
+p
+ParioBench
+BioFlex
+PsioBench
+FleSpioBench
+
+
+Parioflex
+
+FAOS
+
+

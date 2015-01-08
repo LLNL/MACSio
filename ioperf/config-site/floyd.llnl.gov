@@ -1,0 +1,4 @@
+SILO_HOME=/home/miller86/visit/visit/install_2_6_0/silo/4.9/linux-x86_64_gcc-4.1
+HDF5_HOME=/home/miller86/visit/visit/install_2_6_0/hdf5/1.8.7/linux-x86_64_gcc-4.1
+SZIP_HOME=/home/miller86/visit/visit/install_2_6_0/szip/2.1/linux-x86_64_gcc-4.1
+ZLIB_HOME=/usr/lib

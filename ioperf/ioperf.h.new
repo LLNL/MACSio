@@ -1,0 +1,261 @@
+/*
+Copyright (c) 1994 - 2010, Lawrence Livermore National Security, LLC.
+LLNL-CODE-425250.
+All rights reserved.
+
+This file is part of Silo. For details, see silo.llnl.gov.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+   * Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the disclaimer below.
+   * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the disclaimer (as noted
+     below) in the documentation and/or other materials provided with
+     the distribution.
+   * Neither the name of the LLNS/LLNL nor the names of its
+     contributors may be used to endorse or promote products derived
+     from this software without specific prior written permission.
+
+THIS SOFTWARE  IS PROVIDED BY  THE COPYRIGHT HOLDERS  AND CONTRIBUTORS
+"AS  IS" AND  ANY EXPRESS  OR IMPLIED  WARRANTIES, INCLUDING,  BUT NOT
+LIMITED TO, THE IMPLIED  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A  PARTICULAR  PURPOSE ARE  DISCLAIMED.  IN  NO  EVENT SHALL  LAWRENCE
+LIVERMORE  NATIONAL SECURITY, LLC,  THE U.S.  DEPARTMENT OF  ENERGY OR
+CONTRIBUTORS BE LIABLE FOR  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR  CONSEQUENTIAL DAMAGES  (INCLUDING, BUT NOT  LIMITED TO,
+PROCUREMENT OF  SUBSTITUTE GOODS  OR SERVICES; LOSS  OF USE,  DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER  IN CONTRACT, STRICT LIABILITY,  OR TORT (INCLUDING
+NEGLIGENCE OR  OTHERWISE) ARISING IN  ANY WAY OUT  OF THE USE  OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+This work was produced at Lawrence Livermore National Laboratory under
+Contract  No.   DE-AC52-07NA27344 with  the  DOE.  Neither the  United
+States Government  nor Lawrence  Livermore National Security,  LLC nor
+any of  their employees,  makes any warranty,  express or  implied, or
+assumes   any   liability   or   responsibility  for   the   accuracy,
+completeness, or usefulness of any information, apparatus, product, or
+process  disclosed, or  represents  that its  use  would not  infringe
+privately-owned   rights.  Any  reference   herein  to   any  specific
+commercial products,  process, or  services by trade  name, trademark,
+manufacturer or otherwise does not necessarily constitute or imply its
+endorsement,  recommendation,   or  favoring  by   the  United  States
+Government or Lawrence Livermore National Security, LLC. The views and
+opinions  of authors  expressed  herein do  not  necessarily state  or
+reflect those  of the United  States Government or  Lawrence Livermore
+National  Security, LLC,  and shall  not  be used  for advertising  or
+product endorsement purposes.
+*/
+
+#include <stdint.h> /* for uint64_t */
+
+/* if you define members such that a value of 0 serves
+   as a suitable default, then you don't have to worry
+   about any special initialization of structs of this
+   type. */
+typedef struct _options_t
+{
+    const char *iface_name;
+    int request_size_in_bytes;
+    int num_requests;
+    int initial_file_size;
+    int seek_noise;
+    int size_noise;
+    int test_read;
+    ioflags_t flags;
+    int print_details;
+    int alignment;
+    int mpi_rank;
+    int mpi_size;
+    int pmpio_group_rank;
+} options_t;
+
+typedef enum _ioop_t
+{
+    OP_WRITE,
+    OP_READ,
+    OP_OPEN,
+    OP_CLOSE,
+    OP_SEEK,
+    OP_ERROR,
+    OP_OUTPUT_TIMINGS,
+    OP_OUTPUT_SUMMARY
+} ioop_t;
+
+typedef enum _dtype_t
+{
+    TYPE_OPAQUE,    /* type that is unknown to the I/O subsystem and passed without interpretation */
+    TYPE_BIT,       /* 1 bit per entry values packed one or more native ints */
+    TYPE_CHAR,      /* 1 byte per entry ascii values */
+    TYPE_INT32,     /* 4 byte per entry signed integer values */
+    TYPE_INT64,     /* 8 byte per entry signed integer values */
+    TYPE_FLOAT,     /* 4 byte per entry floating point values */
+    TYPE_DOUBLE,    /* 8 byte per entry floating point values */
+    TYPE_LONG_DOUBLE, /* 16 byte per entry floating point values */
+    TYPE_NAMESPACE, /* Used for child symtab entries. Not really a data type */
+} dtype_t;
+
+/*
+   Simple Symbol Table for I/O libraries that do not support
+   their own symbol table, natively.
+
+   Each item in the symbol table is 32 bytes.
+   Keep entire symbol table in memory, sorted by nsid.
+   Write entire symbol table as array of structs to end
+       of file followed by offset|size as last entry in file.
+   If necessary, can compress, separately, name, offset and bits
+       data in chunks sized to fit all entries in a given
+       namespace, keep all compressed data in memory and
+       uncompress at any one time only the contents of the
+       current namespace. I think that might give 3x storage
+       improvement.
+
+   The 'name' field may use all 16 chars for real data. So, not
+   necessarily null terimated.
+
+   The 'offset' within the file is the BYTE offset. We could opt
+   to align everything on some larger quanta, say 1k boundaries.
+   In that case, we could probably reduce number of bits to store
+   offsets by 10. But, we're not going to play those kinds of 
+   games unless and until we discover we need to.
+
+   The 'bits' field encodes a few other key attributes of an
+   entry into a single 64 bit quantity. These are...
+       'type': 4 bits: one of dtype_t w/some room for expansion
+       'nsid':24 bits: namespace id of parent namespace
+       'dims': 2 bits: 1, 2, 3 or 4 dimensional
+       'size':34 bits: total size in quanta of 'type' units.
+
+   The total size is such that it is factorable into a product of
+   'dims' integers of about the same value. Ideally, it would be
+   a perfect square for 'dims' of 2 or a perfect cube for 'dims'
+   of 3. But, those kinds of constraints really limit the set of
+   values appropriate for total size.
+
+   ======== NEW DESIGN NOTES 2/28/2013 =========
+
+   1. Would like arb. length strings (so use name/string heap)
+   2. Would like only *some* symbol table 'chunks' in memory at
+      any one time (means they need to live intermingled with
+      real data in the file)
+   3. Would like symbol table to be hierarchical to improve
+      search
+   4. Would like ability to store chunks 'compressed' in both
+      mem. and file.
+
+   Define a type representing a namespace's page map. Entries
+   of this type represent whole symbol table pages,
+   including the first name in that page and the page's offset
+   in the file.
+
+   All of a namespace's page map plus some of its actual pages
+   will be in memory presistently. There will be an upper limit
+   on total number of symbol table pages in memory with some
+   allowance for fact that a namespace's page map is sort of
+   preimenint. If all the pages for a namespace are preempted,
+   then so can the page map though an explicit call from the
+   application indicating it is done with the namespace would
+   be best for that.
+
+   When a symbol is added, it is inserted alphabetically. If
+   the symbol table page into which it needs to go is full, the
+   page is split into two pages with half the symbols going to
+   each. The 'new' page goes at the end of the file. The old page
+   occupies its orig. slot in the file. There will be a function
+   to 'garbage-collect' such space which will be expensive.
+
+   Symbol table page maps are 'precious' and should only be
+   preempted from memory when the cooresponding namespace is
+   no longer needed.
+
+   In accessing '/foo/bar/gorfo', the map for '/' is loaded and
+   then searched for 'foo/', some pages from '/' wind up getting
+   loaded too. When 'foo/' is found, its page map is first loaded
+   and then searched for 'bar/' and so on until 'gorfo' is found,
+   its offset determined and the read can proceed.
+
+   If an object is deleted, its entry is marked as 'deleted' but
+   space is left for a later garbage collection operation.
+
+*/
+typedef struct _sym_t
+{
+    char name[16];
+    uint64_t bits; /* if type field is directory, use childns */
+    union {
+        uint64_t offset;
+        sym_t *childns;
+    }
+} sym_t;
+
+/* info specific to files */
+typedef struct _finfo_t {
+    int flags; /* file create/open flags */
+    int pmode;  /* file create/open (permissions) mode */
+    char cmode[6]; /* file create/open (access) modes */
+    int hdrbytes; /* # bytes for 'header' */
+    sym_t *symtab;
+} finfo_t;
+
+/* info specific to namespaces */
+typedef struct _nsinfo_t {
+    int count; /* number of entries in namespace */
+    int index; /* current index for ReadNamespace */
+} nsinfo_t;
+
+/* info specific to datasets */
+typedef struct _dsinfo_t {
+} dsinfo_t;
+
+typedef struct _ioinfo_t {
+    finfo_t fi;
+    void *fh; /* i/o lib's current/active fiile handle */
+
+    nsinfo_t nsi;
+    void *nh; /* i/o lib's current/active namescpace handle */
+} ioinfo_t;
+
+/* File functions */
+typedef int (*CreateFileFunc)(const char* fn, ioinfo_t* info);
+typedef int (*OpenFileFunc)(const char* fn, ioinfo_t* info);
+typedef int (*CloseFileFunc)(ioinfo_t* info);
+
+/* Namespace functions */
+typedef int (*CreateNamespaceFunc)(ioinfo_t* info, const char *ns);
+typedef int (*OpenNamespaceFunc)(ioinfo_t* info, const char *ns);
+typedef int (*ReadNamespaceFunc)(ioinfo_t* info, sym_t *sym);
+typedef int (*CloseNamespaceFunc)(ioinfo_t* info);
+
+/* Dataset functions */
+typedef int (*CreateDatasetFunc)(ioinfo_t* info, const char *name,
+                                    dtype_t type, int ndims, int nels);
+typedef int (*OpenDatasetFunc)(ioinfo_t* info, const char *name);
+typedef int (*WriteDatasetFunc)(ioinfo_t* info, const int *spec, const void* buf);
+typedef int (*ReadDatasetFunc)(ioinfo_t* info, const int *spec, void *buf);
+typedef int (*CloseDatasetFunc)(ioinfo_t* info);
+
+typedef struct _iointerface_t
+{
+    CreateFileFunc createFile
+    OpenFileFunc openFile;
+    CloseFileFunc closeFile;
+
+    CreateNamespaceFunc createNamespace;
+    OpenNamespaceFunc openNamespace;
+    ReadNamespaceFunc readNamespace;
+    CloseNamespaceFunc closeNamespace;
+
+    CreateDatasetFunc createDataset;
+    OpenDatasetFunc openDataset;
+    WriteDatasetFunc writeDataset;
+    ReadDatasetFunc readDataset;
+    CloseDatasetFunc closeDataset;
+
+    void *dlhandle;
+    void *iface_specific_data;
+} iointerface_t;
+
+typedef iointerface_t* (*CreateInterfaceFunc)(int argi, int argc, char *argv[], const options_t *opts);
