@@ -7,9 +7,6 @@
 
 #include <log.h>
 
-#define LOG_LINE_LENGTH 128
-#define LOG_LINE_PER_PROC 100
-
 void Log(IOPLogHandle_t *log, char const *msg)
 {
     int i = 0;
@@ -30,7 +27,7 @@ void Log(IOPLogHandle_t *log, char const *msg)
 
     seek_offset = (log->rank * log->lines_per_proc + log->current_line) * log->log_line_length;
 
-    pwrite(log->logfile, buf, sizeof(char) * log->log_line_length, seek_offset);
+    i = pwrite(log->logfile, buf, sizeof(char) * log->log_line_length, seek_offset);
     free(buf);
 
     log->current_line++;
@@ -57,7 +54,7 @@ IOPLogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int line
         memset(linbuf+line_len, ' ', line_len * (lines_per_proc-1) * sizeof(char));
         for (i = 0; i < lines_per_proc; i++)
             linbuf[(i+1)*line_len-1] = '\n';
-        filefd = open(path, O_CREAT|O_WRONLY|O_TRUNC);
+        filefd = open(path, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP);
         for (i = 0; i < size; i++)
         {
             char tmp[32];

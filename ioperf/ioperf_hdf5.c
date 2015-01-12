@@ -136,11 +136,13 @@ static IOPFileHandle_t *make_file_handle(hid_t fid)
     retval->pub.setNamespaceFunc = FNAME(set_ns);
     retval->pub.getNamespaceFunc = FNAME(get_ns);
 
+#if 0
     retval->pub.defineArrayFunc = FNAME(define_array);
     retval->pub.getArrayInfoFunc = FNAME(get_array_info);
     retval->pub.defineArrayPartFunc = FNAME(define_array_part);
     retval->pub.startPendingArraysFunc = FNAME(start_pending_arrays);
     retval->pub.finishPendingArraysFunc = FNAME(finish_pending_arrays);
+#endif
     
     return (IOPFileHandle_t*) retval;
 }
