@@ -3,40 +3,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#ifdef USE_GSL
-#include <gsl/gsl_statistics.h>
-#endif
+#include <unistd.h>
 
 #ifdef USE_MPI
 #include <mpi.h>
 #endif
 
-#define STAT_WIN_SIZE 10
-#define MAX_RAND (pow(2,32)-1)
-#define BUF_SIZE ((size_t)1<<30) /* 1/4 Gigabyte */
-#define TOT_BUFS 262144          /* 1024 Gigabytes */
+#define BUF_SIZE ((size_t)1<<27) /* 1/8th Gigabyte */
+#define TOT_BUFS 8192            /* 1024 Gigabytes */
 
-static double time_random_accesses(char **bufs, int nbufs, int ntries, double *dummy_sum)
+static int buf_ids[TOT_BUFS];
+
+/* return time in micro-seconds to randomly stride
+   (a fraction of a pagesize) through all bufs
+   normalized by the number of samples taken. */
+static double time_random_accesses(char **bufs, int nbufs, double *dummy_sum)
 {
-    int i;
     struct timeval tv0, tv1;
+#ifdef _SC_PAGESIZE
+    int pagesize = (int) sysconf(_SC_PAGESIZE);
+#elif PAGESIZE
+    int pagesize = (int) sysconf(PAGESIZE);
+#endif
+    unsigned long long i = random() % pagesize;
+    unsigned long long maxi = nbufs * BUF_SIZE;
+    int n = 1;
 
     gettimeofday(&tv0, 0);
     double sum = 0;
-    for (i = 0; i < ntries; i++)
+    while (i < maxi)
     {
-        double frac = (double) random() / (double) MAX_RAND;
-        assert(frac<1);
-        size_t j = (size_t) ((double) nbufs * (double) BUF_SIZE * frac);
-        char testval = *(bufs[j/BUF_SIZE] + j%BUF_SIZE);
+        char testval = *(bufs[i/BUF_SIZE] + i%BUF_SIZE);
         sum += ((double) ((int) testval));
-        *(bufs[j/BUF_SIZE] + j%BUF_SIZE) = 'M';
+        *(bufs[i/BUF_SIZE] + i%BUF_SIZE) = 'M';
+        i += (random() % pagesize);
+        n++;
     }
     gettimeofday(&tv1, 0);
     *dummy_sum = sum;
 
-    return (double) (tv1.tv_sec*1e+6+tv1.tv_usec-(tv0.tv_sec*1e+6+tv0.tv_usec))/1e+3;
-
+    return (double) (tv1.tv_sec*1e+6+tv1.tv_usec-(tv0.tv_sec*1e+6+tv0.tv_usec))/n;
 }
 
 int main(int argc, char **argv)
@@ -45,12 +51,12 @@ int main(int argc, char **argv)
     size_t size = 0;
     int done = 0, alldone;
     int i = 0;
+    double mean=0, var=0;
     int mpirank = 0;
     int mpisize = 1;
     int mpierr;
     char outfname[64];
     FILE *outf;
-    double stat_window[STAT_WIN_SIZE];
 
 #ifdef USE_MPI
     MPI_Init(&argc, &argv);
@@ -68,10 +74,11 @@ int main(int argc, char **argv)
 
     /* loop to allocate more memory and test time to randomly access it */
     srandom(0xDeadBeef);
-    fprintf(outf, "Size(Gb)\tSpeed(ms)\tMean    \tStDev\n");
+    fprintf(outf, "Size(Gb)\tSpeed(us)\tMean    \tStDev\n");
     while (!alldone)
     {
-        double speed, size, dummy, mean=0, stdev=0;
+        double speed, size, dummy, lmean, stdev;
+        int nlong = 0;
         bufs[i] = (char*) calloc(BUF_SIZE,1);
         if (!bufs[i])
         {
@@ -80,18 +87,28 @@ int main(int argc, char **argv)
                 free(bufs[j]);
             break;
         }
-        speed = time_random_accesses(bufs, i+1, 1000000, &dummy);
-        stat_window[i%STAT_WIN_SIZE] = speed;
-        if (i >= STAT_WIN_SIZE - 1)
-        {
-#ifdef USE_GSL
-            mean = gsl_stats_mean(stat_window, 1, STAT_WIN_SIZE);
-            stdev = gsl_stats_sd_m(stat_window, 1, STAT_WIN_SIZE, mean);
-            if (speed > mean + 10*stdev) done=1;
-#endif
-        }
-        size = (double) (i+1) * (double) BUF_SIZE / (double) (1<<16) / (double) (1<<16);
+        /* why 2 calls? Mallocs above don't actually do anything. The
+           memory is only allocated when its written to. So, first call
+           ensures all mallocs are indeed allocated. Second call then 
+           times access w/o costs of lazy allocation involved */
+        speed = time_random_accesses(bufs, i+1, &dummy);
+        dummy = 0;
+        speed = time_random_accesses(bufs, i+1, &dummy);
+        lmean = mean;
+        mean = mean + (speed-mean)/(i+1);
+        var = var + (speed-mean)*(speed-lmean);
+        stdev = sqrt(var/(i+1));
+        size = (double) (i+1) * (double) BUF_SIZE / pow(2,30);
         fprintf(outf, "%8.4f\t%8.4f\t%8.4f\t%8.4f\n", size, speed, mean, stdev);
+        if (i > 3 && speed > mean + 1.5*stdev)
+        {
+            nlong++;
+            if (nlong > 1) done = 1;
+        }
+        else
+        {
+            nlong = 0;
+        }
 #if USE_MPI
         mpierr = MPI_Allreduce(&done, &alldone, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
         if (mpierr != MPI_SUCCESS)
