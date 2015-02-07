@@ -66,7 +66,7 @@ static int dummy = GetCurrentTime();
 typedef struct timerec_t
 {
     char *blockName;
-    IOPioop_t op;
+    MACSIO_ioop_t op;
     double time;
     int depth;
 } timerec_t;
@@ -75,7 +75,7 @@ static timerec_t *timerecs = 0;
 static int timerecssize = 0;
 static int ntimerecs = 0;
 
-static void RecordTimer(char const *name, IOPioop_t op, double time, int depth)
+static void RecordTimer(char const *name, MACSIO_ioop_t op, double time, int depth)
 {
     if (ntimerecs == timerecssize)
     {
@@ -110,7 +110,7 @@ static int timevalssize = INIT_TVSIZE;
 static int ntimevals = 0;
 static int nslotsused = 0;
 
-IOPTimerId_t StartTimer()
+MACSIO_TimerId_t StartTimer()
 {
     double time = GetCurrentTime();
     int i, idx = -1;
@@ -127,7 +127,7 @@ IOPTimerId_t StartTimer()
     if (idx != -1)
     {
         timevals[idx] = time;
-        return (IOPTimerId_t) idx;
+        return (MACSIO_TimerId_t) idx;
     }
 
     /* increase size of open timers array if necessary (unlikely we'll ever get here) */
@@ -142,10 +142,10 @@ IOPTimerId_t StartTimer()
 
     timevals[ntimevals] = time;
     ntimevals++;
-    return (IOPTimerId_t) (ntimevals-1);
+    return (MACSIO_TimerId_t) (ntimevals-1);
 }
 
-double StopTimer(IOPTimerId_t id, IOPioop_t op, char const *blockName)
+double StopTimer(MACSIO_TimerId_t id, MACSIO_ioop_t op, char const *blockName)
 {
     double deltat = GetCurrentTime() - timevals[(int)id];
     timevals[(int)id] = 0;

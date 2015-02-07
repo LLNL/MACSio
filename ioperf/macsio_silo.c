@@ -10,7 +10,7 @@
 #endif
 
 #include <ifacemap.h>
-#include <ioperf.h>
+#include <macsio.h>
 #include <options.h>
 #include <util.h>
 
@@ -213,7 +213,7 @@ static int StringToDriver(const char *str)
  */
 
 /* convenient name mapping macors */
-#define FHNDL2(A) IOPFileHandle_ ## A ## _t
+#define FHNDL2(A) MACSIO_FileHandle_ ## A ## _t
 #define FHNDL FHNDL2(silo)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,silo)
@@ -223,7 +223,7 @@ static int StringToDriver(const char *str)
 /* The driver's file handle "inherits" from the public handle */
 typedef struct FHNDL
 {
-    IOPFileHandlePublic_t pub;
+    MACSIO_FileHandlePublic_t pub;
     DBfile *dbfile;
 } FHNDL;
 
@@ -237,9 +237,9 @@ static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 
-static int FNAME(close_file)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
 
-static IOPFileHandle_t *make_file_handle(DBfile *dbfile)
+static MACSIO_FileHandle_t *make_file_handle(DBfile *dbfile)
 {
     FHNDL *retval;
     retval = (FHNDL*) calloc(1,sizeof(FHNDL));
@@ -248,18 +248,18 @@ static IOPFileHandle_t *make_file_handle(DBfile *dbfile)
     /* populate file, namespace and array methods here */
     retval->pub.closeFileFunc = FNAME(close_file);
 
-    return (IOPFileHandle_t*) retval;
+    return (MACSIO_FileHandle_t*) retval;
 }
 
-static IOPFileHandle_t *FNAME(create_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(create_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
-    DBfile *dbfile = DBCreate(filename, DB_CLOBBER, DB_LOCAL, "ioperf test file", driver);
+    DBfile *dbfile = DBCreate(filename, DB_CLOBBER, DB_LOCAL, "macsio test file", driver);
     if (!dbfile) return 0;
 #warning FIX ERROR CHECKING
     return make_file_handle(dbfile);
 }
 
-static IOPFileHandle_t *FNAME(open_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(open_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
     DBfile *dbfile = DBOpen(filename,  DB_UNKNOWN, DB_APPEND); 
     if (!dbfile) return 0;
@@ -267,7 +267,7 @@ static IOPFileHandle_t *FNAME(open_file)(char const *pathname, int flags, IOPopt
     return make_file_handle(dbfile);
 }
 
-static int FNAME(close_file)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     int retval;
     FHNDL *fh = (FHNDL*) _fh;
@@ -276,9 +276,9 @@ static int FNAME(close_file)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *mo
     return retval;
 }
 
-static IOPoptlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
+static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const int unknownArgsFlag = IOP_WARN;
+    const int unknownArgsFlag = MACSIO_WARN;
     char driver_str[128];
     char compression_str[512];
     int cksums = 0;
@@ -287,7 +287,7 @@ static IOPoptlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 
     strcpy(driver_str, "DB_HDF5");
     strcpy(compression_str, "");
-    IOPProcessCommandLine(unknownArgsFlag, argi, argc, argv,
+    MACSIO_ProcessCommandLine(unknownArgsFlag, argi, argc, argv,
         "--driver %s",
             "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants) [DB_HDF5]",
             &driver_str,
@@ -303,7 +303,7 @@ static IOPoptlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
         "--show-all-errors",
             "Show all errors Silo encounters",
             &show_all_errors,
-    IOP_END_OF_ARGS);
+    MACSIO_END_OF_ARGS);
 
 #warning MOVE THIS STUFF TO register METHOD
     driver = StringToDriver(driver_str);
@@ -319,9 +319,9 @@ static int register_this_interface()
 {
     unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
     if (strlen(iface_name) >= MAX_IFACE_NAME)
-        IOP_ERROR(("interface name \"%s\" too long",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
     if (iface_map[id].slotUsed!= 0)
-        IOP_ERROR(("hash collision for interface name \"%s\"",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
 
     /* Take this slot in the map */
     iface_map[id].slotUsed = 1;

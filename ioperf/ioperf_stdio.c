@@ -7,7 +7,7 @@
 #include <string.h>
 
 /* convenient name mapping macors */
-#define FHNDL2(A) IOPFileHandle_ ## A ## _t
+#define FHNDL2(A) MACSIO_FileHandle_ ## A ## _t
 #define FHNDL FHNDL2(stdio)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,stdio)
@@ -21,13 +21,13 @@ static char const *iface_ext = "dat";
 /* The driver's file handle "inherits" from the public handle */
 typedef struct FHNDL
 {
-    IOPFileHandlePublic_t pub;
+    MACSIO_FileHandlePublic_t pub;
     FILE *f;
 } FHNDL;
 
-static int FNAME(close_file)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
 
-static IOPFileHandle_t *make_file_handle(FILE* f)
+static MACSIO_FileHandle_t *make_file_handle(FILE* f)
 {
     FHNDL *retval;
     retval = (FHNDL*) calloc(1,sizeof(FHNDL));
@@ -42,24 +42,24 @@ static IOPFileHandle_t *make_file_handle(FILE* f)
     retval->pub.getNamespaceFunc FNAME(get_namespace);
 #endif
 
-    return (IOPFileHandle_t*) retval;
+    return (MACSIO_FileHandle_t*) retval;
 }
 
-static IOPFileHandle_t *FNAME(create_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(create_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
     FILE *file = fopen(pathname, "w+");
     if (!file) return 0;
     return make_file_handle(file);
 }
 
-static IOPFileHandle_t *FNAME(open_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(open_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
     FILE *file = fopen(pathname, "a+");
     if (!file) return 0;
     return make_file_handle(file);
 }
 
-static int FNAME(close_file)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     int retval;
     FHNDL *fh = (FHNDL*) _fh;
@@ -72,9 +72,9 @@ static int register_this_interface()
 {
     unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
     if (strlen(iface_name) >= MAX_IFACE_NAME)
-        IOP_ERROR(("interface name \"%s\" too long",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
     if (iface_map[id].slotUsed!= 0)
-        IOP_ERROR(("hash collision for interface name \"%s\"",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
 
     /* Take this slot in the map */
     iface_map[id].slotUsed = 1;

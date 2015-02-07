@@ -10,6 +10,11 @@ else
 include $(CONFIG_SITE_FILE)
 endif
 
+JSON_C_INC=../json-c/install/include
+JSON_C_LIB=../json-c/install/lib
+JSON_C_LDFLAGS=-ljson-c
+DRIVER_INCS += -I$(JSON_C_INC)
+
 SILO_INC=$(SILO_HOME)/include
 SILO_LIB=$(SILO_HOME)/lib
 SILO_LDFLAGS=-lsiloh5
@@ -25,21 +30,21 @@ HDF5_LDFLAGS=-lhdf5
 
 # Typically, only for linking w/HDF5
 
-
 #CFLAGS=-DPARALLEL
 #CC=mpixlc
 #LINK=mpixlcxx
 
 CFLAGS += -g
 CXX ?= g++
+CC ?= gcc
 LINK ?= g++
 
 COMMON_SRC = options.c ifacemap.c util.c timing.c log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
-BASIC_SRC = ioperf.c
-BASIC_HDR=$(BASIC_SRC:.c=.h)
+BASIC_SRC = macsio_main.c
+BASIC_HDR= macsio.h
 BASIC_OBJ=$(BASIC_SRC:.c=.o)
 
 # Unix stdio and sec2 drivers always present
@@ -54,7 +59,7 @@ TEST_OBJ=$(TEST_SRC:.c=.o)
 # as it can have dependencies on HDF5
 ifeq ($(SILO_HOME),)
 else
-DRIVER_SRC += ioperf_silo.c ioperf_pdbl.c
+DRIVER_SRC += macsio_silo.c ioperf_pdbl.c
 CFLAGS += -DHAVE_SILO
 DRIVER_INCS += -I$(SILO_INC)
 DRIVER_LIBS += -L$(SILO_LIB) $(SILO_LDFLAGS)
@@ -63,7 +68,7 @@ endif
 
 ifeq ($(HDF5_HOME),)
 else
-DRIVER_SRC += ioperf_hdf5.c
+DRIVER_SRC += macsio_hdf5.c
 CFLAGS += -DHAVE_HDF5
 DRIVER_INCS += -I$(HDF5_INC)
 DRIVER_LIBS += -L$(HDF5_LIB) $(HDF5_LDFLAGS)
@@ -102,7 +107,7 @@ DRIVER_OBJ=$(DRIVER_SRC:.c=.o)
 .c.o:
 	$(CXX) $< -o $@ -c $(CFLAGS) -I. $(DRIVER_INCS) 
 
-all: tstopts ioperf
+all: ../json-c/install tsttiming tstlog tstopts macsio
 
 help:
 	@echo "Usage:"
@@ -111,9 +116,17 @@ help:
 	@echo "        for the host you are on, make should find it automatically."
 	@echo "    Use target 'all' to build everything (default)."
 	@echo "    Use target 'tstopts' to make test client for IOPoptlist_t testing."
-	@echo "    Use target 'ioperf' to build an executable with static plugins."
+	@echo "    Use target 'macsio' to build an executable with static plugins."
 	@echo "    Use target 'clean' to clean up objects and executables."
 
+../json-c/install:
+	cd ../json-c; \
+	gunzip < json-c-0.12-20140410b.tar.gz | tar xf -; \
+	mkdir build install; \
+	cd build; \
+	../json-c-0.12-20140410b/configure CC=$(CC) --prefix=`pwd`/../install; \
+        make install
+	
 tsttiming.o: tsttiming.c $(COMMON_HDR)
 
 tsttiming: tsttiming.o $(COMMON_OBJ)
@@ -132,11 +145,14 @@ tstlog: tstlog.o $(COMMON_OBJ)
 # the PDB Lite driver code is #included from PDB driver code
 ioperf_pdbl.o: ioperf_pdb.c
 
-ioperf.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
+macsio.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
-ioperf: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
+macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TST_OBJ)
-	rm -f ioperf tstopts *.dat gmon*.out tstopts.o tsttiming.o tsttiming tstlog tstlog.o
+	rm -f macsio tstopts *.dat gmon*.out tstopts.o tsttiming.o tsttiming tstlog tstlog.o
+
+allclean: clean
+	rm -rf ../json-c/{install,build,json-c-0.12-20140410b}

@@ -2,7 +2,7 @@
 #define _IFACEMAP_H
 
 #include <ifacemap.h>
-#include <ioperf.h>
+#include <macsio.h>
 
 #define MAX_IFACES 32
 #define MAX_IFACE_NAME 64
@@ -16,18 +16,18 @@ extern "C" {
  */
 
 /* Required methods */
-typedef int                     (*InitInterfaceFunc) (IOPoptlist_t const *opts);
-typedef struct IOPFileHandle_t* (*CreateFileFunc)   (char const *pathname, int flags, 
-    IOPoptlist_t const *moreopts);
-typedef struct IOPFileHandle_t* (*OpenFileFunc)     (char const *pathname, int flags,
-    IOPoptlist_t const *moreopts);
+typedef int                     (*InitInterfaceFunc) (MACSIO_optlist_t const *opts);
+typedef struct MACSIO_FileHandle_t* (*CreateFileFunc)   (char const *pathname, int flags, 
+    MACSIO_optlist_t const *moreopts);
+typedef struct MACSIO_FileHandle_t* (*OpenFileFunc)     (char const *pathname, int flags,
+    MACSIO_optlist_t const *moreopts);
 
 /* Optional methods */
-typedef IOPoptlist_t*           (*ProcessArgsFunc)  (int argi, int argc, char **argv);
-typedef IOPoptlist_t*           (*QueryFeaturesFunc)(void);
-typedef int                     (*IdentifyFileFunc) (char const *pathname, IOPoptlist_t const *moreopts);
+typedef MACSIO_optlist_t*           (*ProcessArgsFunc)  (int argi, int argc, char **argv);
+typedef MACSIO_optlist_t*           (*QueryFeaturesFunc)(void);
+typedef int                     (*IdentifyFileFunc) (char const *pathname, MACSIO_optlist_t const *moreopts);
 
-typedef struct IOPIFaceHandle_t
+typedef struct MACSIO_IFaceHandle_t
 {   char                 name[MAX_IFACE_NAME];
     char                 ext[MAX_IFACE_NAME];
     int                  slotUsed;
@@ -37,7 +37,7 @@ typedef struct IOPIFaceHandle_t
     IdentifyFileFunc     identifyFileFunc;
     CreateFileFunc       createFileFunc;
     OpenFileFunc         openFileFunc;
-} IOPIFaceHandle_t;
+} MACSIO_IFaceHandle_t;
 
 /*
  *  Compile time knowledge of known interfaces is built up in
@@ -46,13 +46,13 @@ typedef struct IOPIFaceHandle_t
  *  initialization code (that gets executed before 'main') that
  *  initializes an entry (assuming one is available) in this array.
  */
-extern IOPIFaceHandle_t iface_map[MAX_IFACES];
+extern MACSIO_IFaceHandle_t iface_map[MAX_IFACES];
 
-extern void                IOPGetInterfaceIds(int *cnt, int **ids);
-extern int                 IOPGetInterfaceId(char const *name);
-extern char const         *IOPGetInterfaceName(int id);
-extern IOPIFaceHandle_t const *IOPGetInterfaceByName(char const *name);
-extern IOPIFaceHandle_t const *IOPGetInterfaceById(int id);
+extern void                MACSIO_GetInterfaceIds(int *cnt, int **ids);
+extern int                 MACSIO_GetInterfaceId(char const *name);
+extern char const         *MACSIO_GetInterfaceName(int id);
+extern MACSIO_IFaceHandle_t const *MACSIO_GetInterfaceByName(char const *name);
+extern MACSIO_IFaceHandle_t const *MACSIO_GetInterfaceById(int id);
 
 #ifdef __cplusplus
 }

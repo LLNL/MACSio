@@ -2,7 +2,7 @@
 #include <util.h>
 
 /* Ensure this object is initialized during static initializations */
-IOPIFaceHandle_t iface_map[MAX_IFACES] =
+MACSIO_IFaceHandle_t iface_map[MAX_IFACES] =
 {
     {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0},
     {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0},
@@ -14,7 +14,7 @@ IOPIFaceHandle_t iface_map[MAX_IFACES] =
     {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}, {"", 0, 0, 0, 0, 0, 0}
 };
 
-int IOPGetInterfaceId(char const *name)
+int MACSIO_GetInterfaceId(char const *name)
 {
     int i;
     for (i = 0; i < MAX_IFACES; i++)
@@ -26,14 +26,14 @@ int IOPGetInterfaceId(char const *name)
     return -1;
 }
 
-char const *IOPGetInterfaceName(int i)
+char const *MACSIO_GetInterfaceName(int i)
 {
     if (i < 0 || i >= MAX_IFACES || !iface_map[i].slotUsed)
         return "unknown";
     return iface_map[i].name;
 }
 
-void IOPGetInterfaceIds(int *cnt, int **ids)
+void MACSIO_GetInterfaceIds(int *cnt, int **ids)
 {
     int i, n, pass;
     for (pass = 0; pass < (ids?2:1); pass++)
@@ -54,16 +54,16 @@ void IOPGetInterfaceIds(int *cnt, int **ids)
     *cnt = n;
 }
 
-IOPIFaceHandle_t const *IOPGetInterfaceById(int i)
+MACSIO_IFaceHandle_t const *MACSIO_GetInterfaceById(int i)
 {
     if (i < 0 || i >= MAX_IFACES || !iface_map[i].slotUsed)
         return 0;
     return &iface_map[i];
 }
 
-IOPIFaceHandle_t const *IOPGetInterfaceByName(char const *name)
+MACSIO_IFaceHandle_t const *MACSIO_GetInterfaceByName(char const *name)
 {
-    int id = IOPGetInterfaceId(name);
+    int id = MACSIO_GetInterfaceId(name);
     if (id < 0) return 0;
-    return IOPGetInterfaceById(id);
+    return MACSIO_GetInterfaceById(id);
 }

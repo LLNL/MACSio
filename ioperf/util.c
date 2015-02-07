@@ -17,7 +17,7 @@ typedef struct _knownArgInfo {
    char *paramTypes;		/* the string of parameter conversion specification characters */
    void **paramPtrs;		/* an array of pointers to caller-supplied scalar variables to be assigned */
    struct _knownArgInfo *next;	/* pointer to the next comand line argument */
-} IOP_KnownArgInfo_t;
+} MACSIO_KnownArgInfo_t;
 
 static int GetSizeFromModifierChar(char c)
 {
@@ -98,7 +98,7 @@ unsigned int bjhash(const unsigned char *k, unsigned int length, unsigned int in
    return c;
 }
 
-/* really just an internal function called via IOP_ERROR macro */
+/* really just an internal function called via MACSIO_ERROR macro */
 char const *
 _iop_errmsg(const char *format, /* A printf-like error message. */
             ...                 /* Variable length debugging info specified by
@@ -133,7 +133,7 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
  * Description:	This routine is designed to do parsing of simple command-line arguments and assign values associated with
  *		them to caller-supplied scalar variables. It is used in the following manner.
  *
- *		   IOP_ProccessCommandLine(argc, argv,
+ *		   MACSIO_ProccessCommandLine(argc, argv,
  *		      "-multifile",
  *		         "if specified, use a file-per-timestep",
  *		         &doMultifile,
@@ -143,7 +143,7 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
  *		      "-dims %d %f %d %f",
  *		         "specify size (logical and geometric) of mesh",
  *		         &Ni, &Xi, &Nj, &Xj
- *		      IOP_END_OF_ARGS);
+ *		      MACSIO_END_OF_ARGS);
  *
  *		After the argc,argv arguments, the remaining arguments come in groups of 3. The first of the three is a
  *		argument format specifier much like a printf statement. It indicates the type of each parameter to the
@@ -164,13 +164,13 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
  * Parallel:    This function must be called collectively in MPI_COMM_WORLD. Parallel and serial behavior is identical except in
  *		the
  *
- * Return:	IOP_ARGV_OK, IOP_ARGV_ERROR or IOP_ARGV_HELP
+ * Return:	MACSIO_ARGV_OK, MACSIO_ARGV_ERROR or MACSIO_ARGV_HELP
  *
  * Programmer:	Mark Miller, LLNL, Thu Dec 19, 2001 
  *---------------------------------------------------------------------------------------------------------------------------------
  */
 int
-IOPProcessCommandLine(
+MACSIO_ProcessCommandLine(
    int unknownArgsFlag, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
    int argi,            /* first arg index to start processing at */
    int argc,		/* argc from main */
@@ -186,15 +186,15 @@ IOPProcessCommandLine(
    int invalidArgTypeFound = 0;
    int firstArg;
    int terminalWidth = 80 - 10;
-   IOP_KnownArgInfo_t *knownArgs;
+   MACSIO_KnownArgInfo_t *knownArgs;
    va_list ap;
 
 #ifdef HAVE_PARALLEL
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         IOP_ERROR("MPI is not initialized", unknownArgsFlag);
-         return IOP_ARGV_ERROR;
+         MACSIO_ERROR("MPI is not initialized", unknownArgsFlag);
+         return MACSIO_ARGV_ERROR;
       }
    }
    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -231,13 +231,13 @@ IOPProcessCommandLine(
       int n, paramCount, argNameLength;
       char *fmtStr, *helpStr, *p, *paramTypes;
       void **paramPtrs;
-      IOP_KnownArgInfo_t *newArg, *oldArg;
+      MACSIO_KnownArgInfo_t *newArg, *oldArg;
 
       /* get this arg's format specifier string */
       fmtStr = va_arg(ap, char *);
 
       /* check to see if we're done */
-      if (!strcmp(fmtStr, IOP_END_OF_ARGS))
+      if (!strcmp(fmtStr, MACSIO_END_OF_ARGS))
 	 break;
 
       /* get this arg's help string */
@@ -331,7 +331,7 @@ IOPProcessCommandLine(
       }
 
       /* ok, we're done with this parameter, so plug it into the paramInfo array */
-      newArg = (IOP_KnownArgInfo_t *) malloc(sizeof(IOP_KnownArgInfo_t));
+      newArg = (MACSIO_KnownArgInfo_t *) malloc(sizeof(MACSIO_KnownArgInfo_t));
       newArg->helpStr = helpStr;
       newArg->fmtStr = fmtStr;
       newArg->argNameLength = argNameLength;
@@ -357,14 +357,14 @@ IOPProcessCommandLine(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          IOP_ERROR(("invalid argument type encountered at position %d",invalidArgTypeFound), unknownArgsFlag);
+          MACSIO_ERROR(("invalid argument type encountered at position %d",invalidArgTypeFound), unknownArgsFlag);
 #warning FIX WARN FAILURE BEHAVIOR HERE
-      return IOP_ARGV_ERROR;
+      return MACSIO_ARGV_ERROR;
    }
 
    /* exit if help was requested */
    if (helpWasRequested)
-      return IOP_ARGV_HELP;
+      return MACSIO_ARGV_HELP;
 
    /* ok, now broadcast the whole argc, argv data */ 
 #ifdef HAVE_PARALLEL
@@ -376,8 +376,8 @@ IOPProcessCommandLine(
       if (rank == 0)
       {
 
-	 if (getenv("IOP_IGNORE_UNKNOWN_ARGS"))
-	    unknownArgsFlag = IOP_WARN;
+	 if (getenv("MACSIO_IGNORE_UNKNOWN_ARGS"))
+	    unknownArgsFlag = MACSIO_WARN;
 
          /* compute size of argv */
          argvLen = 0;
@@ -425,7 +425,7 @@ IOPProcessCommandLine(
    while (i < argc)
    {
       int foundArg;
-      IOP_KnownArgInfo_t *p;
+      MACSIO_KnownArgInfo_t *p;
 
       /* search known arguments for this command line argument */
       p = knownArgs;
@@ -447,7 +447,7 @@ IOPProcessCommandLine(
 	    for (j = 0; j < p->paramCount; j++)
 	    {
                if (i == argc - 1)
-                   IOP_ERROR(("too few arguments for command-line options"),IOP_FATAL);
+                   MACSIO_ERROR(("too few arguments for command-line options"),MACSIO_FATAL);
 	       switch (p->paramTypes[j])
 	       {
 	          case 'd':
@@ -461,7 +461,7 @@ IOPProcessCommandLine(
                      tmpDbl = tmpInt * n;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         IOP_ERROR(("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]), unknownArgsFlag);
+                         MACSIO_ERROR(("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]), unknownArgsFlag);
                      }
                      else
                      {
@@ -510,8 +510,8 @@ IOPProcessCommandLine(
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
-             IOP_ERROR(("%s: unknown argument %s. Type %s --help for help",p,argv[i],p), unknownArgsFlag);
-         return IOP_ARGV_ERROR; 
+             MACSIO_ERROR(("%s: unknown argument %s. Type %s --help for help",p,argv[i],p), unknownArgsFlag);
+         return MACSIO_ARGV_ERROR; 
       }
 
       /* move to next argument */
@@ -529,7 +529,7 @@ IOPProcessCommandLine(
    /* free the known args stuff */
    while (knownArgs)
    {
-      IOP_KnownArgInfo_t *next = knownArgs->next;
+      MACSIO_KnownArgInfo_t *next = knownArgs->next;
 
       if (knownArgs->paramTypes)
          free(knownArgs->paramTypes);
@@ -539,5 +539,5 @@ IOPProcessCommandLine(
       knownArgs = next;
    }
 
-   return IOP_ARGV_OK;
+   return MACSIO_ARGV_OK;
 }

@@ -2,7 +2,7 @@
 #include <string>
 
 #include <ifacemap.h>
-#include <ioperf.h>
+#include <macsio.h>
 #include <options.h>
 #include <util.h>
 
@@ -22,7 +22,7 @@
 #include <errno.h>
 
 /* convenient name mapping macors */
-#define FHNDL2(A) IOPFileHandle_ ## A ## _t
+#define FHNDL2(A) MACSIO_FileHandle_ ## A ## _t
 #define FHNDL FHNDL2(hdf5)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,hdf5)
@@ -34,14 +34,14 @@ using std::string;
 
 typedef struct UnsyncedArrayInfo_t
 {
-    char absname[IOP_MAX_ABSNAME];
+    char absname[MACSIO_MAX_ABSNAME];
     int type;
     int dims[4];
 } UnsyncedArrayInfo_t;
 
 typedef struct PendingArrayInfo_t
 {
-    char absname[IOP_MAX_ABSNAME];
+    char absname[MACSIO_MAX_ABSNAME];
     int starts[4];
     int counts[4];
     int strides[4];
@@ -51,7 +51,7 @@ typedef struct PendingArrayInfo_t
 /* The driver's file handle "inherits" from the public handle */
 typedef struct FHNDL
 {
-    IOPFileHandlePublic_t pub;
+    MACSIO_FileHandlePublic_t pub;
     hid_t fid;
     int file_in_sync_with_procs;
     int procs_in_sync_with_procs;
@@ -76,36 +76,36 @@ static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
 
-static int FNAME(close_file)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
-static int FNAME(sync_meta)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
-static int FNAME(sync_data)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
-static int FNAME(create_ns)(struct IOPFileHandle_t *fh, char const *nsname, IOPoptlist_t const *moreopts);
-static char const *FNAME(set_ns)(struct IOPFileHandle_t *fh, char const *nsname, IOPoptlist_t const *moreopts);
-static char const *FNAME(get_ns)(struct IOPFileHandle_t *fh, IOPoptlist_t const *moreopts);
-static int FNAME(define_array)(IOPFileHandle_t *fh, char const *arrname, int type,
-    int const dims[4], IOPoptlist_t const *moreopts);
-static int FNAME(get_array_info)(IOPFileHandle_t *fh, char const *arrname,
-    int *type, int *dims[4], IOPoptlist_t const *moreopts);
-static int FNAME(define_array_part)(IOPFileHandle_t *fh, char const *arrname,
-    int const starts[4], int const counts[4], int strides[4], void **buf, IOPoptlist_t const *moreopts);
-static int FNAME(start_pending_arrays)(IOPFileHandle_t *fh);
-static int FNAME(finish_pending_arrays)(IOPFileHandle_t *fh);
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
+static int FNAME(sync_meta)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
+static int FNAME(sync_data)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
+static int FNAME(create_ns)(struct MACSIO_FileHandle_t *fh, char const *nsname, MACSIO_optlist_t const *moreopts);
+static char const *FNAME(set_ns)(struct MACSIO_FileHandle_t *fh, char const *nsname, MACSIO_optlist_t const *moreopts);
+static char const *FNAME(get_ns)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
+static int FNAME(define_array)(MACSIO_FileHandle_t *fh, char const *arrname, int type,
+    int const dims[4], MACSIO_optlist_t const *moreopts);
+static int FNAME(get_array_info)(MACSIO_FileHandle_t *fh, char const *arrname,
+    int *type, int *dims[4], MACSIO_optlist_t const *moreopts);
+static int FNAME(define_array_part)(MACSIO_FileHandle_t *fh, char const *arrname,
+    int const starts[4], int const counts[4], int strides[4], void **buf, MACSIO_optlist_t const *moreopts);
+static int FNAME(start_pending_arrays)(MACSIO_FileHandle_t *fh);
+static int FNAME(finish_pending_arrays)(MACSIO_FileHandle_t *fh);
 
 static char *copy_absname2(char *dst, char const *src)
 {
     char *retval;
-    if (strlen(src) + 1 > IOP_MAX_ABSNAME)
-        IOP_ERROR(("name \"%s\" too long", src), IOP_FATAL);
-    retval = strncpy(dst, src, IOP_MAX_ABSNAME);
-    dst[IOP_MAX_ABSNAME-1] = '\0';
+    if (strlen(src) + 1 > MACSIO_MAX_ABSNAME)
+        MACSIO_ERROR(("name \"%s\" too long", src), MACSIO_FATAL);
+    retval = strncpy(dst, src, MACSIO_MAX_ABSNAME);
+    dst[MACSIO_MAX_ABSNAME-1] = '\0';
     return retval;
 }
 
 static char *form_and_copy_absname(char *dst, char const *src, char const *dir)
 {
-    if (strlen(src) + strlen(dir) + 1 + 1 > IOP_MAX_ABSNAME)
-        IOP_ERROR(("attempt to form absolute name \"%s/%s\" too long", src, dir), IOP_FATAL);
-    strncpy(dst, dir, IOP_MAX_ABSNAME);
+    if (strlen(src) + strlen(dir) + 1 + 1 > MACSIO_MAX_ABSNAME)
+        MACSIO_ERROR(("attempt to form absolute name \"%s/%s\" too long", src, dir), MACSIO_FATAL);
+    strncpy(dst, dir, MACSIO_MAX_ABSNAME);
     strcat(dst, "/");
     return strcat(dst, src);
 }
@@ -118,7 +118,7 @@ static char *copy_absname(char *dst, char const *src, char const *dir)
         return form_and_copy_absname(dst, src, dir);
 }
 
-static IOPFileHandle_t *make_file_handle(hid_t fid)
+static MACSIO_FileHandle_t *make_file_handle(hid_t fid)
 {
     FHNDL *retval;
     retval = (FHNDL*) calloc(1,sizeof(FHNDL));
@@ -144,7 +144,7 @@ static IOPFileHandle_t *make_file_handle(hid_t fid)
     retval->pub.finishPendingArraysFunc = FNAME(finish_pending_arrays);
 #endif
     
-    return (IOPFileHandle_t*) retval;
+    return (MACSIO_FileHandle_t*) retval;
 }
 
 static hid_t make_fapl()
@@ -177,7 +177,7 @@ static hid_t make_fapl()
         if (lbuf_size > 0)
             flags = H5FD_LOG_ALL;
 
-        h5status |= H5Pset_fapl_log(fapl_id, "ioperf_hdf5_log.out", flags, lbuf_size);
+        h5status |= H5Pset_fapl_log(fapl_id, "macsio_hdf5_log.out", flags, lbuf_size);
     }
 
     if (h5status < 0)
@@ -190,7 +190,7 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
-static IOPFileHandle_t *FNAME(create_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(create_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
     hid_t fapl_id, fid;
     fapl_id = make_fapl();
@@ -200,7 +200,7 @@ static IOPFileHandle_t *FNAME(create_file)(char const *pathname, int flags, IOPo
     return make_file_handle(fid);
 }
 
-static IOPFileHandle_t *FNAME(open_file)(char const *pathname, int flags, IOPoptlist_t const *opts)
+static MACSIO_FileHandle_t *FNAME(open_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
 {
     hid_t fapl_id, fid;
     fapl_id = make_fapl();
@@ -210,7 +210,7 @@ static IOPFileHandle_t *FNAME(open_file)(char const *pathname, int flags, IOPopt
     return make_file_handle(fid);
 }
 
-static int FNAME(close_file)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     int retval;
     FHNDL *fh = (FHNDL*) _fh;
@@ -221,7 +221,7 @@ static int FNAME(close_file)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *mo
     return retval;
 }
 
-static int FNAME(sync_meta)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static int FNAME(sync_meta)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     /* We need to sync all processor's view of the file's groups and datasets */
     FHNDL *fh = (FHNDL*) _fh;
@@ -240,14 +240,14 @@ static int FNAME(sync_meta)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *mor
     return 0;
 }
 
-static int FNAME(sync_data)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static int FNAME(sync_data)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     int retval = 0;
     FHNDL *fh = (FHNDL*) _fh;
     return H5Fflush(fh->fid, H5F_SCOPE_GLOBAL) < 0 ? 1 : 0;
 }
 
-static int FNAME(create_ns)(struct IOPFileHandle_t *_fh, char const *nsname, IOPoptlist_t const *moreopts)
+static int FNAME(create_ns)(struct MACSIO_FileHandle_t *_fh, char const *nsname, MACSIO_optlist_t const *moreopts)
 {
     /* We don't actually do the H5Gcreate here. We only log the request for it.
      * We create it when we 'sync_file_meta'. */
@@ -257,7 +257,7 @@ static int FNAME(create_ns)(struct IOPFileHandle_t *_fh, char const *nsname, IOP
     return 0;
 }
 
-static char const *FNAME(set_ns)(struct IOPFileHandle_t *_fh, char const *nsname, IOPoptlist_t const *moreopts)
+static char const *FNAME(set_ns)(struct MACSIO_FileHandle_t *_fh, char const *nsname, MACSIO_optlist_t const *moreopts)
 {
     char const *retval;
     FHNDL *fh = (FHNDL*) _fh;
@@ -269,15 +269,15 @@ static char const *FNAME(set_ns)(struct IOPFileHandle_t *_fh, char const *nsname
     return retval;
 }
 
-static char const *FNAME(get_ns)(struct IOPFileHandle_t *_fh, IOPoptlist_t const *moreopts)
+static char const *FNAME(get_ns)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
 {
     int retval;
     FHNDL *fh = (FHNDL*) _fh;
     return fh->cwgAbsPath.c_str();
 }
 
-static int FNAME(define_array)(IOPFileHandle_t *_fh, char const *arrname, int type,
-    int const dims[4], IOPoptlist_t const *moreopts)
+static int FNAME(define_array)(MACSIO_FileHandle_t *_fh, char const *arrname, int type,
+    int const dims[4], MACSIO_optlist_t const *moreopts)
 {
     /* Again, we don't actually do the H5Dcreate here. We only log the request for it.
      * We create it when we 'sync_file_meta'. */
@@ -294,8 +294,8 @@ static int FNAME(define_array)(IOPFileHandle_t *_fh, char const *arrname, int ty
     return 0;
 }
 
-static int FNAME(get_array_info)(IOPFileHandle_t *_fh, char const *arrname,
-    int *type, int *dims[4], IOPoptlist_t const *moreopts)
+static int FNAME(get_array_info)(MACSIO_FileHandle_t *_fh, char const *arrname,
+    int *type, int *dims[4], MACSIO_optlist_t const *moreopts)
 {
     /* Not yet implemented */
     *type = 0;
@@ -306,8 +306,8 @@ static int FNAME(get_array_info)(IOPFileHandle_t *_fh, char const *arrname,
     return -1;
 }
 
-static int FNAME(define_array_part)(IOPFileHandle_t *_fh, char const *arrname,
-    int const starts[4], int const counts[4], int strides[4], void **buf, IOPoptlist_t const *moreopts)
+static int FNAME(define_array_part)(MACSIO_FileHandle_t *_fh, char const *arrname,
+    int const starts[4], int const counts[4], int strides[4], void **buf, MACSIO_optlist_t const *moreopts)
 {
     /* Again, we don't actually do the H5Dcreate here. We only log the request for it.
      * We create it when we 'sync_file_meta'. */
@@ -333,22 +333,22 @@ static int FNAME(define_array_part)(IOPFileHandle_t *_fh, char const *arrname,
     return 0;
 }
 
-static int FNAME(start_pending_arrays)(IOPFileHandle_t *_fh)
+static int FNAME(start_pending_arrays)(MACSIO_FileHandle_t *_fh)
 {
     /* without the async. i/o engine, HDF5 is blocking. So, we make this a no-op */
     return 0;
 }
 
-static int FNAME(finish_pending_arrays)(IOPFileHandle_t *_fh)
+static int FNAME(finish_pending_arrays)(MACSIO_FileHandle_t *_fh)
 {
     /* Here is where we actually do all the pending I/O operations */
     return 0;
 }
 
-static IOPoptlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
+static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const int unknownArgsFlag = IOP_WARN;
-    IOPProcessCommandLine(unknownArgsFlag, argi, argc, argv,
+    const int unknownArgsFlag = MACSIO_WARN;
+    MACSIO_ProcessCommandLine(unknownArgsFlag, argi, argc, argv,
         "--sieve-buf-size %d",
             "Specify sieve buffer size (see H5Pset_sieve_buf_size)",
             &sbuf_size,
@@ -366,7 +366,7 @@ static IOPoptlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
             "Use Silo's block-based VFD and specify block size and block count", 
             &silo_block_size, &silo_block_count,
 #endif
-           IOP_END_OF_ARGS);
+           MACSIO_END_OF_ARGS);
     return 0;
 }
 
@@ -374,9 +374,9 @@ static int register_this_interface()
 {
     unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
     if (strlen(iface_name) >= MAX_IFACE_NAME)
-        IOP_ERROR(("interface name \"%s\" too long",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
     if (iface_map[id].slotUsed!= 0)
-        IOP_ERROR(("hash collision for interface name \"%s\"",iface_name) , IOP_FATAL);
+        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
 
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 

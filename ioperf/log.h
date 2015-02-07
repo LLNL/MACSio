@@ -9,7 +9,7 @@ typedef int MPI_Comm;
 
 #include <stdio.h>
 
-typedef struct IOPLogHandle_t
+typedef struct MACSIO_LogHandle_t
 {
     int logfile;
     int rank;
@@ -17,10 +17,10 @@ typedef struct IOPLogHandle_t
     int log_line_length;
     int lines_per_proc;
     int current_line;
-} IOPLogHandle_t;
+} MACSIO_LogHandle_t;
 
-extern IOPLogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int lines_per_proc);
-extern void Log(IOPLogHandle_t *log, char const *msg);
-extern void Log_Finalize(IOPLogHandle_t *log);
+extern MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int lines_per_proc);
+extern void Log(MACSIO_LogHandle_t *log, char const *msg);
+extern void Log_Finalize(MACSIO_LogHandle_t *log);
 
 #endif /* _LOG_H */

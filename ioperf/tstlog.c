@@ -7,7 +7,7 @@
 int main (int argc, char **argv)
 {
     int rank=0, size=1;
-    IOPLogHandle_t *log;
+    MACSIO_LogHandle_t *log;
 
 #ifdef PARALLEL
     MPI_Init(&argc, &argv);

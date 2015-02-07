@@ -3,23 +3,23 @@
 
 #include <stdio.h>
 
-typedef int IOPTimerId_t;
+typedef int MACSIO_TimerId_t;
 
-typedef enum IOPioop_t
+typedef enum MACSIO_ioop_t
 {
     TEST_TIMERS,
     FILE_CREATE,
     FILE_OPEN,
     FILE_CLOSE
     /* need to add more op tags here */
-} IOPioop_t;
+} MACSIO_ioop_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern IOPTimerId_t StartTimer();
-extern double StopTimer(IOPTimerId_t id, IOPioop_t op, char const *blockName);
+extern MACSIO_TimerId_t StartTimer();
+extern double StopTimer(MACSIO_TimerId_t id, MACSIO_ioop_t op, char const *blockName);
 extern void DumpTimings(FILE *f);
 
 #ifdef __cplusplus

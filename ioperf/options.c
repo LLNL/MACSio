@@ -8,17 +8,17 @@
 #include <util.h>
 #include <options.h>
 
-IOPoptlist_t *IOPMakeOptlist()
+MACSIO_optlist_t *MACSIO_MakeOptlist()
 {
-    IOPoptlist_t *optlist = 0;
+    MACSIO_optlist_t *optlist = 0;
     const int maxopts = 100;
 
-    if (0 == (optlist = ALLOC(IOPoptlist_t)))
-        IOP_ERROR(("optlist alloc failed"), IOP_FATAL);
-    if (0 == (optlist->options = ALLOC_N(IOPoptid_t, maxopts)))
-        IOP_ERROR(("optlist alloc failed"), IOP_FATAL);
+    if (0 == (optlist = ALLOC(MACSIO_optlist_t)))
+        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
+    if (0 == (optlist->options = ALLOC_N(MACSIO_optid_t, maxopts)))
+        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
     if (0 == (optlist->values = ALLOC_N(void *, maxopts)))
-        IOP_ERROR(("optlist alloc failed"), IOP_FATAL);
+        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
 
     optlist->numopts = 0;
     optlist->maxopts = maxopts;
@@ -26,28 +26,28 @@ IOPoptlist_t *IOPMakeOptlist()
     return optlist;
 }
 
-int IOPFreeOptlist(IOPoptlist_t *optlist)
+int MACSIO_FreeOptlist(MACSIO_optlist_t *optlist)
 {
     int i;
     if (!optlist)
     {
-        IOP_ERROR(("bad IOPoptlist_t pointer"), IOP_WARN);
+        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
-    IOPClearOptlist(optlist);
+    MACSIO_ClearOptlist(optlist);
     FREE(optlist->options);
     FREE(optlist->values);
     FREE(optlist);
     return 0;
 }
 
-int IOPClearOption(IOPoptlist_t *optlist, IOPoptid_t option)
+int MACSIO_ClearOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option)
 {
     int i, j, foundit=0;
 
     if (!optlist)
     {
-        IOP_ERROR(("bad IOPoptlist_t pointer"), IOP_WARN);
+        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
@@ -68,7 +68,7 @@ int IOPClearOption(IOPoptlist_t *optlist, IOPoptid_t option)
     }
 
     if (!foundit)
-        IOP_ERROR(("non-existent option specified"), IOP_WARN);
+        MACSIO_ERROR(("non-existent option specified"), MACSIO_WARN);
 
     optlist->numopts--;
     optlist->options[optlist->numopts] = OPTID_NOT_SET;
@@ -77,13 +77,13 @@ int IOPClearOption(IOPoptlist_t *optlist, IOPoptid_t option)
     return 0;
 }
 
-int IOPClearOptlist(IOPoptlist_t *optlist)
+int MACSIO_ClearOptlist(MACSIO_optlist_t *optlist)
 {
     int i;
 
     if (!optlist)
     {
-        IOP_ERROR(("bad IOPoptlist_t pointer"), IOP_WARN);
+        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
@@ -98,21 +98,21 @@ int IOPClearOptlist(IOPoptlist_t *optlist)
 }
 
 /* Option list owns memory after this call */
-int IOPAddOption(IOPoptlist_t *optlist, IOPoptid_t option, void *value)
+int MACSIO_AddOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, void *value)
 {
     if (!optlist)
     {
-        IOP_ERROR(("bad IOPoptlist_t pointer"), IOP_WARN);
+        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
     if (optlist->numopts >= optlist->maxopts)
     {
         int maxopts = 2*optlist->maxopts;
-        if (0 == (optlist->options = REALLOC_N(optlist->options,IOPoptid_t,maxopts)))
-            IOP_ERROR(("optlist realloc failed"), IOP_FATAL);
+        if (0 == (optlist->options = REALLOC_N(optlist->options,MACSIO_optid_t,maxopts)))
+            MACSIO_ERROR(("optlist realloc failed"), MACSIO_FATAL);
         if (0 == (optlist->values = REALLOC_N(optlist->values, void *,maxopts)))
-            IOP_ERROR(("optlist realloc failed"), IOP_FATAL);
+            MACSIO_ERROR(("optlist realloc failed"), MACSIO_FATAL);
         optlist->maxopts = maxopts;
     }
 
@@ -123,76 +123,76 @@ int IOPAddOption(IOPoptlist_t *optlist, IOPoptid_t option, void *value)
     return 0;
 }
 
-int IOPAddIntOption(IOPoptlist_t *optlist, IOPoptid_t option, int value)
+int MACSIO_AddIntOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, int value)
 {
     int *p = ALLOC(int);
     *p = value;
-    return IOPAddOption(optlist, option, p);
+    return MACSIO_AddOption(optlist, option, p);
 }
 
-int IOPAddIntArrOption2(IOPoptlist_t *optlist, IOPoptid_t id, IOPoptid_t sid, int const * values, int nvalues)
+int MACSIO_AddIntArrOption2(MACSIO_optlist_t *optlist, MACSIO_optid_t id, MACSIO_optid_t sid, int const * values, int nvalues)
 {
     int *p = ALLOC_N(int,nvalues);
-    IOPAddIntOption(optlist, sid, nvalues);
+    MACSIO_AddIntOption(optlist, sid, nvalues);
     memcpy(p, values, sizeof(int)*nvalues);
-    return IOPAddOption(optlist, id, p);
+    return MACSIO_AddOption(optlist, id, p);
 }
 
-int IOPGetIntOption(IOPoptlist_t const *optlist, IOPoptid_t option)
+int MACSIO_GetIntOption(MACSIO_optlist_t const *optlist, MACSIO_optid_t option)
 {
-    void const *p = IOPGetOption(optlist, option);
+    void const *p = MACSIO_GetOption(optlist, option);
     if (p) return *((int*)p);
     return -INT_MAX;
 }
 
-int const *IOPGetIntArrOption(IOPoptlist_t const *optlist, IOPoptid_t option)
+int const *MACSIO_GetIntArrOption(MACSIO_optlist_t const *optlist, MACSIO_optid_t option)
 {
-    void const *p = IOPGetOption(optlist, option);
+    void const *p = MACSIO_GetOption(optlist, option);
     return (int *) p;
 }
 
-int IOPAddDblOption(IOPoptlist_t *optlist, IOPoptid_t option, double value)
+int MACSIO_AddDblOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, double value)
 {
     double *p = ALLOC(double);
     *p = value;
-    return IOPAddOption(optlist, option, p);
+    return MACSIO_AddOption(optlist, option, p);
 }
 
-int IOPAddDblArrOption2(IOPoptlist_t *optlist, IOPoptid_t id, IOPoptid_t sid, double const * values, int nvalues)
+int MACSIO_AddDblArrOption2(MACSIO_optlist_t *optlist, MACSIO_optid_t id, MACSIO_optid_t sid, double const * values, int nvalues)
 {
     double *p = ALLOC_N(double,nvalues);
-    IOPAddIntOption(optlist, sid, nvalues);
+    MACSIO_AddIntOption(optlist, sid, nvalues);
     memcpy(p, values, sizeof(double)*nvalues);
-    return IOPAddOption(optlist, id, p);
+    return MACSIO_AddOption(optlist, id, p);
 }
 
-double IOPGetDblOption(IOPoptlist_t const *optlist, IOPoptid_t option)
+double MACSIO_GetDblOption(MACSIO_optlist_t const *optlist, MACSIO_optid_t option)
 {
-    void const *p = IOPGetOption(optlist, option);
+    void const *p = MACSIO_GetOption(optlist, option);
     if (p) return *((double*)p);
     return -DBL_MAX;
 }
 
-double const *IOPGetDblArrOption(IOPoptlist_t const *optlist, IOPoptid_t option)
+double const *MACSIO_GetDblArrOption(MACSIO_optlist_t const *optlist, MACSIO_optid_t option)
 {
-    void const *p = IOPGetOption(optlist, option);
+    void const *p = MACSIO_GetOption(optlist, option);
     return (double *) p;
 }
 
-int IOPAddStrOption(IOPoptlist_t *optlist, IOPoptid_t option, char const *value)
+int MACSIO_AddStrOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, char const *value)
 {
     char *p = ALLOC_N(char,strlen(value)+1);
     strcpy(p, value);
-    return IOPAddOption(optlist, option, p);
+    return MACSIO_AddOption(optlist, option, p);
 }
 
-char const *IOPGetStrOption(IOPoptlist_t const *optlist, IOPoptid_t option)
+char const *MACSIO_GetStrOption(MACSIO_optlist_t const *optlist, MACSIO_optid_t option)
 {
-    void const *p = IOPGetOption(optlist, option);
+    void const *p = MACSIO_GetOption(optlist, option);
     return (char const *) p;
 }
 
-void const *IOPGetOption(const IOPoptlist_t *optlist, IOPoptid_t option)
+void const *MACSIO_GetOption(const MACSIO_optlist_t *optlist, MACSIO_optid_t option)
 {
     int i;
 
@@ -206,7 +206,7 @@ void const *IOPGetOption(const IOPoptlist_t *optlist, IOPoptid_t option)
     return 0;
 }
 
-void *IOPGetMutableOption(const IOPoptlist_t *optlist, IOPoptid_t option)
+void *MACSIO_GetMutableOption(const MACSIO_optlist_t *optlist, MACSIO_optid_t option)
 {
     int i;
 
@@ -220,7 +220,7 @@ void *IOPGetMutableOption(const IOPoptlist_t *optlist, IOPoptid_t option)
     return 0;
 }
 
-void *IOPGetMutableArrOption(const IOPoptlist_t *optlist, IOPoptid_t option)
+void *MACSIO_GetMutableArrOption(const MACSIO_optlist_t *optlist, MACSIO_optid_t option)
 {
     int i;
 

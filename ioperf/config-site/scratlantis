@@ -1,5 +1,6 @@
 SILO_HOME=/Users/miller86/installs/silo/4.9.1/i686-apple-darwin11-llvm-gcc-4.2
 HDF5_HOME=/Users/miller86/installs/hdf5/1.8.10-patch1/i686-apple-darwin11-llvm-gcc-4.2
 CXX=/Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicxx
+CC=/Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicc
 CFLAGS=-DPARALLEL
 LINK=$(CXX)
