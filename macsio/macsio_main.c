@@ -71,11 +71,16 @@ static void handle_list_request_and_exit()
 
 static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, MACSIO_optlist_t *opts)
 {
-    const int unknownArgsFlag = MACSIO_WARN;
+    MACSIO_ArgvFlags_t argFlags;
     int plugin_args_start = -1;
     int cl_result;
 
-    cl_result = MACSIO_ProcessCommandLine(unknownArgsFlag, 1, argc, argv,
+    /* Why two nearly identical blocks? Using each to test two different modes for
+       the ProcessCommandLine utility */
+#if 0
+    argFlags.error_mode = MACSIO_WARN;
+    argFlags.route_mode = MACSIO_ARGV_TOMEM;
+    cl_result = MACSIO_ProcessCommandLine(0, argFlags, 1, argc, argv,
         "--interface %s",
             "Specify the name of the interface to be tested. Use keyword 'list' "
             "to print a list of all known interfaces and then exit",
@@ -133,6 +138,59 @@ static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, MACSIO_
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
             &plugin_args_start,
     MACSIO_END_OF_ARGS);
+#else
+    json_object *json_args = json_object_new_object();
+    argFlags.error_mode = MACSIO_WARN;
+    argFlags.route_mode = MACSIO_ARGV_TOJSON;
+    cl_result = MACSIO_ProcessCommandLine((void**)&json_args, argFlags, 1, argc, argv,
+        "--interface %s",
+            "Specify the name of the interface to be tested. Use keyword 'list' "
+            "to print a list of all known interfaces and then exit",
+        "--parallel-file-mode %s %d",
+            "Specify the parallel file mode. There are several choices. "
+            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then "
+            "also specify the number of files. Or, use 'MIFMAX' for MIF mode and "
+            "one file per processor or 'MIFAUTO' for MIF mode and let the test "
+            "determine the optimum file count. Use 'SIF' for SIngle shared File "
+            "(Rich Man's) mode.",
+        "--part-size %d",
+            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character indicates 'B'ytes (2^0), "
+            "'K'ilobytes (2^10), 'M'egabytes (2^20) or 'G'igabytes (2^30). This is then the nominal I/O "
+            "request size emitted from each MPI rank. [1M]",
+        "--avg-num-parts %f",
+            "The average number of mesh parts per MPI rank. Non-integral values are acceptable. For example, "
+            "a value that is half-way between two integers, K and K+1, means that half the ranks have K "
+            "mesh parts and half have K+1 mesh parts. As another example, a value of 2.75 here would mean "
+            "that 75%% of the ranks get 3 parts and 25%% of the ranks get 2 parts. Note that the total "
+            "number of parts is the this number multiplied by the MPI communicator size. If the result of "
+            "that product is non-integral, it will be rounded and a warning message will be generated. [1]",
+        "--part-distribution %s",
+            "Specify how parts are distributed to MPI tasks. (currently ignored)",
+        "--vars-per-part %d",
+            "Number of mesh variable objects in each part. The smallest this can be depends on the mesh "
+            "type. For rectilinear mesh it is 1. For curvilinear mesh it is the number of spatial "
+            "dimensions and for unstructured mesh it is the number of spatial dimensions plus 2 * "
+            "number of topological dimensions. [50]",
+        "--num-dumps %d",
+            "Total number of dump requests to write or read [10]",
+        "--alignment %d",
+            "Align all I/O requests on boundaries that are a integral multiple "
+            "of this size",
+        "--filename %s",
+            "Specify sprintf-style string to indicate how file(s) should be named. If the "
+            "the file(s) already exists, they will be used in a read test. If the file(s) "
+            "do not exist, it/they will be generated in a write test. "
+            "Default is 'macsio-<iface>-<group#>.<ext>' where <group#> is the group number "
+            "(MIF modes) or absent (SIF mode), <iface> is the name of the interface and <ext> "
+            "is the canonical file extension for the given interface.",
+        "--print-details",
+            "Print detailed I/O performance data",
+        "--driver-args %n",
+            "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
+    MACSIO_END_OF_ARGS);
+    printf("eobj=%s\n", json_object_to_json_string(json_args));
+#endif
+
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_ARGV_HELP)

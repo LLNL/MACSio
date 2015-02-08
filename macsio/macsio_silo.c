@@ -278,7 +278,7 @@ static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t c
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const int unknownArgsFlag = MACSIO_WARN;
+    const MACSIO_ArgvFlags_t argFlags = {MACSIO_WARN, MACSIO_ARGV_TOMEM};
     char driver_str[128];
     char compression_str[512];
     int cksums = 0;
@@ -287,7 +287,7 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 
     strcpy(driver_str, "DB_HDF5");
     strcpy(compression_str, "");
-    MACSIO_ProcessCommandLine(unknownArgsFlag, argi, argc, argv,
+    MACSIO_ProcessCommandLine(0, argFlags, argi, argc, argv,
         "--driver %s",
             "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants) [DB_HDF5]",
             &driver_str,

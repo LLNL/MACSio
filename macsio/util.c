@@ -9,6 +9,8 @@
 #endif
 #include <util.h>
 
+#include <json-c/json.h>
+
 typedef struct _knownArgInfo {
    char *helpStr;		/* the help string for this command line argument */
    char *fmtStr;		/* format string for this command line argument */
@@ -171,7 +173,8 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
  */
 int
 MACSIO_ProcessCommandLine(
-   int unknownArgsFlag, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
+   void **retobj,       /* returned object (for cases that need it) */
+   MACSIO_ArgvFlags_t flags, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
    int argi,            /* first arg index to start processing at */
    int argc,		/* argc from main */
    char **argv,		/* argv from main */
@@ -179,7 +182,6 @@ MACSIO_ProcessCommandLine(
 			   3) caller-supplied scalar variables to set */
 )
 {
-
    char *argvStr = NULL;
    int i, rank = 0;
    int helpWasRequested = 0;
@@ -188,12 +190,13 @@ MACSIO_ProcessCommandLine(
    int terminalWidth = 80 - 10;
    MACSIO_KnownArgInfo_t *knownArgs;
    va_list ap;
+   json_object *ret_json_obj = 0;
 
 #ifdef HAVE_PARALLEL
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_ERROR("MPI is not initialized", unknownArgsFlag);
+         MACSIO_ERROR("MPI is not initialized", flags.error_mode);
          return MACSIO_ARGV_ERROR;
       }
    }
@@ -309,14 +312,17 @@ MACSIO_ProcessCommandLine(
 	    if (fmtStr[i] == '%' && fmtStr[i+1] != '%')
 	    {
 	       paramTypes[k] = fmtStr[i+1];
-	       switch (paramTypes[k])
-	       {
-	          case 'd': paramPtrs[k] = va_arg(ap, int *); break;
-	          case 's': paramPtrs[k] = va_arg(ap, char **); break;
-	          case 'f': paramPtrs[k] = va_arg(ap, double *); break;
-	          case 'n': paramPtrs[k] = va_arg(ap, int *); break;
-	          default:  invalidArgTypeFound = k+1; break;
-	       }
+               if (flags.route_mode == MACSIO_ARGV_TOMEM)
+               {
+	           switch (paramTypes[k])
+	           {
+	              case 'd': paramPtrs[k] = va_arg(ap, int *); break;
+	              case 's': paramPtrs[k] = va_arg(ap, char **); break;
+	              case 'f': paramPtrs[k] = va_arg(ap, double *); break;
+	              case 'n': paramPtrs[k] = va_arg(ap, int *); break;
+	              default:  invalidArgTypeFound = k+1; break;
+	           }
+               }
 	       k++;
 	    }
 	 }
@@ -327,7 +333,8 @@ MACSIO_ProcessCommandLine(
 	 argNameLength = n;
 	 paramTypes = NULL;
 	 paramPtrs = (void **) malloc (sizeof(void*));
-	 paramPtrs[0] = va_arg(ap, int *);
+         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+	     paramPtrs[0] = va_arg(ap, int *);
       }
 
       /* ok, we're done with this parameter, so plug it into the paramInfo array */
@@ -357,7 +364,7 @@ MACSIO_ProcessCommandLine(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          MACSIO_ERROR(("invalid argument type encountered at position %d",invalidArgTypeFound), unknownArgsFlag);
+          MACSIO_ERROR(("invalid argument type encountered at position %d",invalidArgTypeFound), flags.error_mode);
 #warning FIX WARN FAILURE BEHAVIOR HERE
       return MACSIO_ARGV_ERROR;
    }
@@ -375,9 +382,8 @@ MACSIO_ProcessCommandLine(
       /* processor zero computes size of linearized argv and builds it */
       if (rank == 0)
       {
-
 	 if (getenv("MACSIO_IGNORE_UNKNOWN_ARGS"))
-	    unknownArgsFlag = MACSIO_WARN;
+	    flags.error_mode = MACSIO_WARN;
 
          /* compute size of argv */
          argvLen = 0;
@@ -398,7 +404,7 @@ MACSIO_ProcessCommandLine(
       }
 
       /* now broadcast the linearized argv */
-      MPI_Bcast(&unknownArgsFlag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      MPI_Bcast(&flags, 1, MPI_INT, 0, MPI_COMM_WORLD);
       MPI_Bcast(&argc, 1, MPI_INT, 0, MPI_COMM_WORLD);
       MPI_Bcast(&argvLen, 1, MPI_INT, 0, MPI_COMM_WORLD);
       if (rank != 0)
@@ -421,6 +427,8 @@ MACSIO_ProcessCommandLine(
 #endif
 
    /* And now, finally, we can process the arguments and assign them */
+   if (flags.route_mode == MACSIO_ARGV_TOJSON)
+       ret_json_obj = json_object_new_object();
    i = argi;
    while (i < argc)
    {
@@ -461,38 +469,58 @@ MACSIO_ProcessCommandLine(
                      tmpDbl = tmpInt * n;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         MACSIO_ERROR(("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]), unknownArgsFlag);
+                         MACSIO_ERROR(("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]), flags.error_mode);
                      }
                      else
                      {
-                         *pInt = (int) tmpDbl;
+                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                             *pInt = (int) tmpDbl;
+                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_int((int)tmpDbl));
                      }
 		     break;
 	          }
 	          case 's':
 	          {
 		     char **pChar = (char **) (p->paramPtrs[j]);
-		     if (*pChar == NULL)
+		     if (pChar && *pChar == NULL)
 		     {
-		        *pChar = (char*) malloc(strlen(argv[++i]+1));
-		        strcpy(*pChar, argv[i]);
+                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                         {
+		             *pChar = (char*) malloc(strlen(argv[++i]+1));
+		             strcpy(*pChar, argv[i]);
+                         }
+                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         {
+                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_string(argv[i+1]));
+                             i++;
+                         }
 		     }
 		     else
                      {
-		        strcpy(*pChar, argv[++i]);
+                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+		             strcpy(*pChar, argv[++i]);
+                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_string(argv[++i]));
                      }
 		     break;
 	          }
 	          case 'f':
 	          {
 		     double *pDouble = (double *) (p->paramPtrs[j]);
-		     *pDouble = atof(argv[++i]);
+                     if (flags.route_mode == MACSIO_ARGV_TOMEM)
+		         *pDouble = atof(argv[++i]);
+                     else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         json_object_object_add(ret_json_obj, argv[i-1], json_object_new_double(atof(argv[++i])));
 		     break;
 	          }
 	          case 'n': /* special case to return arg index */
 	          {
 		     int *pInt = (int *) (p->paramPtrs[j]);
-		     *pInt = ++i;
+                     if (flags.route_mode == MACSIO_ARGV_TOMEM)
+		         *pInt = ++i;
+                     else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         json_object_object_add(ret_json_obj, "argi", json_object_new_int(++i));
 		     break;
 	          }
                }
@@ -501,7 +529,10 @@ MACSIO_ProcessCommandLine(
 	 else
 	 {
             int *pInt = (int *) (p->paramPtrs[0]);
-            *pInt = 1; 
+            if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                *pInt = 1; 
+            else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                json_object_object_add(ret_json_obj, argv[i-1], json_object_new_boolean((json_bool)1));
 	 }
       }
       else
@@ -510,7 +541,7 @@ MACSIO_ProcessCommandLine(
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
-             MACSIO_ERROR(("%s: unknown argument %s. Type %s --help for help",p,argv[i],p), unknownArgsFlag);
+             MACSIO_ERROR(("%s: unknown argument %s. Type %s --help for help",p,argv[i],p), flags.error_mode);
          return MACSIO_ARGV_ERROR; 
       }
 
@@ -538,6 +569,9 @@ MACSIO_ProcessCommandLine(
       free(knownArgs);
       knownArgs = next;
    }
+
+   if (flags.route_mode == MACSIO_ARGV_TOJSON)
+       *retobj = ret_json_obj;
 
    return MACSIO_ARGV_OK;
 }

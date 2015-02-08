@@ -14,6 +14,8 @@ JSON_C_INC=../json-c/install/include
 JSON_C_LIB=../json-c/install/lib
 JSON_C_LDFLAGS=-ljson-c
 DRIVER_INCS += -I$(JSON_C_INC)
+DRIVER_LIBS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
+DRIVER_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
 
 SILO_INC=$(SILO_HOME)/include
 SILO_LIB=$(SILO_HOME)/lib
@@ -98,6 +100,8 @@ DRIVER_INCS += -I$(PDB_INC)
 DRIVER_LIBS += -L$(PDB_LIB) $(PDB_LDFLAGS)
 DRIVER_RPATHS += -Wl,-rpath,$(PDB_LIB)
 endif
+
+LDFLAGS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
 
 DRIVER_OBJ=$(DRIVER_SRC:.c=.o)
 

@@ -347,8 +347,8 @@ static int FNAME(finish_pending_arrays)(MACSIO_FileHandle_t *_fh)
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const int unknownArgsFlag = MACSIO_WARN;
-    MACSIO_ProcessCommandLine(unknownArgsFlag, argi, argc, argv,
+    const MACSIO_ArgvFlags_t argFlags = {MACSIO_WARN, MACSIO_ARGV_TOMEM};
+    MACSIO_ProcessCommandLine(0, argFlags, argi, argc, argv,
         "--sieve-buf-size %d",
             "Specify sieve buffer size (see H5Pset_sieve_buf_size)",
             &sbuf_size,

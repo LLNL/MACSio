@@ -8,7 +8,7 @@
 #include <mpi.h>
 #endif
 
-#include <json.h>
+#include <json-c/json.h>
 
 #define MAX(A,B) (((A)>(B))?(A):(B))
 
