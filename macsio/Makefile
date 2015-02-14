@@ -41,7 +41,7 @@ CXX ?= g++
 CC ?= gcc
 LINK ?= g++
 
-COMMON_SRC = options.c ifacemap.c util.c timing.c log.c
+COMMON_SRC = macsio_params.c options.c ifacemap.c util.c timing.c log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 

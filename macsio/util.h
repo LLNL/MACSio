@@ -9,7 +9,7 @@
 typedef struct _MACSIO_ArgvFlags_t
 {
     unsigned int error_mode : 1;
-    unsigned int route_mode : 2;
+    unsigned int route_mode : 2; /* allows for 4 options; only 2 used currently */
 } MACSIO_ArgvFlags_t;
 
 #define MACSIO_WARN      0
@@ -18,8 +18,6 @@ typedef struct _MACSIO_ArgvFlags_t
 #warning RE-THINK THESE NAMES
 #define MACSIO_ARGV_TOMEM     0 
 #define MACSIO_ARGV_TOJSON    1
-#define MACSIO_ARGV_TOFOO     2
-#define MACSIO_ARGV_TOBAR     3
 
 /* helpful memory allocation wrappers */
 #define ALLOC(T) ((T*)calloc((size_t)1,sizeof(T)))

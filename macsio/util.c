@@ -127,6 +127,36 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
   return error_buffer;
 }
 
+/* Handles adding one or more params for a single key. If the key doesn't
+   exist, its a normal object add. If it does exist and is not already an
+   array object, delete it and make it into an array object, otherwise
+   add the new param to the existing array object. */
+static void
+add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addobj)
+{
+    json_object *existing_member;
+
+    if (json_object_object_get_ex(retobj, key, &existing_member))
+    {
+        if (json_object_is_type(existing_member, json_type_array))
+        {
+            json_object_array_add(existing_member, addobj);
+        }
+        else
+        {
+            json_object *addarray = json_object_new_array();
+            json_object_array_add(addarray, existing_member);
+            json_object_array_add(addarray, addobj);
+            json_object_get(existing_member);
+            json_object_object_add(retobj, key, addarray); /* replaces */
+        }
+    }
+    else
+    {
+        json_object_object_add(retobj, key, addobj);
+    }
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------------
  * Audience:	Private
  * Chapter:	Example and Test Utilities	
@@ -434,6 +464,7 @@ MACSIO_ProcessCommandLine(
    {
       int foundArg;
       MACSIO_KnownArgInfo_t *p;
+      char argName[256];
 
       /* search known arguments for this command line argument */
       p = knownArgs;
@@ -441,7 +472,10 @@ MACSIO_ProcessCommandLine(
       while (p && !foundArg)
       {
          if (!strncmp(argv[i], p->fmtStr, (unsigned int)(p->argNameLength) ))
+         {
+            strncpy(argName, argv[i], (unsigned int)(p->argNameLength));
 	    foundArg = 1;
+         }
 	 else
 	    p = p->next;
       }
@@ -476,7 +510,7 @@ MACSIO_ProcessCommandLine(
                          if (flags.route_mode == MACSIO_ARGV_TOMEM)
                              *pInt = (int) tmpDbl;
                          else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_int((int)tmpDbl));
+                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_int((int)tmpDbl));
                      }
 		     break;
 	          }
@@ -492,7 +526,7 @@ MACSIO_ProcessCommandLine(
                          }
                          else if (flags.route_mode == MACSIO_ARGV_TOJSON)
                          {
-                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_string(argv[i+1]));
+                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[i+1]));
                              i++;
                          }
 		     }
@@ -501,7 +535,7 @@ MACSIO_ProcessCommandLine(
                          if (flags.route_mode == MACSIO_ARGV_TOMEM)
 		             strcpy(*pChar, argv[++i]);
                          else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                             json_object_object_add(ret_json_obj, argv[i-1], json_object_new_string(argv[++i]));
+                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[++i]));
                      }
 		     break;
 	          }
@@ -511,7 +545,7 @@ MACSIO_ProcessCommandLine(
                      if (flags.route_mode == MACSIO_ARGV_TOMEM)
 		         *pDouble = atof(argv[++i]);
                      else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                         json_object_object_add(ret_json_obj, argv[i-1], json_object_new_double(atof(argv[++i])));
+                         add_param_to_json_retobj(ret_json_obj, argName, json_object_new_double(atof(argv[++i])));
 		     break;
 	          }
 	          case 'n': /* special case to return arg index */
@@ -520,7 +554,7 @@ MACSIO_ProcessCommandLine(
                      if (flags.route_mode == MACSIO_ARGV_TOMEM)
 		         *pInt = ++i;
                      else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                         json_object_object_add(ret_json_obj, "argi", json_object_new_int(++i));
+                         add_param_to_json_retobj(ret_json_obj, "argi", json_object_new_int(++i));
 		     break;
 	          }
                }
@@ -532,7 +566,7 @@ MACSIO_ProcessCommandLine(
             if (flags.route_mode == MACSIO_ARGV_TOMEM)
                 *pInt = 1; 
             else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                json_object_object_add(ret_json_obj, argv[i-1], json_object_new_boolean((json_bool)1));
+                add_param_to_json_retobj(ret_json_obj, argName, json_object_new_boolean((json_bool)1));
 	 }
       }
       else

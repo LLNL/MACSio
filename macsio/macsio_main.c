@@ -10,6 +10,7 @@
 
 #include <ifacemap.h>
 #include <macsio.h>
+#include <macsio_params.h>
 #include <util.h>
 
 #include <json-c/json.h>
@@ -69,94 +70,17 @@ static void handle_list_request_and_exit()
     exit(0);
 }
 
-static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, MACSIO_optlist_t *opts)
+static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, json_object **clJargs)
 {
-    MACSIO_ArgvFlags_t argFlags;
+    MACSIO_ArgvFlags_t const argFlags = {MACSIO_WARN, MACSIO_ARGV_TOJSON};
     int plugin_args_start = -1;
     int cl_result;
+    json_object *mainJargs = 0;
 
-    /* Why two nearly identical blocks? Using each to test two different modes for
-       the ProcessCommandLine utility */
-#if 0
-    argFlags.error_mode = MACSIO_WARN;
-    argFlags.route_mode = MACSIO_ARGV_TOMEM;
-    cl_result = MACSIO_ProcessCommandLine(0, argFlags, 1, argc, argv,
-        "--interface %s",
-            "Specify the name of the interface to be tested. Use keyword 'list' "
-            "to print a list of all known interfaces and then exit",
-            MACSIO_GetMutableArrOption(opts, IOINTERFACE_NAME),
-        "--parallel-file-mode %s %d",
-            "Specify the parallel file mode. There are several choices. "
-            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then "
-            "also specify the number of files. Or, use 'MIFMAX' for MIF mode and "
-            "one file per processor or 'MIFAUTO' for MIF mode and let the test "
-            "determine the optimum file count. Use 'SIF' for SIngle shared File "
-            "(Rich Man's) mode.",
-            MACSIO_GetMutableArrOption(opts, PARALLEL_FILE_MODE),
-            MACSIO_GetMutableOption(opts, PARALLEL_FILE_COUNT),
-        "--part-size %d",
-            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character indicates 'B'ytes (2^0), "
-            "'K'ilobytes (2^10), 'M'egabytes (2^20) or 'G'igabytes (2^30). This is then the nominal I/O "
-            "request size emitted from each MPI rank. [1M]",
-            MACSIO_GetMutableOption(opts, PART_SIZE),
-        "--avg-num-parts %f",
-            "The average number of mesh parts per MPI rank. Non-integral values are acceptable. For example, "
-            "a value that is half-way between two integers, K and K+1, means that half the ranks have K "
-            "mesh parts and half have K+1 mesh parts. As another example, a value of 2.75 here would mean "
-            "that 75%% of the ranks get 3 parts and 25%% of the ranks get 2 parts. Note that the total "
-            "number of parts is the this number multiplied by the MPI communicator size. If the result of "
-            "that product is non-integral, it will be rounded and a warning message will be generated. [1]",
-            MACSIO_GetMutableOption(opts, AVG_NUM_PARTS),
-        "--part-distribution %s",
-            "Specify how parts are distributed to MPI tasks. (currently ignored)",
-            MACSIO_GetMutableArrOption(opts, PART_DISTRIBUTION),
-        "--vars-per-part %d",
-            "Number of mesh variable objects in each part. The smallest this can be depends on the mesh "
-            "type. For rectilinear mesh it is 1. For curvilinear mesh it is the number of spatial "
-            "dimensions and for unstructured mesh it is the number of spatial dimensions plus 2 * "
-            "number of topological dimensions. [50]",
-            MACSIO_GetMutableOption(opts, VARS_PER_PART),
-        "--num-dumps %d",
-            "Total number of dump requests to write or read [10]",
-            MACSIO_GetMutableOption(opts, NUM_DUMPS),
-        "--alignment %d",
-            "Align all I/O requests on boundaries that are a integral multiple "
-            "of this size",
-            MACSIO_GetMutableOption(opts, ALIGNMENT),
-        "--filename %s",
-            "Specify sprintf-style string to indicate how file(s) should be named. If the "
-            "the file(s) already exists, they will be used in a read test. If the file(s) "
-            "do not exist, it/they will be generated in a write test. "
-            "Default is 'macsio-<iface>-<group#>.<ext>' where <group#> is the group number "
-            "(MIF modes) or absent (SIF mode), <iface> is the name of the interface and <ext> "
-            "is the canonical file extension for the given interface.",
-            MACSIO_GetMutableArrOption(opts, FILENAME_SPRINTF),
-        "--print-details",
-            "Print detailed I/O performance data",
-            MACSIO_GetMutableOption(opts, PRINT_TIMING_DETAILS),
-        "--driver-args %n",
-            "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
-            &plugin_args_start,
-    MACSIO_END_OF_ARGS);
-#else
-    json_object *json_args = json_object_new_object();
-    argFlags.error_mode = MACSIO_WARN;
-    argFlags.route_mode = MACSIO_ARGV_TOJSON;
-    cl_result = MACSIO_ProcessCommandLine((void**)&json_args, argFlags, 1, argc, argv,
-        "--interface %s",
-            "Specify the name of the interface to be tested. Use keyword 'list' "
-            "to print a list of all known interfaces and then exit",
-        "--parallel-file-mode %s %d",
-            "Specify the parallel file mode. There are several choices. "
-            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then "
-            "also specify the number of files. Or, use 'MIFMAX' for MIF mode and "
-            "one file per processor or 'MIFAUTO' for MIF mode and let the test "
-            "determine the optimum file count. Use 'SIF' for SIngle shared File "
-            "(Rich Man's) mode.",
-        "--part-size %d",
-            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character indicates 'B'ytes (2^0), "
-            "'K'ilobytes (2^10), 'M'egabytes (2^20) or 'G'igabytes (2^30). This is then the nominal I/O "
-            "request size emitted from each MPI rank. [1M]",
+    cl_result = MACSIO_ProcessCommandLine((void**)&mainJargs, argFlags, 1, argc, argv,
+        MACSIO_ARGV_DEF(interface, %s),
+        MACSIO_ARGV_DEF(parallel_file_mode, %s %d),
+        MACSIO_ARGV_DEF(part_size, %d),
         "--avg-num-parts %f",
             "The average number of mesh parts per MPI rank. Non-integral values are acceptable. For example, "
             "a value that is half-way between two integers, K and K+1, means that half the ranks have K "
@@ -188,19 +112,17 @@ static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, MACSIO_
         "--driver-args %n",
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
     MACSIO_END_OF_ARGS);
-    printf("eobj=%s\n", json_object_to_json_string(json_args));
-#endif
-
+    printf("%s\n", json_object_to_json_string(mainJargs));
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_ARGV_HELP)
         handle_help_request_and_exit(plugin_args_start+1, argc, argv);
 
-    if (!strcmp(MACSIO_GetStrOption(opts, IOINTERFACE_NAME), "list"))
+    if (!strcmp(json_object_path_get_string(mainJargs, MACSIO_ARGV_KEY(interface)), "list"))
         handle_list_request_and_exit();
 
     /* sanity check some values */
-    if (!MACSIO_GetStrOption(opts, IOINTERFACE_NAME))
+    if (!strcmp(json_object_path_get_string(mainJargs, MACSIO_ARGV_KEY(interface)), ""))
         MACSIO_ERROR(("no io-interface specified"), MACSIO_FATAL);
 
     if (plugin_argi)
@@ -276,6 +198,7 @@ int
 main(int argc, char *argv[])
 {
     MACSIO_FileHandle_t *fh;
+    json_object *jargs;
     MACSIO_optlist_t *opts;
     const MACSIO_IFaceHandle_t *ioiface;
     double         t0,t1;
@@ -284,7 +207,7 @@ main(int argc, char *argv[])
     opts = SetupDefaultOptions();
 
     /* Process the command line */
-    ProcessCommandLine(argc, argv, &argi, opts);
+    ProcessCommandLine(argc, argv, &argi, &jargs);
 
 #ifdef PARALLEL
     {
@@ -300,7 +223,7 @@ main(int argc, char *argv[])
     
     /* Start total timer */
 
-    for (dump = 0; dump < MACSIO_GetIntOption(opts, NUM_DUMPS); i++)
+    for (dumpNum = 0; dumpNum < MACSIO_GetIntOption(opts, NUM_DUMPS); dumpNum++)
     {
         /* Use 'Fill' for read operation */
         const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(MACSIO_GetStrOption(opts, IOINTERFACE_NAME));
@@ -310,7 +233,7 @@ main(int argc, char *argv[])
         /* Start dump timer */
 
         /* do the dump */
-        (*(iface->Dump))(macsio_problem_object, opts, timer_object, dump);
+        (*(iface->Dump))(argc, argi, argv, opts, macsio_problem_object, timer_object, dumpNum);
 
         /* stop timer */
 
