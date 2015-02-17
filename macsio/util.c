@@ -134,7 +134,7 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
 static void
 add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addobj)
 {
-    json_object *existing_member;
+    json_object *existing_member = 0;
 
     if (json_object_object_get_ex(retobj, key, &existing_member))
     {
@@ -333,7 +333,7 @@ MACSIO_ProcessCommandLine(
          paramTypes = (char *) malloc((unsigned int)paramCount+1);
 
          /* allocate a string for the pointers to caller's arguments to set */ 
-         paramPtrs = (void **) malloc(paramCount * sizeof(void*));
+         paramPtrs = (void **) calloc(paramCount, sizeof(void*));
 
          /* ok, make a second pass through the string and setup argument pointers and conversion characters */
 	 k = 0;
@@ -464,7 +464,10 @@ MACSIO_ProcessCommandLine(
    {
       int foundArg;
       MACSIO_KnownArgInfo_t *p;
-      char argName[256];
+      char argName[64] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                          0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                          0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                          0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
       /* search known arguments for this command line argument */
       p = knownArgs;

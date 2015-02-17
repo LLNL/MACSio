@@ -1,0 +1,6 @@
+SILO_HOME=/usr/gapps/silo/4.10.2/${SYS_TYPE}
+HDF5_HOME=/usr/gapps/silo/hdf5/1.8.10/${SYS_TYPE}
+SZIP_HOME=/usr/gapps/silo/szip/2.1/${SYS_TYPE}
+CFLAGS=-DPARALLEL
+CXX=mpiCC
+LINK=mpiCC
