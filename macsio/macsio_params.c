@@ -1,5 +1,6 @@
 #include <macsio_params.h>
 
+#warning MOVE ARG FORMAT STRINGS HERE TOO
 MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
     {_ArgvParamKeys_min, ""},
     {interface, 

@@ -112,7 +112,6 @@ static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, json_ob
         "--driver-args %n",
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
     MACSIO_END_OF_ARGS);
-    printf("%s\n", json_object_to_json_string(mainJargs));
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_ARGV_HELP)
@@ -127,6 +126,8 @@ static void ProcessCommandLine(int argc, char *argv[], int *plugin_argi, json_ob
 
     if (plugin_argi)
         *plugin_argi = plugin_args_start>-1?plugin_args_start+1:argc;
+
+    *clJargs = mainJargs;
 
 }
 
@@ -198,24 +199,33 @@ int
 main(int argc, char *argv[])
 {
     MACSIO_FileHandle_t *fh;
+    json_object *main_obj = json_object_new_object();
+    json_object *parallel_obj = json_object_new_object();
     json_object *jargs;
     MACSIO_optlist_t *opts;
     const MACSIO_IFaceHandle_t *ioiface;
     double         t0,t1;
     int            argi;
+    int size = 1, rank = 0;
+
+#ifdef PARALLEL
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
 
     opts = SetupDefaultOptions();
 
-    /* Process the command line */
+    /* Process the command line and put the results in the problem */
     ProcessCommandLine(argc, argv, &argi, &jargs);
+    json_object_object_add(main_obj, MACSIO_MAIN_KEY(clargs), jargs);
 
-#ifdef PARALLEL
-    {
-        MPI_Init(&argc, &argv);
-        MPI_Comm_size(MPI_COMM_WORLD, (int *) MACSIO_GetMutableOption(opts, MPI_SIZE));
-	MPI_Comm_rank(MPI_COMM_WORLD, (int *) MACSIO_GetMutableOption(opts, MPI_RANK));
-    }
-#endif
+
+    json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_size), json_object_new_int(size));
+    json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_rank), json_object_new_int(rank));
+    json_object_object_add(main_obj, MACSIO_MAIN_KEY(parallel), parallel_obj);
+
+    printf("\"%s\"\n", json_object_to_json_string(main_obj));
 
 #if 0
     /* Generate a static problem object to dump on each dump */
