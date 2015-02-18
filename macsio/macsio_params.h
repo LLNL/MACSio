@@ -14,7 +14,7 @@ typedef enum _MACSIO_MainParamKeys_t {
     clargs,
     interface_options,
     parallel,
-    mesh,
+    problem,
     _MainParamKeys_max
 } MACSIO_MainParamKeys_t;
 static MACSIO_MainParamKeys_t main_param_keychk;
@@ -26,10 +26,14 @@ typedef enum _MACSIO_ArgvParamKeys_t {
     interface,
     parallel_file_mode,
     part_size,
+    part_dim,
+    part_type,
     avg_num_parts,
     part_distribution,
     vars_per_part,
     num_dumps,
+    alignment,
+    filename,
     _ArgvParamKeys_max
 } MACSIO_ArgvParamKeys_t;
 static MACSIO_ArgvParamKeys_t argv_param_keychk;
@@ -52,6 +56,7 @@ static MACSIO_ParallelParamKeys_t parallel_param_keychk;
 /* Parameter keys for MACSio's mesh synthesis */
 typedef enum _MACSIO_MeshParamKeys_t {
     _MeshParamKeys_min = 0,
+    parts,
     _MeshParamKeys_max
 } MACSIO_MeshParamKeys_t;
 static MACSIO_MeshParamKeys_t mesh_param_keychk;

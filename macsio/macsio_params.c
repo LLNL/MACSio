@@ -17,6 +17,8 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
         "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character indicates 'B'ytes (2^0), "
         "'K'ilobytes (2^10), 'M'egabytes (2^20) or 'G'igabytes (2^30). This is then the nominal I/O "
         "request size emitted from each MPI rank. [1M]"},
+    {part_dim,
+        "Spatial dimenion of parts; 1, 2, or 3"},
     {avg_num_parts,
         "The average number of mesh parts per MPI rank. Non-integral values are acceptable. For example, "
         "a value that is half-way between two integers, K and K+1, means that half the ranks have K "
@@ -33,5 +35,11 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
         "number of topological dimensions. [50]"},
     {num_dumps,
         "Total number of dump requests to write or read [10]"},
+    {alignment,
+        "Not currently document"},
+    {filename,
+        "Not currently document"},
+    {part_type,
+        "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured', 'arbitrary'"},
     {_ArgvParamKeys_max, ""}
 };

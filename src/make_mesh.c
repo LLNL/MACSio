@@ -193,8 +193,8 @@ static json_object *
 make_dims_array(int ndims, int const *dims)
 {
     json_object *dims_array = json_object_new_array();
-    json_object_array_add(dims_array, json_object_new_int(ndims);
-    json_object_array_add(dims_array, json_object_new_int(dims[0]);
+    json_object_array_add(dims_array, json_object_new_int(ndims));
+    json_object_array_add(dims_array, json_object_new_int(dims[0]));
     if (ndims > 1)
         json_object_array_add(dims_array, json_object_new_int(dims[1]));
     if (ndims > 2)
