@@ -174,7 +174,6 @@ static json_object *
 make_dims_array(int ndims, const int *dims)
 {
     json_object *dims_array = json_object_new_array();
-    json_object_array_add(dims_array, json_object_new_int(ndims));
     json_object_array_add(dims_array, json_object_new_int(dims[0]));
     if (ndims > 1)
         json_object_array_add(dims_array, json_object_new_int(dims[1]));
@@ -239,7 +238,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         vals = (double *) malloc(y_dim(dims) * sizeof(double));
         for (i = 0; i < y_dim(dims); i++)
             vals[i] = y_min(bounds) + i * delta;
-        json_object_object_add(coords, "YAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[0]));
+        json_object_object_add(coords, "YAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[1]));
     }
 
     if (ndims > 2)
@@ -249,7 +248,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         vals = (double *) malloc(z_dim(dims) * sizeof(double));
         for (i = 0; i < z_dim(dims); i++)
             vals[i] = z_min(bounds) + i * delta;
-        json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[0]));
+        json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2]));
     }
 
     return coords;
@@ -540,7 +539,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     int size = json_object_path_get_int(main_obj, "parallel/mpi_size");
     int part_size = json_object_path_get_int(main_obj, "clargs/--part_size") / sizeof(double);
     double avg_num_parts = json_object_path_get_double(main_obj, "clargs/--avg_num_parts");
-    int dim = json_object_path_get_double(main_obj, "clargs/--part_dim");
+    int dim = json_object_path_get_int(main_obj, "clargs/--part_dim");
     double total_num_parts_d = size * avg_num_parts;
     int total_num_parts = (int) lround(total_num_parts_d);
     int myrank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
@@ -552,6 +551,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     int nx_parts = total_num_parts, ny_parts = 1, nz_parts = 1;
     int nx = part_size, ny = 1, nz = 1;
     int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
+    int ipart_width = 1, jpart_width = 0, kpart_width = 0;
     int part_dims[3];
     double part_bounds[6];
 
@@ -561,12 +561,15 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     else if (dim == 2)
     {
         best_2d_factors(total_num_parts, &nx_parts, &ny_parts);
+printf("nx_parts=%d, ny_parts=%d\n", nx_parts, ny_parts);
         best_2d_factors(part_size, &nx, &ny);
+        jpart_width = 1;
     }
     else if (dim == 3)
     {
         best_3d_factors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
         best_3d_factors(part_size, &nx, &ny, &nz);
+        kpart_width = 1;
     }
     set_dims(part_dims, nx, ny, nz);
 
@@ -591,7 +594,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
                 {
                     /* build mesh part on this rank */
                     set_bounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
-                                            (double) ipart+1, (double) jpart+1, (double) kpart+1);
+                        (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
                         json_object_path_get_string(main_obj, "clargs/--part_type"));
                     json_object_array_add(part_array, part_obj);
@@ -788,6 +791,8 @@ main(int argc, char *argv[])
     double         t0,t1;
     int            argi;
     int size = 1, rank = 0;
+    char outfName[64];
+    FILE *outf;
 
 #ifdef PARALLEL
     MPI_Comm macsio_io_comm = MPI_COMM_WORLD;
@@ -812,7 +817,10 @@ main(int argc, char *argv[])
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(problem), problem_obj);
 
     /* Just here for debugging for the moment */
-    printf("\"%s\"\n", json_object_to_json_string(main_obj));
+    snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", rank);
+    outf = fopen(outfName, "w");
+    fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+    fclose(outf);
 
     /* Start total timer */
 
