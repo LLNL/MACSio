@@ -455,6 +455,103 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
     return topology;
 }
 
+#warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
+static json_object *
+make_scalar_var(int ndims, int const *dims, double const *bounds,
+    char const *centering, char const *dtype, char const *kind)
+{
+    json_object *var_obj = json_object_new_object();
+    int i,j,k,n;
+    int dims2[3] = {1,1,1};
+    int minus_one = strcmp(centering, "zone")?0:-1;
+    json_object *data_obj;
+    double *valdp;
+    int    *valip;
+
+    for (i = 0; i < ndims; i++)
+        dims2[i] = dims[i] + minus_one;
+
+#warning NEED EXPLICIT NAME FOR VARIABLE
+    json_object_object_add(var_obj, "name", json_object_new_string(kind));
+    json_object_object_add(var_obj, "centering", json_object_new_string(centering));
+    if (!strcmp(dtype, "double"))
+        data_obj = json_object_new_extarr_alloc(json_extarr_type_flt64, ndims, dims2);
+    else if (!strcmp(dtype, "int"))
+        data_obj = json_object_new_extarr_alloc(json_extarr_type_int32, ndims, dims2);
+    json_object_object_add(var_obj, "data", data_obj);
+    valdp = (double *) json_object_extarr_data(data_obj);
+    valip = (int *) json_object_extarr_data(data_obj);
+
+    n = 0;
+    srandom(0xBabeFace);
+    for (i = 0; i < dims2[0]; i++)
+    {
+        for (j = 0; j < dims2[1]; j++)
+        {
+            for (k = 0; k < dims2[2]; k++)
+            {
+#warning PUT THESE INTO A GENERATOR FUNCTION
+#warning ACCOUNT FOR HALF ZONE OFFSETS
+                if (!strcmp(kind, "constant"))
+                    valdp[n++] = 1.0;
+                else if (!strcmp(kind, "random"))
+                    valdp[n++] = (double) (random() % 1000) / 1000;
+                else if (!strcmp(kind, "xramp"))
+                    valdp[n++] = i * x_delta(dims, bounds);
+                else if (!strcmp(kind, "spherical"))
+                {
+                    double x = i * x_delta(dims, bounds);
+                    double y = j * y_delta(dims, bounds);
+                    double z = k * z_delta(dims, bounds);
+                    valdp[n++] = sqrt(x*x+y*y+z*z);
+                }
+                else if (!strcmp(kind, "ysin"))
+                {
+                    double y = j * y_delta(dims, bounds);
+                    valdp[n++] = sin(y*3.1415266);
+                }
+                else if (!strcmp(kind, "xlayers"))
+                {
+                    valip[n++] = (i / 20) % 3;
+                }
+            }
+        }
+    }
+
+    return var_obj; 
+
+}
+
+static json_object *
+make_vector_var(int ndims, int const *dims, double const *bounds)
+{
+}
+
+static json_object *
+make_tensor_var(int ndims, int const *dims, double const *bounds)
+{
+}
+
+static json_object *
+make_subset_var(int ndims, int const *dims, double const *bounds)
+{
+}
+
+static json_object *
+make_mesh_vars(int ndims, int const *dims, double const *bounds)
+{
+    json_object *vars_array = json_object_new_array();
+
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "constant"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "random"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "spherical"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "xramp"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "ysin"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "int", "xlayers"));
+
+    return vars_array;
+}
+
 static json_object *
 make_arb_mesh_topology(int ndims, int const *dims)
 {
@@ -477,16 +574,20 @@ static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *d
 
 static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("rectilinear"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", make_dims_array(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", make_bounds_array(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_rect_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_rect_mesh_topology(ndims, dims));
-    return mesh_chunk;
+    json_object *chunk_obj = json_object_new_object();
+    json_object *mesh_obj = json_object_new_object();
+    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("rectilinear"));
+    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
+    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "LogDims", make_dims_array(ndims, dims));
+    json_object_object_add(mesh_obj, "Bounds", make_bounds_array(bounds));
+    json_object_object_add(mesh_obj, "Coords", make_rect_mesh_coords(ndims, dims, bounds));
+    json_object_object_add(mesh_obj, "Topology", make_rect_mesh_topology(ndims, dims));
+    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
+#warning ADD NVARS AND VARMAPS ARGS HERE
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds));
+    return chunk_obj;
 }
 
 static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
@@ -825,6 +926,7 @@ main(int argc, char *argv[])
     json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_rank), json_object_new_int(rank));
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(parallel), parallel_obj);
 
+#warning CREATE AN IO CONTEXT OBJECT
     /* Acquire an I/O context handle from the plugin */
 
     /* Sanity check args */

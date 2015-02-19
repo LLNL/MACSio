@@ -362,34 +362,51 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     json_object *dimsobj;
     char *coordnames[] = {"X","Y","Z"};
     void const *coords[3];
-    int ndims = json_object_path_get_int(part, "GeomDim");
-    int dims[3];
+    int ndims = json_object_path_get_int(part, "Mesh/GeomDim");
+    int dims[3] = {1,1,1};
+    int dimsz[3] = {1,1,1};
 
-    dimsobj = json_object_path_get_array(part, "LogDims");
+    dimsobj = json_object_path_get_array(part, "Mesh/LogDims");
 
-    coordobj = json_object_path_get_extarr(part, "Coords/XAxisCoords");
+    coordobj = json_object_path_get_extarr(part, "Mesh/Coords/XAxisCoords");
     coords[0] = json_object_extarr_data(coordobj);
     dims[0] = json_object_get_int(json_object_array_get_idx(dimsobj, 0));
+    dimsz[0] = dims[0]-1;
     if (ndims > 1)
     {
-        coordobj = json_object_path_get_extarr(part, "Coords/YAxisCoords");
+        coordobj = json_object_path_get_extarr(part, "Mesh/Coords/YAxisCoords");
         coords[1] = json_object_extarr_data(coordobj);
         dims[1] = json_object_get_int(json_object_array_get_idx(dimsobj, 1));
+        dimsz[1] = dims[1]-1;
+        
     }
     if (ndims > 2)
     {
-        coordobj = json_object_path_get_extarr(part, "Coords/ZAxisCoords");
+        coordobj = json_object_path_get_extarr(part, "Mesh/Coords/ZAxisCoords");
         coords[2] = json_object_extarr_data(coordobj);
         dims[2] = json_object_get_int(json_object_array_get_idx(dimsobj, 2));
+        dimsz[2] = dims[2]-1;
     }
 
     DBPutQuadmesh(dbfile, "mesh", coordnames, coords, dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
 
+    json_object *varsobj = json_object_path_get_array(part, "Vars");
+    for (int i = 0; i < json_object_array_length(varsobj); i++)
+    {
+        json_object *varobj = json_object_array_get_idx(varsobj, i);
+        int cent = strcmp(json_object_path_get_string(varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
+        int *d = cent==DB_NODECENT?dims:dimsz;
+        json_object *dataobj = json_object_path_get_extarr(varobj, "data");
+        int dtype = json_object_extarr_type(dataobj)==json_extarr_type_flt64?DB_DOUBLE:DB_INT;
+        
+        DBPutQuadvar1(dbfile, json_object_path_get_string(varobj, "name"), "mesh",
+            (void *)json_object_extarr_data(dataobj), d, ndims, 0, 0, dtype, cent, 0); 
+    }
 }
 
 static void write_mesh_part(DBfile *dbfile, json_object *part)
 {
-    if (!strcmp(json_object_path_get_string(part, "MeshType"), "rectilinear"))
+    if (!strcmp(json_object_path_get_string(part, "Mesh/MeshType"), "rectilinear"))
         write_rect_mesh_part(dbfile, part);
 }
 
@@ -468,7 +485,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         json_object *this_part = json_object_array_get_idx(parts, i);
 
         snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
-            json_object_path_get_int(this_part, "ChunkID"));
+            json_object_path_get_int(this_part, "Mesh/ChunkID"));
  
         DBMkDir(siloFile, domain_dir);
         DBSetDir(siloFile, domain_dir);

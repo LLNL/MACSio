@@ -20,6 +20,8 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
         "request size emitted from each MPI rank. [1M]"},
     {part_dim,
         "Spatial dimenion of parts; 1, 2, or 3"},
+    {part_type,
+        "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured', 'arbitrary'"},
     {avg_num_parts,
         "The average number of mesh parts per MPI rank. Non-integral values are acceptable. For example, "
         "a value that is half-way between two integers, K and K+1, means that half the ranks have K "
@@ -43,7 +45,5 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
     {fileext,
         "Extension of generated file(s). [.dat]"},
 #warning SHOULD REALLY USE AN ENUM HERE. BUT HOW
-    {part_type,
-        "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured', 'arbitrary'"},
     {_ArgvParamKeys_max, ""}
 };
