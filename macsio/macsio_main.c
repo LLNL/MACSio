@@ -222,6 +222,8 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
     double *vals, delta;
     int i;
 
+#warning SUPPORT DIFFERENT DATATYPES HERE
+
     json_object_object_add(coords, "CoordBasis", json_object_new_string("X,Y,Z"));
 
     /* build X coordinate array */
@@ -462,6 +464,7 @@ make_arb_mesh_topology(int ndims, int const *dims)
 static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *mesh_chunk = json_object_new_object();
+    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("uniform"));
     json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
     json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
     json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
@@ -475,6 +478,7 @@ static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *d
 static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *mesh_chunk = json_object_new_object();
+    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("rectilinear"));
     json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
     json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
     json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
@@ -488,6 +492,7 @@ static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims
 static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *mesh_chunk = json_object_new_object();
+    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("curvilinear"));
     json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
     json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
     json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
@@ -501,6 +506,7 @@ static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims
 static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *mesh_chunk = json_object_new_object();
+    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("ucdzoo"));
     json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
     json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
     json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
@@ -698,6 +704,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
     MACSIO_END_OF_ARGS);
 
+    plugin_args_start = json_object_path_get_int(mainJargs, "argi");
+
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_ARGV_HELP)
         handle_help_request_and_exit(plugin_args_start+1, argc, argv);
@@ -845,7 +853,7 @@ main(int argc, char *argv[])
         /* Start dump timer */
 
         /* do the dump */
-        (*(iface->dumpFunc))(argc, argi, argv, main_obj, dumpNum, dumpTime);
+        (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 
         /* stop timer */
 

@@ -555,9 +555,9 @@ MACSIO_ProcessCommandLine(
 	          {
 		     int *pInt = (int *) (p->paramPtrs[j]);
                      if (flags.route_mode == MACSIO_ARGV_TOMEM)
-		         *pInt = ++i;
+		         *pInt = i++;
                      else if (flags.route_mode == MACSIO_ARGV_TOJSON)
-                         add_param_to_json_retobj(ret_json_obj, "argi", json_object_new_int(++i));
+                         add_param_to_json_retobj(ret_json_obj, "argi", json_object_new_int(i++));
 		     break;
 	          }
                }

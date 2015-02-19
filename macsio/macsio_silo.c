@@ -286,7 +286,7 @@ static void *CreateSiloFile(const char *fname, const char *nsname, void *userDat
 {
     int driver = *((int*) userData);
     DBfile *siloFile = DBCreate(fname, DB_CLOBBER, DB_LOCAL, "macsio output file", driver);
-    if (siloFile)
+    if (siloFile && nsname)
     {
         DBMkDir(siloFile, nsname);
         DBSetDir(siloFile, nsname);
@@ -299,7 +299,7 @@ static void *OpenSiloFile(const char *fname, const char *nsname, PMPIO_iomode_t 
 {
     DBfile *siloFile = DBOpen(fname, DB_UNKNOWN,
         ioMode == PMPIO_WRITE ? DB_APPEND : DB_READ);
-    if (siloFile)
+    if (siloFile && nsname)
     {
         if (ioMode == PMPIO_WRITE)
             DBMkDir(siloFile, nsname);
@@ -320,10 +320,7 @@ static void WriteMultiXXXObjects(DBfile *siloFile, PMPIO_baton_t *bat, int size,
 {
     int i;
     char **meshBlockNames = (char **) malloc(size * sizeof(char*));
-    char **tempBlockNames = (char **) malloc(size * sizeof(char*));
-    char **velBlockNames = (char **) malloc(size * sizeof(char*));
     int *blockTypes = (int *) malloc(size * sizeof(int));
-    int *varTypes = (int *) malloc(size * sizeof(int));
 
     /* Go to root directory in the silo file */
     DBSetDir(siloFile, "/");
@@ -333,46 +330,67 @@ static void WriteMultiXXXObjects(DBfile *siloFile, PMPIO_baton_t *bat, int size,
     {
         int groupRank = PMPIO_GroupRank(bat, i);
         meshBlockNames[i] = (char *) malloc(1024);
-        velBlockNames[i] = (char *) malloc(1024);
-        tempBlockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
         {
             /* this mesh block is in the file 'root' owns */
-            sprintf(meshBlockNames[i], "/domain_%03d/qmesh", i);
-            sprintf(velBlockNames[i], "/domain_%03d/velocity", i);
-            sprintf(tempBlockNames[i], "/domain_%03d/temp", i);
+            sprintf(meshBlockNames[i], "/domain_%07d/qmesh", i);
         }
         else
         {
             /* this mesh block is another file */ 
-            sprintf(meshBlockNames[i], "silo_%03d.%s:/domain_%03d/qmesh",
-                groupRank, file_ext, i);
-            sprintf(velBlockNames[i], "silo_%03d.%s:/domain_%03d/velocity",
-                groupRank, file_ext, i);
-            sprintf(tempBlockNames[i], "silo_%03d.%s:/domain_%03d/temp",
+            sprintf(meshBlockNames[i], "macsio_silo_%05d.%s:/domain_%07d/mesh",
                 groupRank, file_ext, i);
         }
         blockTypes[i] = DB_QUADMESH;
-        varTypes[i] = DB_QUADVAR;
     }
 
     /* Write the multi-block objects */
-    DBPutMultimesh(siloFile, "multi_qmesh", size, meshBlockNames, blockTypes, 0);
-    DBPutMultivar(siloFile, "multi_velocity", size, velBlockNames, varTypes, 0);
-    DBPutMultivar(siloFile, "multi_temp", size, tempBlockNames, varTypes, 0);
+    DBPutMultimesh(siloFile, "multi_mesh", size, meshBlockNames, blockTypes, 0);
 
     /* Clean up */
     for (i = 0; i < size; i++)
     {
         free(meshBlockNames[i]);
-        free(velBlockNames[i]);
-        free(tempBlockNames[i]);
     }
     free(meshBlockNames);
-    free(velBlockNames);
-    free(tempBlockNames);
     free(blockTypes);
-    free(varTypes);
+}
+
+static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
+{
+    json_object *coordobj;
+    json_object *dimsobj;
+    char *coordnames[] = {"X","Y","Z"};
+    void const *coords[3];
+    int ndims = json_object_path_get_int(part, "GeomDim");
+    int dims[3];
+
+    dimsobj = json_object_path_get_array(part, "LogDims");
+
+    coordobj = json_object_path_get_extarr(part, "Coords/XAxisCoords");
+    coords[0] = json_object_extarr_data(coordobj);
+    dims[0] = json_object_get_int(json_object_array_get_idx(dimsobj, 0));
+    if (ndims > 1)
+    {
+        coordobj = json_object_path_get_extarr(part, "Coords/YAxisCoords");
+        coords[1] = json_object_extarr_data(coordobj);
+        dims[1] = json_object_get_int(json_object_array_get_idx(dimsobj, 1));
+    }
+    if (ndims > 2)
+    {
+        coordobj = json_object_path_get_extarr(part, "Coords/ZAxisCoords");
+        coords[2] = json_object_extarr_data(coordobj);
+        dims[2] = json_object_get_int(json_object_array_get_idx(dimsobj, 2));
+    }
+
+    DBPutQuadmesh(dbfile, "mesh", coordnames, coords, dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
+
+}
+
+static void write_mesh_part(DBfile *dbfile, json_object *part)
+{
+    if (!strcmp(json_object_path_get_string(part, "MeshType"), "rectilinear"))
+        write_rect_mesh_part(dbfile, part);
 }
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
@@ -455,13 +473,15 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         DBMkDir(siloFile, domain_dir);
         DBSetDir(siloFile, domain_dir);
 
+        write_mesh_part(siloFile, this_part);
 
         DBSetDir(siloFile, "..");
     }
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */
     if (rank == 0)
-        WriteMultiXXXObjects(siloFile, bat, size, "foo");
+        WriteMultiXXXObjects(siloFile, bat, size,
+            json_object_path_get_string(main_obj, "clargs/--fileext"));
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
