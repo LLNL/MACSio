@@ -129,7 +129,7 @@ _iop_errmsg(const char *format, /* A printf-like error message. */
 
 /* Handles adding one or more params for a single key. If the key doesn't
    exist, its a normal object add. If it does exist and is not already an
-   array object, delete it and make it into an array object, otherwise
+   array object, delete it and make it into an array object. Otherwise
    add the new param to the existing array object. */
 static void
 add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addobj)

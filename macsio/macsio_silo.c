@@ -16,6 +16,12 @@
 
 #include <silo.h>
 
+#ifdef PARALLEL
+#include <mpi.h>
+#endif
+
+#include <pmpio.h>
+
 /*
  *  BEGIN StringToDriver utility code from Silo's tests
  */
@@ -237,45 +243,6 @@ static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 
-static int FNAME(close_file)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
-
-static MACSIO_FileHandle_t *make_file_handle(DBfile *dbfile)
-{
-    FHNDL *retval;
-    retval = (FHNDL*) calloc(1,sizeof(FHNDL));
-    retval->dbfile = dbfile;
-
-    /* populate file, namespace and array methods here */
-    retval->pub.closeFileFunc = FNAME(close_file);
-
-    return (MACSIO_FileHandle_t*) retval;
-}
-
-static MACSIO_FileHandle_t *FNAME(create_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
-{
-    DBfile *dbfile = DBCreate(filename, DB_CLOBBER, DB_LOCAL, "macsio test file", driver);
-    if (!dbfile) return 0;
-#warning FIX ERROR CHECKING
-    return make_file_handle(dbfile);
-}
-
-static MACSIO_FileHandle_t *FNAME(open_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
-{
-    DBfile *dbfile = DBOpen(filename,  DB_UNKNOWN, DB_APPEND); 
-    if (!dbfile) return 0;
-#warning FIX ERROR CHECKING
-    return make_file_handle(dbfile);
-}
-
-static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
-{
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    retval = DBClose(fh->dbfile);
-    free(fh);
-    return retval;
-}
-
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
     const MACSIO_ArgvFlags_t argFlags = {MACSIO_WARN, MACSIO_ARGV_TOMEM};
@@ -315,6 +282,196 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
     return 0;
 }
 
+static void *CreateSiloFile(const char *fname, const char *nsname, void *userData)
+{
+    int driver = *((int*) userData);
+    DBfile *siloFile = DBCreate(fname, DB_CLOBBER, DB_LOCAL, "macsio output file", driver);
+    if (siloFile)
+    {
+        DBMkDir(siloFile, nsname);
+        DBSetDir(siloFile, nsname);
+    }
+    return (void *) siloFile;
+}
+
+static void *OpenSiloFile(const char *fname, const char *nsname, PMPIO_iomode_t ioMode,
+    void *userData)
+{
+    DBfile *siloFile = DBOpen(fname, DB_UNKNOWN,
+        ioMode == PMPIO_WRITE ? DB_APPEND : DB_READ);
+    if (siloFile)
+    {
+        if (ioMode == PMPIO_WRITE)
+            DBMkDir(siloFile, nsname);
+        DBSetDir(siloFile, nsname);
+    }
+    return (void *) siloFile;
+}
+
+static void CloseSiloFile(void *file, void *userData)
+{
+    DBfile *siloFile = (DBfile *) file;
+    if (siloFile)
+        DBClose(siloFile);
+}
+
+static void WriteMultiXXXObjects(DBfile *siloFile, PMPIO_baton_t *bat, int size,
+    const char *file_ext)
+{
+    int i;
+    char **meshBlockNames = (char **) malloc(size * sizeof(char*));
+    char **tempBlockNames = (char **) malloc(size * sizeof(char*));
+    char **velBlockNames = (char **) malloc(size * sizeof(char*));
+    int *blockTypes = (int *) malloc(size * sizeof(int));
+    int *varTypes = (int *) malloc(size * sizeof(int));
+
+    /* Go to root directory in the silo file */
+    DBSetDir(siloFile, "/");
+
+    /* Construct the lists of individual object names */
+    for (i = 0; i < size; i++)
+    {
+        int groupRank = PMPIO_GroupRank(bat, i);
+        meshBlockNames[i] = (char *) malloc(1024);
+        velBlockNames[i] = (char *) malloc(1024);
+        tempBlockNames[i] = (char *) malloc(1024);
+        if (groupRank == 0)
+        {
+            /* this mesh block is in the file 'root' owns */
+            sprintf(meshBlockNames[i], "/domain_%03d/qmesh", i);
+            sprintf(velBlockNames[i], "/domain_%03d/velocity", i);
+            sprintf(tempBlockNames[i], "/domain_%03d/temp", i);
+        }
+        else
+        {
+            /* this mesh block is another file */ 
+            sprintf(meshBlockNames[i], "silo_%03d.%s:/domain_%03d/qmesh",
+                groupRank, file_ext, i);
+            sprintf(velBlockNames[i], "silo_%03d.%s:/domain_%03d/velocity",
+                groupRank, file_ext, i);
+            sprintf(tempBlockNames[i], "silo_%03d.%s:/domain_%03d/temp",
+                groupRank, file_ext, i);
+        }
+        blockTypes[i] = DB_QUADMESH;
+        varTypes[i] = DB_QUADVAR;
+    }
+
+    /* Write the multi-block objects */
+    DBPutMultimesh(siloFile, "multi_qmesh", size, meshBlockNames, blockTypes, 0);
+    DBPutMultivar(siloFile, "multi_velocity", size, velBlockNames, varTypes, 0);
+    DBPutMultivar(siloFile, "multi_temp", size, tempBlockNames, varTypes, 0);
+
+    /* Clean up */
+    for (i = 0; i < size; i++)
+    {
+        free(meshBlockNames[i]);
+        free(velBlockNames[i]);
+        free(tempBlockNames[i]);
+    }
+    free(meshBlockNames);
+    free(velBlockNames);
+    free(tempBlockNames);
+    free(blockTypes);
+    free(varTypes);
+}
+
+#warning HOW IS A NEW DUMP CLASS HANDLED
+static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
+{
+    DBfile *siloFile;
+    int numGroups = -1;
+    int rank, size;
+    char fileName[256], nsName[256];
+    PMPIO_baton_t *bat;
+
+    /* process cl args */
+    FNAME(process_args)(argi, argc, argv);
+
+    rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
+    size = json_object_path_get_int(main_obj, "parallel/mpi_size");
+
+#warning MOVE TO A FUNCTION
+    /* ensure we're in MIF mode and determine the file count */
+    json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/--parallel_file_mode");
+    if (parfmode_obj)
+    {
+        json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
+        json_object *filecnt = json_object_array_get_idx(parfmode_obj, 1);
+#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
+        if (!strcmp(json_object_get_string(modestr), "SIF"))
+        {
+            MACSIO_ERROR(("Silo plugin doesn't support SIF mode"), MACSIO_FATAL);
+        }
+        else if (strcmp(json_object_get_string(modestr), "MIF"))
+        {
+            MACSIO_ERROR(("Ignoring non-standard MIF mode"), MACSIO_WARN);
+        }
+        numGroups = json_object_get_int(filecnt);
+    }
+    else
+    {
+        char const * modestr = json_object_path_get_string(main_obj, "clargs/--parallel_file_mode");
+        if (!strcmp(modestr, "SIF"))
+        {
+            MACSIO_ERROR(("Silo plugin doesn't support SIF mode"), MACSIO_FATAL);
+        }
+        else if (!strcmp(modestr, "MIFMAX"))
+            numGroups = json_object_path_get_int(main_obj, "parallel/mpi_size");
+        else if (!strcmp(modestr, "MIFAUTO"))
+        {
+            /* Call utility to determine optimal file count */
+#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
+        }
+    }
+
+    /* Initialize PMPIO, pass a pointer to the driver type as the user data. */
+    bat = PMPIO_Init(numGroups, PMPIO_WRITE, MPI_COMM_WORLD, 1,
+        CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
+
+    /* Construct name for the silo file */
+    sprintf(fileName, "%s_silo_%05d.%s",
+        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        PMPIO_GroupRank(bat, rank),
+        json_object_path_get_string(main_obj, "clargs/--fileext"));
+
+    /* Wait for write access to the file. All processors call this.
+     * Some processors (the first in each group) return immediately
+     * with write access to the file. Other processors wind up waiting
+     * until they are given control by the preceeding processor in 
+     * the group when that processor calls "HandOffBaton" */
+    siloFile = (DBfile *) PMPIO_WaitForBaton(bat, fileName, 0);
+
+    json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
+    int numParts = json_object_array_length(parts);
+
+    for (int i = 0; i < numParts; i++)
+    {
+        char domain_dir[256];
+        json_object *this_part = json_object_array_get_idx(parts, i);
+
+        snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
+            json_object_path_get_int(this_part, "ChunkID"));
+ 
+        DBMkDir(siloFile, domain_dir);
+        DBSetDir(siloFile, domain_dir);
+
+
+        DBSetDir(siloFile, "..");
+    }
+
+    /* If this is the 'root' processor, also write Silo's multi-XXX objects */
+    if (rank == 0)
+        WriteMultiXXXObjects(siloFile, bat, size, "foo");
+
+    /* Hand off the baton to the next processor. This winds up closing
+     * the file so that the next processor that opens it can be assured
+     * of getting a consistent and up to date view of the file's contents. */
+    PMPIO_HandOffBaton(bat, siloFile);
+
+    /* We're done using PMPIO, so finish it off */
+    PMPIO_Finish(bat);
+}
+
 static int register_this_interface()
 {
     unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
@@ -329,9 +486,7 @@ static int register_this_interface()
     strcpy(iface_map[id].ext, iface_ext);
 
     /* Must define at least these two methods */
-    iface_map[id].createFileFunc = FNAME(create_file);
-    iface_map[id].openFileFunc = FNAME(open_file);
-
+    iface_map[id].dumpFunc = FNAME(main_dump);
     iface_map[id].processArgsFunc = FNAME(process_args);
 
     return 0;
@@ -345,42 +500,3 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
-
-#if 0
-static int Write_silo(void *buf, size_t nbytes)
-{
-    static int n = 0;
-    int dims[3] = {1, 1, 1};
-    int status;
-
-    dims[0] = nbytes / sizeof(double);
-    if (!has_mesh)
-    {
-        char *coordnames[] = {"x"};
-        void *coords[3] = {0, 0, 0};
-        coords[0] = buf;
-        has_mesh = 1;
-        status = DBPutQuadmesh(dbfile, "mesh", coordnames, coords, dims, 1, DB_DOUBLE, DB_COLLINEAR, 0);
-    }
-    else
-    {
-        char dsname[64];
-        sprintf(dsname, "data_%07d", n++);
-        status = DBPutQuadvar1(dbfile, dsname, "mesh", buf, dims, 1, 0, 0, DB_DOUBLE, DB_NODECENT, 0);
-    }
-
-    if (status < 0) return 0;
-    return nbytes;
-}
-
-static int Read_silo(void *buf, size_t nbytes)
-{
-    char dsname[64];
-    static int n = 0;
-    void *status;
-    sprintf(dsname, "data_%07d", n++);
-    status = DBGetQuadvar(dbfile, dsname);
-    if (status == 0) return 0;
-    return nbytes;
-}
-#endif

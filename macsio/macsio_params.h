@@ -33,7 +33,8 @@ typedef enum _MACSIO_ArgvParamKeys_t {
     vars_per_part,
     num_dumps,
     alignment,
-    filename,
+    filebase,
+    fileext,
     _ArgvParamKeys_max
 } MACSIO_ArgvParamKeys_t;
 static MACSIO_ArgvParamKeys_t argv_param_keychk;

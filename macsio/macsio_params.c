@@ -6,6 +6,7 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
     {interface, 
         "Specify the name of the interface to be tested. Use keyword 'list' "
         "to print a list of all known interfaces and then exit"},
+#warning SHOULD REALLY USE AN ENUM HERE. BUT HOW
     {parallel_file_mode,
         "Specify the parallel file mode. There are several choices. "
         "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then "
@@ -37,8 +38,11 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
         "Total number of dump requests to write or read [10]"},
     {alignment,
         "Not currently document"},
-    {filename,
-        "Not currently document"},
+    {filebase,
+        "Basename of generated file(s). [macsio_]"},
+    {fileext,
+        "Extension of generated file(s). [.dat]"},
+#warning SHOULD REALLY USE AN ENUM HERE. BUT HOW
     {part_type,
         "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured', 'arbitrary'"},
     {_ArgvParamKeys_max, ""}

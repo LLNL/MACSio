@@ -550,8 +550,8 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     int R = size - Q;                   /* # ranks with K parts */
     int nx_parts = total_num_parts, ny_parts = 1, nz_parts = 1;
     int nx = part_size, ny = 1, nz = 1;
-    int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
     int ipart_width = 1, jpart_width = 0, kpart_width = 0;
+    int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
     int part_dims[3];
     double part_bounds[6];
 
@@ -561,7 +561,6 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     else if (dim == 2)
     {
         best_2d_factors(total_num_parts, &nx_parts, &ny_parts);
-printf("nx_parts=%d, ny_parts=%d\n", nx_parts, ny_parts);
         best_2d_factors(part_size, &nx, &ny);
         jpart_width = 1;
     }
@@ -573,14 +572,15 @@ printf("nx_parts=%d, ny_parts=%d\n", nx_parts, ny_parts);
     }
     set_dims(part_dims, nx, ny, nz);
 
+#warning SHOULD MAIN OBJECT KNOW WHERE ALL CHUNKS ARE OR ONLY CHUNKS ON THIS RANK
+    /* We have either K or K+1 parts so randomly select that for each rank */
     srandom(0xDeadBeef);
     rank = 0;
     chunk = 0;
     parts_on_this_rank = K + random() % 2;
     if (parts_on_this_rank == K) R--;
-    if (R < 0)
+    if (R == 0)
     {
-        R = 0;
         parts_on_this_rank = K+1;
         Q--;
     }
@@ -598,15 +598,15 @@ printf("nx_parts=%d, ny_parts=%d\n", nx_parts, ny_parts);
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
                         json_object_path_get_string(main_obj, "clargs/--part_type"));
                     json_object_array_add(part_array, part_obj);
-                    chunk++;
                 }
+                chunk++;
                 parts_on_this_rank--;
-                if (parts_on_this_rank = 0)
+                if (parts_on_this_rank == 0)
                 {
                     rank++;
                     parts_on_this_rank = K + random() % 2;
                     if (parts_on_this_rank == K) R--;
-                    if (R < 0)
+                    if (R <= 0)
                     {
                         R = 0;
                         parts_on_this_rank = K+1;
@@ -692,7 +692,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         MACSIO_ARGV_DEF(vars_per_part, %d),
         MACSIO_ARGV_DEF(num_dumps, %d),
         MACSIO_ARGV_DEF(alignment, %d),
-        MACSIO_ARGV_DEF(filename, %s),
+        MACSIO_ARGV_DEF(filebase, %s),
+        MACSIO_ARGV_DEF(fileext, %s),
         "--driver-args %n",
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
     MACSIO_END_OF_ARGS);
@@ -791,6 +792,7 @@ main(int argc, char *argv[])
     double         t0,t1;
     int            argi;
     int size = 1, rank = 0;
+    double dumpTime = 0;
     char outfName[64];
     FILE *outf;
 
@@ -804,13 +806,20 @@ main(int argc, char *argv[])
 
     opts = SetupDefaultOptions();
 
+#warning SET DEFAULT VALUES FOR CLARGS
+
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(clargs), clargs_obj);
 
+    /* Setup parallel information */
     json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_size), json_object_new_int(size));
     json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_rank), json_object_new_int(rank));
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(parallel), parallel_obj);
+
+    /* Acquire an I/O context handle from the plugin */
+
+    /* Sanity check args */
 
     /* Generate a static problem object to dump on each dump */
     problem_obj = MACSIO_GenerateStaticDumpObject(main_obj);
@@ -824,19 +833,19 @@ main(int argc, char *argv[])
 
     /* Start total timer */
 
-    for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
+    dumpTime = 0.0;
+    for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/--num_dumps"); dumpNum++)
     {
         /* Use 'Fill' for read operation */
-        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(MACSIO_GetStrOption(opts, IOINTERFACE_NAME));
+        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
+            json_object_path_get_string(main_obj, "clargs/--interface"));
 
         /* log dump start */
 
         /* Start dump timer */
 
         /* do the dump */
-/*
-        (*(iface->Dump))(argc, argi, argv, opts, macsio_problem_object, timer_object, dumpNum);
-*/
+        (*(iface->dumpFunc))(argc, argi, argv, main_obj, dumpNum, dumpTime);
 
         /* stop timer */
 

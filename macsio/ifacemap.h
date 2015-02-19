@@ -2,6 +2,7 @@
 #define _IFACEMAP_H
 
 #include <ifacemap.h>
+#include <json-c/json.h>
 #include <macsio.h>
 
 #define MAX_IFACES 32
@@ -24,6 +25,7 @@ typedef struct MACSIO_FileHandle_t* (*OpenFileFunc)     (char const *pathname, i
 
 /* Optional methods */
 typedef MACSIO_optlist_t*           (*ProcessArgsFunc)  (int argi, int argc, char **argv);
+typedef void                        (*DumpFunc)(int argc, int argi, char **argv, json_object *main_obj, int dumpNum, double dumpTime);
 typedef MACSIO_optlist_t*           (*QueryFeaturesFunc)(void);
 typedef int                     (*IdentifyFileFunc) (char const *pathname, MACSIO_optlist_t const *moreopts);
 
@@ -33,6 +35,7 @@ typedef struct MACSIO_IFaceHandle_t
     int                  slotUsed;
     InitInterfaceFunc    initInterfaceFunc;
     ProcessArgsFunc      processArgsFunc;
+    DumpFunc             dumpFunc;
     QueryFeaturesFunc    queryFeaturesFunc;
     IdentifyFileFunc     identifyFileFunc;
     CreateFileFunc       createFileFunc;
