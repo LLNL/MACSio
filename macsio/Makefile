@@ -53,8 +53,11 @@ BASIC_OBJ=$(BASIC_SRC:.c=.o)
 DRIVER_SRC = ioperf_sec2.c ioperf_stdio.c
 CFLAGS += -DHAVE_SEC2 -DHAVE_STDIO
 
-TEST_SRC = tstopts.c
+TEST_SRC = tstopts.c tsttiming.c tstlog.c
 TEST_OBJ=$(TEST_SRC:.c=.o)
+
+TOOL_SRC = probe.c
+TOOL_OBJ=$(TOOL_SRC:.c=.o)
 
 # PDB Lite is part of Silo
 # If Silo is present, append it ahead of HDF5
@@ -116,12 +119,13 @@ help:
 	@echo "    Make [CONFIG_SITE_FILE=<path-to-config-file>] <target>"
 	@echo "    If there is already a config-file in the config-site dir"
 	@echo "        for the host you are on, make should find it automatically."
-	@echo "    Use target 'all' to build everything (default)."
+	@echo "    Use target 'all' to build everything."
 	@echo "    Use target 'macsio' to build an executable with static plugins."
 	@echo "    Use target 'clean' to clean up objects and executables."
-	@echo "    Use target 'allclean' to clean + remove data files and json-c install."
+	@echo "    Use target 'dataclean' to clean + remove various data files."
+	@echo "    Use target 'allclean' to dataclean + remove json-c install."
 
-all: ../json-c/install tsttiming tstlog tstopts macsio
+all: ../json-c/install tsttiming tstlog tstopts macsio probe
 
 ../json-c/install:
 	cd ../json-c; \
@@ -131,18 +135,19 @@ all: ../json-c/install tsttiming tstlog tstopts macsio
 	../json-c-0.12-20140410b/configure CC=$(CC) --prefix=`pwd`/../install; \
         make install
 	
-tsttiming.o: tsttiming.c $(COMMON_HDR)
+probe.o: probe.c
+probe: probe.o
+	$(LINK) $< -o $@ $(LDFLAGS)
 
+tsttiming.o: tsttiming.c $(COMMON_HDR)
 tsttiming: tsttiming.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
 
 tstopts.o: tstopts.c $(COMMON_HDR)
-
 tstopts: tstopts.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
 
 tstlog.o: tstlog.c $(COMMON_HDR)
-
 tstlog: tstlog.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
 
@@ -155,9 +160,11 @@ macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS)
 
 clean:
-	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TST_OBJ)
-	rm -f macsio tstopts *.dat gmon*.out tstopts.o tsttiming.o tsttiming tstlog tstlog.o
+	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
+	rm -f macsio tstopts tsttiming tstlog probe
 
-allclean: clean
-	rm -rf ../json-c/{install,build,json-c-0.12-20140410b}
+dataclean: clean
 	rm -f *.json *.silo *.log
+
+allclean: dataclean
+	rm -rf ../json-c/{install,build,json-c-0.12-20140410b}

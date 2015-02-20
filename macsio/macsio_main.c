@@ -636,6 +636,36 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     return 0;
 }
 
+static int choose_part_count(int K, int mod, int *R, int *Q)
+{
+    int retval = K + random() % mod;
+    if (retval == K)
+    {
+        if (*R > 0)
+        {
+            *R--;
+        }
+        else if (*Q > 0)
+        {
+            retval = K+1;
+            *Q--;
+        }
+    }
+    else
+    {
+        if (*Q > 0)
+        {
+            *Q--;
+        }
+        else if (*R > 0)
+        {
+            retval = K;
+            *R--;
+        }
+    }
+    return retval;
+}
+
 /* Just a very simple spatial partitioning */
 json_object *
 MACSIO_GenerateStaticDumpObject(json_object *main_obj)
@@ -655,6 +685,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     int K1 = K+1;                 /* some ranks get K+1 parts */
     int Q = total_num_parts - size * K; /* # ranks with K+1 parts */
     int R = size - Q;                   /* # ranks with K parts */
+    int mod = ((double)K == avg_num_parts)?1:2;
     int nx_parts = total_num_parts, ny_parts = 1, nz_parts = 1;
     int nx = part_size, ny = 1, nz = 1;
     int ipart_width = 1, jpart_width = 0, kpart_width = 0;
@@ -684,13 +715,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     srandom(0xDeadBeef);
     rank = 0;
     chunk = 0;
-    parts_on_this_rank = K + random() % 2;
-    if (parts_on_this_rank == K) R--;
-    if (R == 0)
-    {
-        parts_on_this_rank = K+1;
-        Q--;
-    }
+    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
     for (ipart = 0; ipart < nx_parts; ipart++)
     {
         for (jpart = 0; jpart < ny_parts; jpart++)
@@ -711,14 +736,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
                 if (parts_on_this_rank == 0)
                 {
                     rank++;
-                    parts_on_this_rank = K + random() % 2;
-                    if (parts_on_this_rank == K) R--;
-                    if (R <= 0)
-                    {
-                        R = 0;
-                        parts_on_this_rank = K+1;
-                        Q--;
-                    }
+                    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
                 }
             }
         }

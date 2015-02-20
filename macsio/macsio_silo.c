@@ -368,7 +368,7 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
 {
     json_object *coordobj;
     json_object *dimsobj;
-    char *coordnames[] = {"X","Y","Z"};
+    char const *coordnames[] = {"X","Y","Z"};
     void const *coords[3];
     int ndims = json_object_path_get_int(part, "Mesh/GeomDim");
     int dims[3] = {1,1,1};
@@ -396,13 +396,15 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
         dimsz[2] = dims[2]-1;
     }
 
-    DBPutQuadmesh(dbfile, "mesh", coordnames, coords, dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
+    DBPutQuadmesh(dbfile, "mesh", (char**) coordnames, coords,
+        dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
 
     json_object *varsobj = json_object_path_get_array(part, "Vars");
     for (int i = 0; i < json_object_array_length(varsobj); i++)
     {
         json_object *varobj = json_object_array_get_idx(varsobj, i);
-        int cent = strcmp(json_object_path_get_string(varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
+        int cent = strcmp(json_object_path_get_string(
+            varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
         int *d = cent==DB_NODECENT?dims:dimsz;
         json_object *dataobj = json_object_path_get_extarr(varobj, "data");
         int dtype = json_object_extarr_type(dataobj)==json_extarr_type_flt64?DB_DOUBLE:DB_INT;
@@ -424,10 +426,15 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     DBfile *siloFile;
     int numGroups = -1;
     int rank, size;
-    char fileName[256], nsName[256];
+    char fileName[256];
     PMPIO_baton_t *bat;
 
+#if 0
     log = Log_Init(MPI_COMM_WORLD, "macsio_silo.log", 128, 20);
+#endif
+
+    /* Without this barrier, I get strange behavior with Silo's PMPIO interface */
+    MPI_Barrier(MPI_COMM_WORLD);
 
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);
@@ -518,7 +525,9 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     /* We're done using PMPIO, so finish it off */
     PMPIO_Finish(bat);
 
+#if 0
     Log_Finalize(log);
+#endif
 }
 
 static int register_this_interface()
