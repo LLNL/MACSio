@@ -111,17 +111,17 @@ DRIVER_OBJ=$(DRIVER_SRC:.c=.o)
 .c.o:
 	$(CXX) $< -o $@ -c $(CFLAGS) -I. $(DRIVER_INCS) 
 
-all: ../json-c/install tsttiming tstlog tstopts macsio
-
 help:
 	@echo "Usage:"
 	@echo "    Make [CONFIG_SITE_FILE=<path-to-config-file>] <target>"
 	@echo "    If there is already a config-file in the config-site dir"
 	@echo "        for the host you are on, make should find it automatically."
 	@echo "    Use target 'all' to build everything (default)."
-	@echo "    Use target 'tstopts' to make test client for IOPoptlist_t testing."
 	@echo "    Use target 'macsio' to build an executable with static plugins."
 	@echo "    Use target 'clean' to clean up objects and executables."
+	@echo "    Use target 'allclean' to clean + remove data files and json-c install."
+
+all: ../json-c/install tsttiming tstlog tstopts macsio
 
 ../json-c/install:
 	cd ../json-c; \
@@ -160,3 +160,4 @@ clean:
 
 allclean: clean
 	rm -rf ../json-c/{install,build,json-c-0.12-20140410b}
+	rm -f *.json *.silo *.log

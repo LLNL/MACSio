@@ -15,7 +15,7 @@ int main (int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-    log = Log_Init(MPI_COMM_WORLD, "tstlog.out", 128, 20);
+    log = Log_Init(MPI_COMM_WORLD, "tstlog.log", 128, 20);
 
     if (rank == 1)
     {
@@ -35,9 +35,7 @@ int main (int argc, char **argv)
         int i;
         for (i = 0; i < 25; i++)
         {
-            char tmp[256];
-            sprintf(tmp, "Outputing line %d for rank %d\n", i, rank);
-            Log(log, tmp);
+            Log(log, "Outputing line %d for rank %d\n", i, rank);
         }
     }
 

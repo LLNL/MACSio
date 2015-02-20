@@ -20,7 +20,7 @@ typedef struct MACSIO_LogHandle_t
 } MACSIO_LogHandle_t;
 
 extern MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int lines_per_proc);
-extern void Log(MACSIO_LogHandle_t *log, char const *msg);
+extern void Log(MACSIO_LogHandle_t *log, char const *fmt, ...);
 extern void Log_Finalize(MACSIO_LogHandle_t *log);
 
 #endif /* _LOG_H */

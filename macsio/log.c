@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -7,11 +8,18 @@
 
 #include <log.h>
 
-void Log(MACSIO_LogHandle_t *log, char const *msg)
+void Log(MACSIO_LogHandle_t *log, char const *fmt, ...)
 {
     int i = 0;
     off_t seek_offset;
+    char *msg = (char *) malloc(log->log_line_length);
     char *buf = (char *) malloc(log->log_line_length);
+    va_list ptr;
+
+    va_start(ptr, fmt);
+    vsnprintf(msg, log->log_line_length-1, fmt, ptr);
+    va_end(ptr);
+    msg[log->log_line_length-1] = '\0';
 
     while (i < strlen(msg) && i < log->log_line_length)
     {
@@ -49,7 +57,6 @@ MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int 
     {
         int i, filefd;
         char *linbuf = (char*) malloc(line_len * lines_per_proc * sizeof(char));
-        printf("Log Init starting\n");
         memset(linbuf, '-', line_len * sizeof(char));
         memset(linbuf+line_len, ' ', line_len * (lines_per_proc-1) * sizeof(char));
         for (i = 0; i < lines_per_proc; i++)
@@ -68,10 +75,6 @@ MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int 
 #ifdef PARALLEL
     MPI_Barrier(comm);
 #endif
-    if (rank == 0)
-    {
-        printf("Log Init finished\n");
-    }
 
     retval = (MACSIO_LogHandle_t *) malloc(sizeof(MACSIO_LogHandle_t));
     /*retval->logfile = open(path, O_WRONLY|O_NONBLOCK);*/

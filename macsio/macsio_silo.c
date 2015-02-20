@@ -11,6 +11,7 @@
 
 #include <ifacemap.h>
 #include <macsio.h>
+#include <log.h>
 #include <options.h>
 #include <util.h>
 
@@ -242,6 +243,8 @@ DBfile *dbfile;
 static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
+#warning MOVE LOG HANDLE TO IO CONTEXT
+static MACSIO_LogHandle_t *log;
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
@@ -277,15 +280,18 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
     DBSetCompression(compression_str);
+#if 0
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
+#endif
+    DBShowErrors(DB_ALL_AND_DRVR, 0);
 
     return 0;
 }
 
 static void *CreateSiloFile(const char *fname, const char *nsname, void *userData)
 {
-    int driver = *((int*) userData);
-    DBfile *siloFile = DBCreate(fname, DB_CLOBBER, DB_LOCAL, "macsio output file", driver);
+    int driverId = *((int*) userData);
+    DBfile *siloFile = DBCreate(fname, DB_CLOBBER, DB_LOCAL, "macsio output file", driverId);
     if (siloFile && nsname)
     {
         DBMkDir(siloFile, nsname);
@@ -297,8 +303,10 @@ static void *CreateSiloFile(const char *fname, const char *nsname, void *userDat
 static void *OpenSiloFile(const char *fname, const char *nsname, PMPIO_iomode_t ioMode,
     void *userData)
 {
-    DBfile *siloFile = DBOpen(fname, DB_UNKNOWN,
-        ioMode == PMPIO_WRITE ? DB_APPEND : DB_READ);
+    int driverId = *((int*) userData);
+    /*Log(log, "DBOpen(\"%s\", %d, %d)", fname, driverId, ioMode==PMPIO_WRITE ? DB_APPEND : DB_READ);*/
+    DBfile *siloFile = DBOpen(fname, driverId, ioMode==PMPIO_WRITE ? DB_APPEND : DB_READ);
+    /*Log(log, "siloFile = %p", siloFile);*/
     if (siloFile && nsname)
     {
         if (ioMode == PMPIO_WRITE)
@@ -419,6 +427,8 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     char fileName[256], nsName[256];
     PMPIO_baton_t *bat;
 
+    log = Log_Init(MPI_COMM_WORLD, "macsio_silo.log", 128, 20);
+
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);
 
@@ -507,6 +517,8 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* We're done using PMPIO, so finish it off */
     PMPIO_Finish(bat);
+
+    Log_Finalize(log);
 }
 
 static int register_this_interface()
