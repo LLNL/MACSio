@@ -2,11 +2,13 @@
 #include <string>
 
 #include <ifacemap.h>
-#include <macsio.h>
+#include <macsio_main.h>
+#include <macsio_params.h>
+#include <log.h>
 #include <options.h>
 #include <util.h>
 
-#ifdef HAVE_PARALLEL
+#ifdef PARALLEL
 #include <mpi.h>
 #endif
 
@@ -16,6 +18,7 @@
 #ifdef HAVE_SILO
 #include <silo.h>
 #endif
+#include <pmpio.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -28,38 +31,6 @@
 #define FNAME(FUNC) FNAME2(FUNC,hdf5)
 #define INAME2(A) #A
 #define INAME INAME2(hdf5)
-
-using std::map;
-using std::string;
-
-typedef struct UnsyncedArrayInfo_t
-{
-    char absname[MACSIO_MAX_ABSNAME];
-    int type;
-    int dims[4];
-} UnsyncedArrayInfo_t;
-
-typedef struct PendingArrayInfo_t
-{
-    char absname[MACSIO_MAX_ABSNAME];
-    int starts[4];
-    int counts[4];
-    int strides[4];
-    void **buf;
-} PendingArrayInfo_t;
-
-/* The driver's file handle "inherits" from the public handle */
-typedef struct FHNDL
-{
-    MACSIO_FileHandlePublic_t pub;
-    hid_t fid;
-    int file_in_sync_with_procs;
-    int procs_in_sync_with_procs;
-    map<string, hid_t> unsyncedGroupsMap;
-    string cwgAbsPath;
-    map<string, UnsyncedArrayInfo_t> unsyncedArraysMap;
-    map<string, PendingArrayInfo_t> pendingArraysMap;
-} FHNDL;
 
 /* the name you want to assign to the interface */
 static char const *iface_name = INAME;
@@ -75,77 +46,7 @@ static int lbuf_size = 0;
 static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
-
-static int FNAME(close_file)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
-static int FNAME(sync_meta)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
-static int FNAME(sync_data)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
-static int FNAME(create_ns)(struct MACSIO_FileHandle_t *fh, char const *nsname, MACSIO_optlist_t const *moreopts);
-static char const *FNAME(set_ns)(struct MACSIO_FileHandle_t *fh, char const *nsname, MACSIO_optlist_t const *moreopts);
-static char const *FNAME(get_ns)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
-static int FNAME(define_array)(MACSIO_FileHandle_t *fh, char const *arrname, int type,
-    int const dims[4], MACSIO_optlist_t const *moreopts);
-static int FNAME(get_array_info)(MACSIO_FileHandle_t *fh, char const *arrname,
-    int *type, int *dims[4], MACSIO_optlist_t const *moreopts);
-static int FNAME(define_array_part)(MACSIO_FileHandle_t *fh, char const *arrname,
-    int const starts[4], int const counts[4], int strides[4], void **buf, MACSIO_optlist_t const *moreopts);
-static int FNAME(start_pending_arrays)(MACSIO_FileHandle_t *fh);
-static int FNAME(finish_pending_arrays)(MACSIO_FileHandle_t *fh);
-
-static char *copy_absname2(char *dst, char const *src)
-{
-    char *retval;
-    if (strlen(src) + 1 > MACSIO_MAX_ABSNAME)
-        MACSIO_ERROR(("name \"%s\" too long", src), MACSIO_FATAL);
-    retval = strncpy(dst, src, MACSIO_MAX_ABSNAME);
-    dst[MACSIO_MAX_ABSNAME-1] = '\0';
-    return retval;
-}
-
-static char *form_and_copy_absname(char *dst, char const *src, char const *dir)
-{
-    if (strlen(src) + strlen(dir) + 1 + 1 > MACSIO_MAX_ABSNAME)
-        MACSIO_ERROR(("attempt to form absolute name \"%s/%s\" too long", src, dir), MACSIO_FATAL);
-    strncpy(dst, dir, MACSIO_MAX_ABSNAME);
-    strcat(dst, "/");
-    return strcat(dst, src);
-}
-
-static char *copy_absname(char *dst, char const *src, char const *dir)
-{
-    if (src[0] == '/')
-        return copy_absname2(dst, src);
-    else
-        return form_and_copy_absname(dst, src, dir);
-}
-
-static MACSIO_FileHandle_t *make_file_handle(hid_t fid)
-{
-    FHNDL *retval;
-    retval = (FHNDL*) calloc(1,sizeof(FHNDL));
-    retval->fid = fid;
-    retval->file_in_sync_with_procs = 1;
-    retval->procs_in_sync_with_procs = 1;
-
-    /* populate file, namespace and array methods here */
-    retval->pub.closeFileFunc = FNAME(close_file);
-
-    retval->pub.syncMetaFunc = FNAME(sync_meta);
-    retval->pub.syncDataFunc = FNAME(sync_data);
-
-    retval->pub.createNamespaceFunc = FNAME(create_ns);
-    retval->pub.setNamespaceFunc = FNAME(set_ns);
-    retval->pub.getNamespaceFunc = FNAME(get_ns);
-
-#if 0
-    retval->pub.defineArrayFunc = FNAME(define_array);
-    retval->pub.getArrayInfoFunc = FNAME(get_array_info);
-    retval->pub.defineArrayPartFunc = FNAME(define_array_part);
-    retval->pub.startPendingArraysFunc = FNAME(start_pending_arrays);
-    retval->pub.finishPendingArraysFunc = FNAME(finish_pending_arrays);
-#endif
-    
-    return (MACSIO_FileHandle_t*) retval;
-}
+static MACSIO_LogHandle_t *log;
 
 static hid_t make_fapl()
 {
@@ -169,7 +70,6 @@ static hid_t make_fapl()
             silo_block_count);
     }
     else
-#endif
     if (use_log)
     {
         int flags = H5FD_LOG_LOC_IO|H5FD_LOG_NUM_IO|H5FD_LOG_TIME_IO|H5FD_LOG_ALLOC;
@@ -179,6 +79,7 @@ static hid_t make_fapl()
 
         h5status |= H5Pset_fapl_log(fapl_id, "macsio_hdf5_log.out", flags, lbuf_size);
     }
+#endif
 
     if (h5status < 0)
     {
@@ -188,161 +89,6 @@ static hid_t make_fapl()
     }
 
     return fapl_id;
-}
-
-static MACSIO_FileHandle_t *FNAME(create_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
-{
-    hid_t fapl_id, fid;
-    fapl_id = make_fapl();
-    fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id); 
-    if (fid < 0) return 0;
-#warning FIX ERROR CHECKING
-    return make_file_handle(fid);
-}
-
-static MACSIO_FileHandle_t *FNAME(open_file)(char const *pathname, int flags, MACSIO_optlist_t const *opts)
-{
-    hid_t fapl_id, fid;
-    fapl_id = make_fapl();
-    fid = H5Fopen(filename,  H5F_ACC_RDWR, fapl_id); 
-    if (fid < 0) return 0;
-#warning FIX ERROR CHECKING
-    return make_file_handle(fid);
-}
-
-static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
-{
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    if (dspc != -1)
-        H5Sclose(dspc);
-    retval = H5Fclose(fh->fid);
-    free(fh);
-    return retval;
-}
-
-static int FNAME(sync_meta)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
-{
-    /* We need to sync all processor's view of the file's groups and datasets */
-    FHNDL *fh = (FHNDL*) _fh;
-#ifdef HAVE_PARALLEL
-    MPI_Comm fileComm = fh->comm;
-#endif
-
-    /* Do an all gather of unsyncedGroups */
-
-    /* Do an all gather of unsyncedArrayInfos */
-
-    /* Unique the list of arrays */
-
-    /* Loop to HDF5 creating relevant groups and datasets */
-
-    return 0;
-}
-
-static int FNAME(sync_data)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
-{
-    int retval = 0;
-    FHNDL *fh = (FHNDL*) _fh;
-    return H5Fflush(fh->fid, H5F_SCOPE_GLOBAL) < 0 ? 1 : 0;
-}
-
-static int FNAME(create_ns)(struct MACSIO_FileHandle_t *_fh, char const *nsname, MACSIO_optlist_t const *moreopts)
-{
-    /* We don't actually do the H5Gcreate here. We only log the request for it.
-     * We create it when we 'sync_file_meta'. */
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    fh->unsyncedGroupsMap[string(nsname)] = 0;
-    return 0;
-}
-
-static char const *FNAME(set_ns)(struct MACSIO_FileHandle_t *_fh, char const *nsname, MACSIO_optlist_t const *moreopts)
-{
-    char const *retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    retval = fh->cwgAbsPath.c_str();
-    if (nsname[0] == '/')
-        fh->cwgAbsPath = string(nsname);
-    else
-        fh->cwgAbsPath = string(retval) + "/" + string(nsname);
-    return retval;
-}
-
-static char const *FNAME(get_ns)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t const *moreopts)
-{
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    return fh->cwgAbsPath.c_str();
-}
-
-static int FNAME(define_array)(MACSIO_FileHandle_t *_fh, char const *arrname, int type,
-    int const dims[4], MACSIO_optlist_t const *moreopts)
-{
-    /* Again, we don't actually do the H5Dcreate here. We only log the request for it.
-     * We create it when we 'sync_file_meta'. */
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    UnsyncedArrayInfo_t info;
-    copy_absname(info.absname, arrname, fh->cwgAbsPath.c_str());
-    info.type = type;
-    info.dims[0] = dims[0];
-    info.dims[1] = dims[1];
-    info.dims[2] = dims[2];
-    info.dims[3] = dims[3];
-    fh->unsyncedArraysMap[info.absname] = info;
-    return 0;
-}
-
-static int FNAME(get_array_info)(MACSIO_FileHandle_t *_fh, char const *arrname,
-    int *type, int *dims[4], MACSIO_optlist_t const *moreopts)
-{
-    /* Not yet implemented */
-    *type = 0;
-    (*dims)[0] = 0;
-    (*dims)[1] = 0;
-    (*dims)[2] = 0;
-    (*dims)[3] = 0;
-    return -1;
-}
-
-static int FNAME(define_array_part)(MACSIO_FileHandle_t *_fh, char const *arrname,
-    int const starts[4], int const counts[4], int strides[4], void **buf, MACSIO_optlist_t const *moreopts)
-{
-    /* Again, we don't actually do the H5Dcreate here. We only log the request for it.
-     * We create it when we 'sync_file_meta'. */
-    int retval;
-    FHNDL *fh = (FHNDL*) _fh;
-    PendingArrayInfo_t info;
-    copy_absname(info.absname, arrname, fh->cwgAbsPath.c_str());
-    info.starts[0] = starts[0];
-    info.starts[1] = starts[1];
-    info.starts[2] = starts[2];
-    info.starts[3] = starts[3];
-    info.counts[0] = counts[0];
-    info.counts[1] = counts[1];
-    info.counts[2] = counts[2];
-    info.counts[3] = counts[3];
-    info.strides[0] = strides[0];
-    info.strides[1] = strides[1];
-    info.strides[2] = strides[2];
-    info.strides[3] = strides[3];
-    info.buf = buf;
-#warning WE NEED TO COPY OPTIONS TOO FOR THINGS LIKE IND VS. COLL I/O
-    fh->pendingArraysMap[info.absname] = info;
-    return 0;
-}
-
-static int FNAME(start_pending_arrays)(MACSIO_FileHandle_t *_fh)
-{
-    /* without the async. i/o engine, HDF5 is blocking. So, we make this a no-op */
-    return 0;
-}
-
-static int FNAME(finish_pending_arrays)(MACSIO_FileHandle_t *_fh)
-{
-    /* Here is where we actually do all the pending I/O operations */
-    return 0;
 }
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
@@ -370,6 +116,209 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
     return 0;
 }
 
+static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
+{
+#ifdef PARALLEL
+    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+    MPI_Info mpiInfo;
+    char fileName[256];
+
+#warning INCLUDE ARGS FOR ISTORE AND K_SYM
+#warning INCLUDE ARG PROCESS FOR HINTS
+    MPI_Info_create(&mpiInfo);
+
+#if 0
+    H5Pset_fapl_mpio(fapl_id, MPI_COMM_WORLD, mpiInfo);
+#endif
+
+    /* Construct name for the silo file */
+    sprintf(fileName, "%s_hdf5.%s",
+        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        json_object_path_get_string(main_obj, "clargs/--fileext"));
+
+    hid_t h5File = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
+
+    H5Fclose(h5File);
+
+#endif
+}
+
+typedef struct _user_data {
+    hid_t groupId;
+} user_data_t;
+
+static void *CreateHDF5File(const char *fname, const char *nsname, void *userData)
+{
+    hid_t *retval = 0;
+    hid_t h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (h5File >= 0)
+    {
+        if (nsname && userData)
+        {
+            user_data_t *ud = (user_data_t *) userData;
+            ud->groupId = H5Gcreate(h5File, nsname, 0);
+        }
+        retval = (hid_t *) malloc(sizeof(hid_t));
+        *retval = h5File;
+    }
+    return (void *) retval;
+}
+
+static void *OpenHDF5File(const char *fname, const char *nsname,
+                   PMPIO_iomode_t ioMode, void *userData)
+{
+    hid_t *retval;
+    hid_t h5File = H5Fopen(fname, ioMode == PMPIO_WRITE ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (h5File >= 0)
+    {
+        if (ioMode == PMPIO_WRITE && nsname && userData)
+        {
+            user_data_t *ud = (user_data_t *) userData;
+            ud->groupId = H5Gcreate(h5File, nsname, 0);
+        }
+        retval = (hid_t *) malloc(sizeof(hid_t));
+        *retval = h5File;
+    }
+    return (void *) retval;
+}
+
+static void CloseHDF5File(void *file, void *userData)
+{
+    if (userData)
+    {
+        user_data_t *ud = (user_data_t *) userData;
+        H5Gclose(ud->groupId);
+    }
+    H5Fclose(*((hid_t*) file));
+    free(file);
+}
+
+static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
+{
+    int size, rank;
+    int numGroups = 3;
+    hid_t *h5File_ptr;
+    hid_t h5File;
+    hid_t h5Group;
+    char fileName[256];
+    int i, len;
+    int *theData;
+    user_data_t userData;
+
+#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
+    PMPIO_baton_t *bat = PMPIO_Init(numFiles, PMPIO_WRITE, MPI_COMM_WORLD, 3,
+        CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
+
+    /* Construct name for the silo file */
+    sprintf(fileName, "%s_hdf5_%05d.%s",
+        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        PMPIO_GroupRank(bat, rank),
+        json_object_path_get_string(main_obj, "clargs/--fileext"));
+
+    h5File_ptr = (hid_t *) PMPIO_WaitForBaton(bat, fileName, 0);
+    h5File = *h5File_ptr;
+    h5Group = userData.groupId;
+
+    json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
+    int numParts = json_object_array_length(parts);
+
+    for (int i = 0; i < numParts; i++)
+    {
+        char domain_dir[256];
+        json_object *this_part = json_object_array_get_idx(parts, i);
+
+        snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
+            json_object_path_get_int(this_part, "Mesh/ChunkID"));
+ 
+#if 0
+        DBMkDir(siloFile, domain_dir);
+        DBSetDir(siloFile, domain_dir);
+
+        write_mesh_part(h5File, this_part);
+
+        DBSetDir(siloFile, "..");
+#endif
+    }
+
+    /* If this is the 'root' processor, also write Silo's multi-XXX objects */
+#if 0
+    if (rank == 0)
+        WriteMultiXXXObjects(main_obj, siloFile, bat);
+#endif
+
+    /* Hand off the baton to the next processor. This winds up closing
+     * the file so that the next processor that opens it can be assured
+     * of getting a consistent and up to date view of the file's contents. */
+    PMPIO_HandOffBaton(bat, h5File_ptr);
+
+    /* We're done using PMPIO, so finish it off */
+    PMPIO_Finish(bat);
+
+#if 0
+    Log_Finalize(log);
+#endif
+}
+
+static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj,
+    int dumpn, double dumpt)
+{
+    int rank, size, numFiles;
+
+#warning SET ERROR MODE OF HDF5 LIBRARY
+
+#warning MAKE LOGGING A CL OPTION
+#if 0
+    log = Log_Init(MPI_COMM_WORLD, "macsio_hdf5.log", 128, 20);
+#endif
+
+    /* Without this barrier, I get strange behavior with Silo's PMPIO interface */
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* process cl args */
+    FNAME(process_args)(argi, argc, argv);
+
+    rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
+    size = json_object_path_get_int(main_obj, "parallel/mpi_size");
+
+#warning MOVE TO A FUNCTION
+    /* ensure we're in MIF mode and determine the file count */
+    json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/--parallel_file_mode");
+    if (parfmode_obj)
+    {
+        json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
+        json_object *filecnt = json_object_array_get_idx(parfmode_obj, 1);
+#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
+        if (strcmp(json_object_get_string(modestr), "MIF"))
+        {
+            MACSIO_ERROR(("Ignoring non-standard MIF mode"), MACSIO_WARN);
+        }
+        numFiles = json_object_get_int(filecnt);
+
+        main_dump_mif(main_obj, numFiles, dumpn, dumpt);
+    }
+    else
+    {
+        char const * modestr = json_object_path_get_string(main_obj, "clargs/--parallel_file_mode");
+        if (!strcmp(modestr, "SIF"))
+        {
+            main_dump_sif(main_obj, dumpn, dumpt);
+        }
+        else if (!strcmp(modestr, "MIFMAX"))
+            numFiles = json_object_path_get_int(main_obj, "parallel/mpi_size");
+        else if (!strcmp(modestr, "MIFAUTO"))
+        {
+            /* Call utility to determine optimal file count */
+#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
+        }
+        main_dump_mif(main_obj, numFiles, dumpn, dumpt);
+    }
+
+#if 0
+    Log_Finalize(log);
+#endif
+
+}
+
 static int register_this_interface()
 {
     unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
@@ -386,9 +335,7 @@ static int register_this_interface()
     strcpy(iface_map[id].ext, iface_ext);
 
     /* Must define at least these two methods */
-    iface_map[id].createFileFunc = FNAME(create_file);
-    iface_map[id].openFileFunc = FNAME(open_file);
-
+    iface_map[id].dumpFunc = FNAME(main_dump);
     iface_map[id].processArgsFunc = FNAME(process_args);
 
     return 0;
@@ -402,47 +349,3 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
-
-#if 0
-static int Write_hdf5(void *buf, size_t nbytes)
-{
-    hid_t dsid;
-    herr_t n1, n2;
-    char dsname[256];
-    static int n = 0;
-    if (dspc == -1)
-    {
-        hsize_t dims = nbytes;
-        dspc = H5Screate_simple(1, &dims, &dims);
-    }
-
-    sprintf(dsname, "data_%07d", n++);
-    dsid = H5Dcreate(fid, dsname, H5T_NATIVE_UCHAR, dspc, H5P_DEFAULT);
-    if (dsid < 0) return 0;
-    n1 = H5Dwrite(dsid, H5T_NATIVE_UCHAR, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-    n2 = H5Dclose(dsid);
-    if (n1 < 0 || n2 < 0) return 0;
-    return nbytes;
-}
-
-static int Read_hdf5(void *buf, size_t nbytes)
-{
-    hid_t dsid;
-    herr_t n1, n2;
-    char dsname[256];
-    static int n = 0;
-    if (dspc == -1)
-    {
-        hsize_t dims = nbytes;
-        dspc = H5Screate_simple(1, &dims, &dims);
-    }
-
-    sprintf(dsname, "data_%07d", n++);
-    dsid = H5Dopen(fid, dsname);
-    if (dsid < 0) return 0;
-    n1 = H5Dread(dsid, H5T_NATIVE_UCHAR, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-    n2  = H5Dclose(dsid);
-    if (n1 < 0 || n2 < 0) return 0;
-    return nbytes;
-}
-#endif

@@ -323,55 +323,6 @@ static void CloseSiloFile(void *file, void *userData)
         DBClose(siloFile);
 }
 
-static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_baton_t *bat)
-{
-    int i;
-    char const *file_ext = json_object_path_get_string(main_obj, "clargs/--fileext");
-    char const *file_base = json_object_path_get_string(main_obj, "clargs/--filebase");
-    int numChunks = json_object_path_get_int(main_obj, "problem/global/TotalParts");
-    char **meshBlockNames = (char **) malloc(numChunks * sizeof(char*));
-    char **varBlockNames = (char **) malloc(numChunks * sizeof(char*));
-    int *blockTypes = (int *) malloc(numChunks * sizeof(int));
-
-    /* Go to root directory in the silo file */
-    DBSetDir(siloFile, "/");
-
-    /* Construct the lists of individual object names */
-    for (i = 0; i < numChunks; i++)
-    {
-        int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
-        int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
-        meshBlockNames[i] = (char *) malloc(1024);
-        if (groupRank == 0)
-        {
-            /* this mesh block is in the file 'root' owns */
-            sprintf(meshBlockNames[i], "/domain_%07d/mesh", i);
-        }
-        else
-        {
-#warning USE SILO NAMESCHEMES INSTEAD
-            sprintf(meshBlockNames[i], "%s_silo_%05d.%s:/domain_%07d/mesh",
-                json_object_path_get_string(main_obj, "clargs/--filebase"),
-                groupRank, 
-                json_object_path_get_string(main_obj, "clargs/--fileext"),
-                i);
-        }
-        blockTypes[i] = DB_QUADMESH;
-    }
-
-    /* Write the multi-block objects */
-    DBPutMultimesh(siloFile, "multi_mesh", numChunks, meshBlockNames, blockTypes, 0);
-
-    /* Clean up */
-    for (i = 0; i < numChunks; i++)
-    {
-        free(meshBlockNames[i]);
-    }
-    free(meshBlockNames);
-    free(varBlockNames);
-    free(blockTypes);
-}
-
 static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
 {
     json_object *coordobj;
@@ -428,6 +379,91 @@ static void write_mesh_part(DBfile *dbfile, json_object *part)
         write_rect_mesh_part(dbfile, part);
 }
 
+static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_baton_t *bat)
+{
+    int i, j;
+    char const *file_ext = json_object_path_get_string(main_obj, "clargs/--fileext");
+    char const *file_base = json_object_path_get_string(main_obj, "clargs/--filebase");
+    int numChunks = json_object_path_get_int(main_obj, "problem/global/TotalParts");
+    char **blockNames = (char **) malloc(numChunks * sizeof(char*));
+    int *blockTypes = (int *) malloc(numChunks * sizeof(int));
+
+    /* Go to root directory in the silo file */
+    DBSetDir(siloFile, "/");
+
+    /* Construct the lists of individual object names */
+    for (i = 0; i < numChunks; i++)
+    {
+        int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
+        int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
+        blockNames[i] = (char *) malloc(1024);
+        if (groupRank == 0)
+        {
+            /* this mesh block is in the file 'root' owns */
+            sprintf(blockNames[i], "/domain_%07d/mesh", i);
+        }
+        else
+        {
+#warning USE SILO NAMESCHEMES INSTEAD
+            sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/mesh",
+                json_object_path_get_string(main_obj, "clargs/--filebase"),
+                groupRank, 
+                json_object_path_get_string(main_obj, "clargs/--fileext"),
+                i);
+        }
+        blockTypes[i] = DB_QUADMESH;
+    }
+
+    /* Write the multi-block objects */
+    DBPutMultimesh(siloFile, "multi_mesh", numChunks, blockNames, blockTypes, 0);
+
+    /* Clean up */
+    for (i = 0; i < numChunks; i++)
+        free(blockNames[i]);
+
+    json_object *parts_array = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *first_part = json_object_array_get_idx(parts_array, 0);
+    json_object *vars_array = json_object_path_get_array(first_part, "Vars");
+    int numVars = json_object_array_length(vars_array);
+    for (j = 0; j < numVars; j++)
+    {
+        json_object *varobj = json_object_array_get_idx(vars_array, j);
+        char const *varname = json_object_path_get_string(varobj, "name");
+
+        for (i = 0; i < numChunks; i++)
+        {
+            int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
+            int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
+            blockNames[i] = (char *) malloc(1024);
+            if (groupRank == 0)
+            {
+                /* this mesh block is in the file 'root' owns */
+                sprintf(blockNames[i], "/domain_%07d/%s", i, varname);
+            }
+            else
+            {
+#warning USE SILO NAMESCHEMES INSTEAD
+                sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/%s",
+                    json_object_path_get_string(main_obj, "clargs/--filebase"),
+                    groupRank, 
+                    json_object_path_get_string(main_obj, "clargs/--fileext"),
+                    i,varname);
+            }
+            blockTypes[i] = DB_QUADVAR;
+        }
+
+        /* Write the multi-block objects */
+        DBPutMultivar(siloFile, varname, numChunks, blockNames, blockTypes, 0);
+
+        /* Clean up */
+        for (i = 0; i < numChunks; i++)
+            free(blockNames[i]);
+    }
+
+    free(blockNames);
+    free(blockTypes);
+}
+
 #warning HOW IS A NEW DUMP CLASS HANDLED
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
@@ -437,10 +473,12 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     char fileName[256];
     PMPIO_baton_t *bat;
 
+#warning MAKE LOGGING A CL OPTION
 #if 0
     log = Log_Init(MPI_COMM_WORLD, "macsio_silo.log", 128, 20);
 #endif
 
+#warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
     /* Without this barrier, I get strange behavior with Silo's PMPIO interface */
     MPI_Barrier(MPI_COMM_WORLD);
 
