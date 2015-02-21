@@ -10,7 +10,7 @@
 #endif
 
 #include <ifacemap.h>
-#include <macsio.h>
+#include <macsio_main.h>
 #include <log.h>
 #include <options.h>
 #include <util.h>
@@ -323,44 +323,52 @@ static void CloseSiloFile(void *file, void *userData)
         DBClose(siloFile);
 }
 
-static void WriteMultiXXXObjects(DBfile *siloFile, PMPIO_baton_t *bat, int size,
-    const char *file_ext)
+static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_baton_t *bat)
 {
     int i;
-    char **meshBlockNames = (char **) malloc(size * sizeof(char*));
-    int *blockTypes = (int *) malloc(size * sizeof(int));
+    char const *file_ext = json_object_path_get_string(main_obj, "clargs/--fileext");
+    char const *file_base = json_object_path_get_string(main_obj, "clargs/--filebase");
+    int numChunks = json_object_path_get_int(main_obj, "problem/global/TotalParts");
+    char **meshBlockNames = (char **) malloc(numChunks * sizeof(char*));
+    char **varBlockNames = (char **) malloc(numChunks * sizeof(char*));
+    int *blockTypes = (int *) malloc(numChunks * sizeof(int));
 
     /* Go to root directory in the silo file */
     DBSetDir(siloFile, "/");
 
     /* Construct the lists of individual object names */
-    for (i = 0; i < size; i++)
+    for (i = 0; i < numChunks; i++)
     {
-        int groupRank = PMPIO_GroupRank(bat, i);
+        int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
+        int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
         meshBlockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
         {
             /* this mesh block is in the file 'root' owns */
-            sprintf(meshBlockNames[i], "/domain_%07d/qmesh", i);
+            sprintf(meshBlockNames[i], "/domain_%07d/mesh", i);
         }
         else
         {
-            /* this mesh block is another file */ 
-            sprintf(meshBlockNames[i], "macsio_silo_%05d.%s:/domain_%07d/mesh",
-                groupRank, file_ext, i);
+#warning USE SILO NAMESCHEMES INSTEAD
+            sprintf(meshBlockNames[i], "%s_silo_%05d.%s:/domain_%07d/mesh",
+                json_object_path_get_string(main_obj, "clargs/--filebase"),
+                groupRank, 
+                json_object_path_get_string(main_obj, "clargs/--fileext"),
+                i);
         }
         blockTypes[i] = DB_QUADMESH;
     }
 
     /* Write the multi-block objects */
-    DBPutMultimesh(siloFile, "multi_mesh", size, meshBlockNames, blockTypes, 0);
+    DBPutMultimesh(siloFile, "multi_mesh", numChunks, meshBlockNames, blockTypes, 0);
 
     /* Clean up */
-    for (i = 0; i < size; i++)
+    for (i = 0; i < numChunks; i++)
     {
         free(meshBlockNames[i]);
     }
     free(meshBlockNames);
+    free(varBlockNames);
     free(blockTypes);
 }
 
@@ -514,8 +522,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */
     if (rank == 0)
-        WriteMultiXXXObjects(siloFile, bat, size,
-            json_object_path_get_string(main_obj, "clargs/--fileext"));
+        WriteMultiXXXObjects(main_obj, siloFile, bat);
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured

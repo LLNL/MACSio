@@ -46,7 +46,7 @@ COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
 BASIC_SRC = macsio_main.c
-BASIC_HDR= macsio.h
+BASIC_HDR= macsio_main.h
 BASIC_OBJ=$(BASIC_SRC:.c=.o)
 
 # Unix stdio and sec2 drivers always present

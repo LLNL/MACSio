@@ -57,6 +57,7 @@ static MACSIO_ParallelParamKeys_t parallel_param_keychk;
 /* Parameter keys for MACSio's mesh synthesis */
 typedef enum _MACSIO_MeshParamKeys_t {
     _MeshParamKeys_min = 0,
+    global,
     parts,
     _MeshParamKeys_max
 } MACSIO_MeshParamKeys_t;

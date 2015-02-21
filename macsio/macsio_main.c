@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 #include <ifacemap.h>
-#include <macsio.h>
+#include <macsio_main.h>
 #include <macsio_params.h>
 #include <util.h>
 
@@ -182,6 +182,7 @@ make_dims_array(int ndims, const int *dims)
     return dims_array;
 }
 
+#warning WOULD BE MORE CONSISTENT TO STORE AS MIN/MAX PAIRS
 static json_object *
 make_bounds_array(double const * bounds)
 {
@@ -558,6 +559,8 @@ make_arb_mesh_topology(int ndims, int const *dims)
     return 0;
 }
 
+#warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
+#warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
 static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *mesh_chunk = json_object_new_object();
@@ -572,6 +575,7 @@ static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *d
     return mesh_chunk;
 }
 
+#warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
 static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
 {
     json_object *chunk_obj = json_object_new_object();
@@ -638,6 +642,7 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
 
 static int choose_part_count(int K, int mod, int *R, int *Q)
 {
+    /* We have either K or K+1 parts so randomly select that for each rank */
     int retval = K + random() % mod;
     if (retval == K)
     {
@@ -666,13 +671,20 @@ static int choose_part_count(int K, int mod, int *R, int *Q)
     return retval;
 }
 
-/* Just a very simple spatial partitioning */
-json_object *
-MACSIO_GenerateStaticDumpObject(json_object *main_obj)
+#warning GET FUNTION NAMING CONSISTENT THROUGHOUT SOURCE FILES
+#warning COULD IMPROVE DESIGN A BIT BY SEPARATING ALGORITHM FOR GEN WITH A CALLBACK
+/* Just a very simple spatial partitioning. We use the same exact algorithm
+   to determine which rank owns a chunk. So, we overload this method and
+   for that purpose as well even though in that case, it doesn generate
+   anything. */
+static json_object *
+MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
 {
 #warning FIX READ ACCESS TO KEYS MAKE IT TYPE SAFE
-    json_object *mesh_obj = json_object_new_object();
-    json_object *part_array = json_object_new_array();
+#warning FIX LEAK OF OBJECTS FOR QUERY CASE
+    json_object *mesh_obj = rank_owning_chunkId?0:json_object_new_object();
+    json_object *global_obj = rank_owning_chunkId?0:json_object_new_object();
+    json_object *part_array = rank_owning_chunkId?0:json_object_new_array();
     int size = json_object_path_get_int(main_obj, "parallel/mpi_size");
     int part_size = json_object_path_get_int(main_obj, "clargs/--part_size") / sizeof(double);
     double avg_num_parts = json_object_path_get_double(main_obj, "clargs/--avg_num_parts");
@@ -690,12 +702,14 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
     int nx = part_size, ny = 1, nz = 1;
     int ipart_width = 1, jpart_width = 0, kpart_width = 0;
     int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
-    int part_dims[3];
-    double part_bounds[6];
+    int part_dims[3], part_block_dims[3], global_dims[3];
+    double part_bounds[6], global_bounds[6];
 
     /* Determine spatial size and arrangement of parts */
     if (dim == 1)
+    {
         ; /* no-op */
+    }
     else if (dim == 2)
     {
         best_2d_factors(total_num_parts, &nx_parts, &ny_parts);
@@ -709,12 +723,21 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
         kpart_width = 1;
     }
     set_dims(part_dims, nx, ny, nz);
+    set_dims(part_block_dims, nx_parts, ny_parts, nz_parts);
+    set_bounds(global_bounds, 0, 0, 0,
+        nx_parts * ipart_width, ny_parts * jpart_width, nz_parts * kpart_width);
+    if (!rank_owning_chunkId)
+    {
+        json_object_object_add(global_obj, "TotalParts", json_object_new_int(total_num_parts));
+        json_object_object_add(global_obj, "LogDims", make_dims_array(dim, part_block_dims));
+        json_object_object_add(global_obj, "Bounds", make_bounds_array(global_bounds));
+        json_object_object_add(mesh_obj, MACSIO_MESH_KEY(global), global_obj);
+    }
 
 #warning SHOULD MAIN OBJECT KNOW WHERE ALL CHUNKS ARE OR ONLY CHUNKS ON THIS RANK
-    /* We have either K or K+1 parts so randomly select that for each rank */
-    srandom(0xDeadBeef);
     rank = 0;
     chunk = 0;
+    srandom(0xDeadBeef); /* initialize for choose_part_count */
     parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
     for (ipart = 0; ipart < nx_parts; ipart++)
     {
@@ -722,7 +745,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
         {
             for (kpart = 0; kpart < nz_parts; kpart++)
             {
-                if (rank == myrank)
+                if (!rank_owning_chunkId && rank == myrank)
                 {
                     /* build mesh part on this rank */
                     set_bounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
@@ -730,6 +753,11 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
                         json_object_path_get_string(main_obj, "clargs/--part_type"));
                     json_object_array_add(part_array, part_obj);
+                }
+                else if (rank_owning_chunkId && *rank_owning_chunkId == chunk)
+                {
+                    *rank_owning_chunkId = rank;
+                    return 0;
                 }
                 chunk++;
                 parts_on_this_rank--;
@@ -745,6 +773,13 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj)
 
     return mesh_obj;
 
+}
+
+int MACSIO_GetRankOwningPart(json_object *main_obj, int chunkId)
+{
+    int tmp = chunkId;
+    MACSIO_GenerateStaticDumpObject(main_obj, &tmp);
+    return tmp;
 }
 
 static void handle_help_request_and_exit(int argi, int argc, char **argv)
@@ -950,7 +985,7 @@ main(int argc, char *argv[])
     /* Sanity check args */
 
     /* Generate a static problem object to dump on each dump */
-    problem_obj = MACSIO_GenerateStaticDumpObject(main_obj);
+    problem_obj = MACSIO_GenerateStaticDumpObject(main_obj,0);
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(problem), problem_obj);
 
     /* Just here for debugging for the moment */
