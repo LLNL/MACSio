@@ -216,6 +216,8 @@ make_uniform_mesh_coords(int ndims, int const *dims, double const *bounds)
     return coords;
 }
 
+#warning PACKAGE EXTARR METHOD WITH CHECKSUM STUFF
+
 static json_object *
 make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
 {
@@ -518,6 +520,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
             }
         }
     }
+#warning ADD CHECKSUM TO JSON OBJECT
 
     return var_obj; 
 
@@ -702,7 +705,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
     int nx = part_size, ny = 1, nz = 1;
     int ipart_width = 1, jpart_width = 0, kpart_width = 0;
     int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
-    int part_dims[3], part_block_dims[3], global_dims[3];
+    int part_dims[3], part_block_dims[3], global_log_dims[3], global_indices[3];
     double part_bounds[6], global_bounds[6];
 
     /* Determine spatial size and arrangement of parts */
@@ -724,12 +727,15 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
     }
     set_dims(part_dims, nx, ny, nz);
     set_dims(part_block_dims, nx_parts, ny_parts, nz_parts);
+    set_dims(global_log_dims, nx * nx_parts, ny * ny_parts, nz * nz_parts);
     set_bounds(global_bounds, 0, 0, 0,
         nx_parts * ipart_width, ny_parts * jpart_width, nz_parts * kpart_width);
     if (!rank_owning_chunkId)
     {
         json_object_object_add(global_obj, "TotalParts", json_object_new_int(total_num_parts));
-        json_object_object_add(global_obj, "LogDims", make_dims_array(dim, part_block_dims));
+#warning NOT SURE PartsLogDims IS USEFUL IN GENERAL CASE
+        json_object_object_add(global_obj, "PartsLogDims", make_dims_array(dim, part_block_dims));
+        json_object_object_add(global_obj, "LogDims", make_dims_array(dim, global_log_dims));
         json_object_object_add(global_obj, "Bounds", make_bounds_array(global_bounds));
         json_object_object_add(mesh_obj, MACSIO_MESH_KEY(global), global_obj);
     }
@@ -747,11 +753,21 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
             {
                 if (!rank_owning_chunkId && rank == myrank)
                 {
+                    int global_log_origin[3];
+
                     /* build mesh part on this rank */
                     set_bounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
                         json_object_path_get_string(main_obj, "clargs/--part_type"));
+                    set_dims(global_indices, ipart, jpart, kpart);
+#warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
+#warning GlogalLogIndices MAY NOT BE NEEDED
+                    json_object_object_add(part_obj, "GlobalLogIndices",
+                        make_dims_array(dim, global_indices));
+                    set_dims(global_log_origin, ipart * nx, jpart * ny, kpart * nz);
+                    json_object_object_add(part_obj, "GlobalLogOrigin",
+                        make_dims_array(dim, global_log_origin));
                     json_object_array_add(part_array, part_obj);
                 }
                 else if (rank_owning_chunkId && *rank_owning_chunkId == chunk)
@@ -858,7 +874,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
     MACSIO_END_OF_ARGS);
 
+#warning FIXME
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
+    plugin_args_start = argc;
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_ARGV_HELP)
@@ -979,6 +997,7 @@ main(int argc, char *argv[])
     json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_rank), json_object_new_int(rank));
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(parallel), parallel_obj);
 
+#warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEY'RE RESTRICTED
 #warning CREATE AN IO CONTEXT OBJECT
     /* Acquire an I/O context handle from the plugin */
 
@@ -988,6 +1007,7 @@ main(int argc, char *argv[])
     problem_obj = MACSIO_GenerateStaticDumpObject(main_obj,0);
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(problem), problem_obj);
 
+#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
     snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", rank);
     outf = fopen(outfName, "w");

@@ -19,12 +19,12 @@ DRIVER_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
 
 SILO_INC=$(SILO_HOME)/include
 SILO_LIB=$(SILO_HOME)/lib
-SILO_LDFLAGS=-lsiloh5
+SILO_LDFLAGS=-lsiloh5 -lz
 
 #  This is for PDB Lite, not to be confused with PDB
 PDBL_INC=$(SILO_HOME)/include
 PDBL_LIB=$(SILO_HOME)/lib
-PDBL_LDFLAGS=-lsiloh5
+PDBL_LDFLAGS=-lsiloh5 -lz
 
 HDF5_INC=$(HDF5_HOME)/include
 HDF5_LIB=$(HDF5_HOME)/lib
