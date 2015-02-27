@@ -347,6 +347,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     int *theData;
     user_data_t userData;
 
+#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 #warning SET FILE AND DATASET PROPERTIES
 #warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
     PMPIO_baton_t *bat = PMPIO_Init(numFiles, PMPIO_WRITE, MPI_COMM_WORLD, 3,
