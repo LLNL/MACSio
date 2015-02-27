@@ -306,6 +306,35 @@ static void CloseHDF5File(void *file, void *userData)
     free(file);
 }
 
+static void write_mesh_part(hid_t h5loc, json_object *part_obj)
+{
+#warning WE'RE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
+    int i;
+    json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
+    for (i = 0; i < json_object_array_length(vars_array); i++)
+    {
+        int j;
+        hsize_t var_dims[3];
+        hid_t fspace_id, ds_id;
+        json_object *var_obj = json_object_array_get_idx(vars_array, i);
+        json_object *data_obj = json_object_path_get_extarr(var_obj, "data");
+        char const *varname = json_object_path_get_string(var_obj, "name");
+        int ndims = json_object_extarr_ndims(data_obj);
+        void const *buf = json_object_extarr_data(data_obj);
+        hid_t dtype_id = json_object_extarr_type(data_obj)==json_extarr_type_flt64? 
+                H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
+
+        for (j = 0; j < ndims; j++)
+            var_dims[j] = json_object_extarr_dim(data_obj, j);
+
+        fspace_id = H5Screate_simple(ndims, var_dims, 0);
+        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, H5P_DEFAULT); 
+        H5Dwrite(ds_id, dtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
+        H5Dclose(ds_id);
+        H5Sclose(fspace_id);
+    }
+}
+
 static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
 {
     int size, rank;
@@ -318,9 +347,13 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     int *theData;
     user_data_t userData;
 
+#warning SET FILE AND DATASET PROPERTIES
 #warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
     PMPIO_baton_t *bat = PMPIO_Init(numFiles, PMPIO_WRITE, MPI_COMM_WORLD, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
+
+    rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
+    size = json_object_path_get_int(main_obj, "parallel/mpi_size");
 
     /* Construct name for the silo file */
     sprintf(fileName, "%s_hdf5_%05d.%s",
@@ -333,24 +366,21 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     h5Group = userData.groupId;
 
     json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
-    int numParts = json_object_array_length(parts);
 
-    for (int i = 0; i < numParts; i++)
+    for (int i = 0; i < json_object_array_length(parts); i++)
     {
         char domain_dir[256];
         json_object *this_part = json_object_array_get_idx(parts, i);
+        hid_t domain_group_id;
 
         snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
             json_object_path_get_int(this_part, "Mesh/ChunkID"));
  
-#if 0
-        DBMkDir(siloFile, domain_dir);
-        DBSetDir(siloFile, domain_dir);
+        domain_group_id = H5Gcreate1(h5File, domain_dir, 0);
 
-        write_mesh_part(h5File, this_part);
+        write_mesh_part(domain_group_id, this_part);
 
-        DBSetDir(siloFile, "..");
-#endif
+        H5Gclose(domain_group_id);
     }
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */

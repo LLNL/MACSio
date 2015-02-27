@@ -358,10 +358,10 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     DBPutQuadmesh(dbfile, "mesh", (char**) coordnames, coords,
         dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
 
-    json_object *varsobj = json_object_path_get_array(part, "Vars");
-    for (int i = 0; i < json_object_array_length(varsobj); i++)
+    json_object *vars_array = json_object_path_get_array(part, "Vars");
+    for (int i = 0; i < json_object_array_length(vars_array); i++)
     {
-        json_object *varobj = json_object_array_get_idx(varsobj, i);
+        json_object *varobj = json_object_array_get_idx(vars_array, i);
         int cent = strcmp(json_object_path_get_string(
             varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
         int *d = cent==DB_NODECENT?dims:dimsz;
