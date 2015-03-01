@@ -37,6 +37,7 @@ static char const *paste_my_path(char const *first, ...)
 }
 
 
+/* Using Variadic macros */
 #define FOO_MY_PATH(...) #__VA_ARGS__
 #define PASTE_MY_PATH(...) paste_my_path(__VA_ARGS__,NIX)
 
