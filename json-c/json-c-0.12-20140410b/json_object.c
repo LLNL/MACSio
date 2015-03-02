@@ -1313,52 +1313,28 @@ static void *json_object_path_get_voidptr(struct json_object *src, char const *k
 static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char *key_path)
 {
 #warning we need to support . and .. notation here too
+    int idx;
     struct json_object *sub_object = 0;
-    char *slash_char_p;
-    char *brack_char_p;
+    char *slash_char_p, *next = 0;
 
-    if (!src || !key_path) return 0;
+    if (!src) return 0;
+    if (!key_path) return src;
 
-    slash_char_p = strchr(key_path,'/');
-    brack_char_p = strchr(key_path,'[');
-
-    if ((brack_char_p && slash_char_p && brack_char_p < slash_char_p) ||
-         brack_char_p)
-    {
-        char *ep = 0; int idx;
-        errno = 0;
-        idx = (int) strtol(brack_char_p+1,&ep,10);
-        *brack_char_p = '\0';
-        if (errno == 0 && ep != brack_char_p+1 &&
-            json_object_object_get_ex(src, key_path, &sub_object) &&
-            sub_object && json_object_is_type(sub_object, json_type_array) &&
-            (0 <= idx && idx < json_object_array_length(sub_object)))
-        {
-            struct json_object *array_obj = json_object_array_get_idx(sub_object,idx);
-            if (array_obj && slash_char_p)
-                return json_object_apath_get_leafobj_recurse(array_obj, slash_char_p+1);
-            else
-                return array_obj;
-        }
-        else if (slash_char_p) /* treat as though '[123...9]' is just part of the object's name */
-        {
-            *slash_char_p = '\0';
-            if (json_object_object_get_ex(src, key_path, &sub_object))
-                return json_object_apath_get_leafobj_recurse(sub_object, slash_char_p+1);
-        }
-    }
-    else if (slash_char_p)
+    slash_char_p = strchr(key_path, '/');
+    if (slash_char_p)
     {
         *slash_char_p = '\0';
-        if (json_object_object_get_ex(src, key_path, &sub_object))
-            return json_object_apath_get_leafobj_recurse(sub_object, slash_char_p+1);
+        next = slash_char_p+1;
     }
-    else
-    {
-        if (json_object_object_get_ex(src, key_path, &sub_object))
-            return sub_object;
-    }
-    return 0;
+    errno = 0;
+    idx = (int) strtol(key_path, 0, 10);
+    
+    if (json_object_is_type(src, json_type_array) && errno == 0 &&
+        0 <= idx && idx < json_object_array_length(src))
+        return json_object_apath_get_leafobj_recurse(json_object_array_get_idx(src, idx), next);
+    if (json_object_object_get_ex(src, key_path, &sub_object) && sub_object)
+        return json_object_apath_get_leafobj_recurse(sub_object, next);
+    return src;
 }
 
 static struct json_object* json_object_apath_get_leafobj(struct json_object *obj, char const *key_path)

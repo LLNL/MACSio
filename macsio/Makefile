@@ -125,11 +125,12 @@ help:
 	@echo "    Use target 'dataclean' to clean + remove various data files."
 	@echo "    Use target 'allclean' to dataclean + remove json-c install."
 
-all: ../json-c/install tsttiming tstlog tstopts macsio probe
+all: json-c tsttiming tstlog tstopts macsio probe
+
+json-c: ../json-c/install
 
 ../json-c/install:
 	cd ../json-c; \
-	gunzip < json-c-0.12-20140410b.tar.gz | tar xf -; \
 	mkdir build install; \
 	cd build; \
 	../json-c-0.12-20140410b/configure CC=$(CC) --prefix=`pwd`/../install; \
@@ -167,4 +168,4 @@ dataclean: clean
 	rm -f *.json *.silo *.log
 
 allclean: dataclean
-	rm -rf ../json-c/{install,build,json-c-0.12-20140410b}
+	rm -rf ../json-c/{install,build}

@@ -166,12 +166,12 @@ int main(int argc, char **argv)
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_apath_get_int(filobj, "steve/cameron/b"),
                 json_object_apath_get_int(filobj, "abc"));
-            printf("\"array[2]\" = %d\n",
-                json_object_apath_get_int(filobj, "array[2]"));
-            printf("\"array2[2]/sandy\" = \"%s\"\n",
-                json_object_apath_get_string(filobj, "array2[2]/sandy"));
-            printf("\"array[2]\" = \"%s\"\n",
-                json_object_apath_get_string(filobj, "array[2]"));
+            printf("\"array/2\" = %d\n",
+                json_object_apath_get_int(filobj, "array/2"));
+            printf("\"array2/6/cameron/a\" = %d\n",
+                json_object_apath_get_int(filobj, "array2/6/cameron/a"));
+            printf("\"array2/2\" = \"%s\"\n",
+                json_object_apath_get_string(filobj, "array2/2"));
         }
         {
             struct json_object *eobj = json_object_new_enum();

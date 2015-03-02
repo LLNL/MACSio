@@ -7,8 +7,10 @@ numbered 0.12-20140410.
 It has been modified to support
      * Optimized, homogenously typed, multi-dimensional arrays.
        That is, arrays whose members are NOT json objects but
-       the individual array elements in a larger buffer.
+       the individual array elements in a larger buffer. These
+       are 'extarr' object types.
      * Enumerated types.
+     * Path-oriented object get/set methods.
 
 These modifications have not been pushed back to JSON-C 
 implementors primarily because they sorta break the JSON-C
