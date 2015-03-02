@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -1495,6 +1496,43 @@ struct json_object *json_object_apath_get_object(struct json_object *obj, char c
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
     if (leafobj) return leafobj;
     return 0;
+}
+
+char const *json_paste_path(char const *first, ...)
+{
+    static char retbuf[4096];
+    int n = sizeof(retbuf);
+    static char tmpstr[32];
+    int val;
+    char *str;
+
+    va_list ap;
+    va_start(ap, first);
+
+    retbuf[0] = '\0';
+    strncat(retbuf, first, n);
+    n -= strlen(first);
+    val = va_arg(ap, int);
+
+    while (val != JSON_C_NIX && n)
+    {
+        snprintf(tmpstr, sizeof(tmpstr), "%d", val);
+        tmpstr[sizeof(tmpstr)-1] = '\0';
+        if (retbuf[sizeof(retbuf)-n-1] != '/')
+        {
+            strncat(retbuf, "/", n);
+            n -= 1;
+        }
+        strncat(retbuf, tmpstr, n);
+        n -= strlen(tmpstr);
+        str = va_arg(ap, char*);
+        strncat(retbuf, str, n);
+        n -= strlen(str);
+        val = va_arg(ap, int);
+    }
+    va_end(ap);
+
+    return retbuf;
 }
 
 static void *json_object_path_get_leafobj_recurse(struct json_object *src, char *key_path, json_type jtype)

@@ -650,7 +650,10 @@ extern struct json_object * json_object_path_get_any(struct json_object *src, ch
 extern json_bool    json_object_object_path_get_ex(struct json_object *src, char const *key_path, struct json_object **val);
 
 /* apath methods are an improvement over path methods (for gets anyways).
-   They support paths with arrays, "/foo/bar[16]/gorfo[32]/dims"
+   They support paths with intermediate array objects as in
+       "/foo/bar/16/gorfo/32/11/dims"
+           where "bar" is an array object and '16' is the index we want and
+           where "gorfo" is an array object whose members are also array objects, etc.
    and do sane casting to return type whenever needed. */
 extern json_bool    json_object_apath_get_boolean(struct json_object *src, char const *key_path);
 extern int          json_object_apath_get_int(struct json_object *src, char const *key_path);
@@ -658,6 +661,16 @@ extern int64_t      json_object_apath_get_int64(struct json_object *src, char co
 extern double       json_object_apath_get_double(struct json_object *src, char const *key_path);
 extern char const * json_object_apath_get_string(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_apath_get_object(struct json_object *src, char const *key_path);
+
+/* using variadic macros here */
+extern char const *json_paste_path(char const *, ...);
+#define JSON_C_NIX -1
+#define JsonGetBool(OBJ, ...)  json_object_apath_get_boolean(OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+#define JsonGetInt(OBJ, ...)   json_object_apath_get_int(    OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+#define JsonGetInt64(OBJ, ...) json_object_apath_get_int64(  OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+#define JsonGetDbl(OBJ, ...)   json_object_apath_get_double( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+#define JsonGetStr(OBJ, ...)   json_object_apath_get_string( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+#define JsonGetObj(OBJ, ...)   json_object_apath_get_object( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
 
 /* primitive value overwrite (set) methods */
 extern json_bool json_object_set_boolean(struct json_object *bool_obj, json_bool val);

@@ -22,11 +22,16 @@ static char const *paste_my_path(char const *first, ...)
 
     while (val != NIX && n)
     {
-        char *str = va_arg(ap, char*);
         snprintf(tmpstr, sizeof(tmpstr), "%d", val);
         tmpstr[sizeof(tmpstr)-1] = '\0';
+        if (retbuf[sizeof(retbuf)-n-1] != '/')
+        {
+            strncat(retbuf, "/", n);
+            n -= 1;
+        }
         strncat(retbuf, tmpstr, n);
         n -= strlen(tmpstr);
+        char *str = va_arg(ap, char*);
         strncat(retbuf, str, n);
         n -= strlen(str);
         val = va_arg(ap, int);
@@ -45,7 +50,8 @@ int main()
 {
     int i=13, j=1234;
     
-    printf("\"%s\"\n", PASTE_MY_PATH("/foo/bar/gorfo[",i,"]/alice/mark[",j,"]/bob"));
+    printf("\"%s\"\n", PASTE_MY_PATH("/foo/bar/gorfo",i,"/alice/mark",j,"/bob"));
+    printf("\"%s\"\n", PASTE_MY_PATH("/foo/bar/gorfo/",i,"/alice/mark/",j,"/bob"));
     printf("\"%s\"\n", FOO_MY_PATH(/foo/bar/gorfo[,i,]/alice/mark[,j,]/bob));
     printf("\"%s\"\n", paste_my_path("/mark/steve",NIX));
     return 0;
