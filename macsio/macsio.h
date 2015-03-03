@@ -4,11 +4,17 @@
 #include <options.h>
 
 #include <stddef.h>
+#include <stdlib.h>
 
 #define MACSIO_MAX_NAME 16 
 #define MACSIO_MAX_NS_DEPTH 10
 #define MACSIO_MAX_ABSNAME (MACSIO_MAX_NS_DEPTH*(MACSIO_MAX_NAME+1))
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#warning REMOVE THIS TYPEDEF
 typedef struct MACSIO_FileHandlePublic_t
 {
     /* Public Data Members */
@@ -42,5 +48,9 @@ typedef struct MACSIO_FileHandle_t {
     MACSIO_FileHandlePublic_t pub;
     /* private part follows per I/O-lib driver */
 } MACSIO_FileHandle_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* #ifndef _MACSIO_H */

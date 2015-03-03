@@ -1,3 +1,4 @@
+#warning ADD COPYRIGHT INFORMATION TO ALL FILES
 #include <errno.h>
 #include <float.h>
 #include <math.h>
@@ -16,6 +17,7 @@
 
 #include <json-c/json.h>
 
+#warning CHANGE PARALLEL SYMBOL TO HAVE_MPI
 #ifdef PARALLEL
 #include <mpi.h>
 #endif

@@ -11,6 +11,7 @@
 
 #include <ifacemap.h>
 #include <macsio_main.h>
+#include <macsio_mif.h>
 #include <log.h>
 #include <options.h>
 #include <util.h>
@@ -20,8 +21,6 @@
 #ifdef PARALLEL
 #include <mpi.h>
 #endif
-
-#include <pmpio.h>
 
 /*
  *  BEGIN StringToDriver utility code from Silo's tests
@@ -300,16 +299,16 @@ static void *CreateSiloFile(const char *fname, const char *nsname, void *userDat
     return (void *) siloFile;
 }
 
-static void *OpenSiloFile(const char *fname, const char *nsname, PMPIO_iomode_t ioMode,
+static void *OpenSiloFile(const char *fname, const char *nsname, MACSIO_MIF_iomode_t ioMode,
     void *userData)
 {
     int driverId = *((int*) userData);
-    /*Log(log, "DBOpen(\"%s\", %d, %d)", fname, driverId, ioMode==PMPIO_WRITE ? DB_APPEND : DB_READ);*/
-    DBfile *siloFile = DBOpen(fname, driverId, ioMode==PMPIO_WRITE ? DB_APPEND : DB_READ);
+    /*Log(log, "DBOpen(\"%s\", %d, %d)", fname, driverId, ioMode==MACSIO_MIF_WRITE ? DB_APPEND : DB_READ);*/
+    DBfile *siloFile = DBOpen(fname, driverId, ioMode==MACSIO_MIF_WRITE ? DB_APPEND : DB_READ);
     /*Log(log, "siloFile = %p", siloFile);*/
     if (siloFile && nsname)
     {
-        if (ioMode == PMPIO_WRITE)
+        if (ioMode == MACSIO_MIF_WRITE)
             DBMkDir(siloFile, nsname);
         DBSetDir(siloFile, nsname);
     }
@@ -378,7 +377,7 @@ static void write_mesh_part(DBfile *dbfile, json_object *part)
         write_rect_mesh_part(dbfile, part);
 }
 
-static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_baton_t *bat)
+static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO_MIF_baton_t *bat)
 {
     int i, j;
     char const *file_ext = JsonGetStr(main_obj, "clargs/--fileext");
@@ -394,7 +393,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_
     for (i = 0; i < numChunks; i++)
     {
         int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
-        int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
+        int groupRank = MACSIO_MIF_GroupRank(bat, rank_owning_chunk);
         blockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
         {
@@ -420,19 +419,19 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_
     for (i = 0; i < numChunks; i++)
         free(blockNames[i]);
 
-    json_object *parts_array = JsonGetObj(main_obj, "problem/parts");
-    json_object *first_part = json_object_array_get_idx(parts_array, 0);
+    json_object *first_part = JsonGetObj(main_obj, "problem/parts", 0);
     json_object *vars_array = JsonGetObj(first_part, "Vars");
     int numVars = json_object_array_length(vars_array);
     for (j = 0; j < numVars; j++)
     {
+#warning CANNOT DO JsonGetObj(obj, i)
         json_object *varobj = json_object_array_get_idx(vars_array, j);
         char const *varname = JsonGetStr(varobj, "name");
 
         for (i = 0; i < numChunks; i++)
         {
             int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
-            int groupRank = PMPIO_GroupRank(bat, rank_owning_chunk);
+            int groupRank = MACSIO_MIF_GroupRank(bat, rank_owning_chunk);
             blockNames[i] = (char *) malloc(1024);
             if (groupRank == 0)
             {
@@ -470,7 +469,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     int numGroups = -1;
     int rank, size;
     char fileName[256];
-    PMPIO_baton_t *bat;
+    MACSIO_MIF_baton_t *bat;
 
 #warning MAKE LOGGING A CL OPTION
 #if 0
@@ -478,7 +477,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 #endif
 
 #warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
-    /* Without this barrier, I get strange behavior with Silo's PMPIO interface */
+    /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* process cl args */
@@ -521,14 +520,14 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         }
     }
 
-    /* Initialize PMPIO, pass a pointer to the driver type as the user data. */
-    bat = PMPIO_Init(numGroups, PMPIO_WRITE, MPI_COMM_WORLD, 1,
+    /* Initialize MACSIO_MIF, pass a pointer to the driver type as the user data. */
+    bat = MACSIO_MIF_Init(numGroups, MACSIO_MIF_WRITE, MPI_COMM_WORLD, 1,
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */
     sprintf(fileName, "%s_silo_%05d.%s",
         JsonGetStr(main_obj, "clargs/--filebase"),
-        PMPIO_GroupRank(bat, rank),
+        MACSIO_MIF_GroupRank(bat, rank),
         JsonGetStr(main_obj, "clargs/--fileext"));
 
     /* Wait for write access to the file. All processors call this.
@@ -536,7 +535,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
      * with write access to the file. Other processors wind up waiting
      * until they are given control by the preceeding processor in 
      * the group when that processor calls "HandOffBaton" */
-    siloFile = (DBfile *) PMPIO_WaitForBaton(bat, fileName, 0);
+    siloFile = (DBfile *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
     json_object *parts = JsonGetObj(main_obj, "problem/parts");
     int numParts = json_object_array_length(parts);
@@ -563,10 +562,10 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
      * of getting a consistent and up to date view of the file's contents. */
-    PMPIO_HandOffBaton(bat, siloFile);
+    MACSIO_MIF_HandOffBaton(bat, siloFile);
 
-    /* We're done using PMPIO, so finish it off */
-    PMPIO_Finish(bat);
+    /* We're done using MACSIO_MIF, so finish it off */
+    MACSIO_MIF_Finish(bat);
 
 #if 0
     Log_Finalize(log);

@@ -7,6 +7,7 @@
 #include <ifacemap.h>
 #include <macsio_main.h>
 #include <macsio_params.h>
+#include <macsio_mif.h>
 #include <log.h>
 #include <options.h>
 #include <util.h>
@@ -18,8 +19,6 @@
 #ifdef HAVE_SILO
 #include <silo.h> /* for the Silo block based VFD option */
 #endif
-#warning MAKE PMPIO HEADERS PART OF MACSIO
-#include <pmpio.h>
 
 #include <hdf5.h>
 
@@ -278,13 +277,13 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
 }
 
 static void *OpenHDF5File(const char *fname, const char *nsname,
-                   PMPIO_iomode_t ioMode, void *userData)
+                   MACSIO_MIF_iomode_t ioMode, void *userData)
 {
     hid_t *retval;
-    hid_t h5File = H5Fopen(fname, ioMode == PMPIO_WRITE ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
+    hid_t h5File = H5Fopen(fname, ioMode == MACSIO_MIF_WRITE ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
     if (h5File >= 0)
     {
-        if (ioMode == PMPIO_WRITE && nsname && userData)
+        if (ioMode == MACSIO_MIF_WRITE && nsname && userData)
         {
             user_data_t *ud = (user_data_t *) userData;
             ud->groupId = H5Gcreate1(h5File, nsname, 0);
@@ -350,7 +349,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 #warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 #warning SET FILE AND DATASET PROPERTIES
 #warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
-    PMPIO_baton_t *bat = PMPIO_Init(numFiles, PMPIO_WRITE, MPI_COMM_WORLD, 3,
+    MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, MACSIO_MIF_WRITE, MPI_COMM_WORLD, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
@@ -359,10 +358,10 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     /* Construct name for the silo file */
     sprintf(fileName, "%s_hdf5_%05d.%s",
         json_object_path_get_string(main_obj, "clargs/--filebase"),
-        PMPIO_GroupRank(bat, rank),
+        MACSIO_MIF_GroupRank(bat, rank),
         json_object_path_get_string(main_obj, "clargs/--fileext"));
 
-    h5File_ptr = (hid_t *) PMPIO_WaitForBaton(bat, fileName, 0);
+    h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     h5File = *h5File_ptr;
     h5Group = userData.groupId;
 
@@ -393,10 +392,10 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
      * of getting a consistent and up to date view of the file's contents. */
-    PMPIO_HandOffBaton(bat, h5File_ptr);
+    MACSIO_MIF_HandOffBaton(bat, h5File_ptr);
 
-    /* We're done using PMPIO, so finish it off */
-    PMPIO_Finish(bat);
+    /* We're done using MACSIO_MIF, so finish it off */
+    MACSIO_MIF_Finish(bat);
 
 #if 0
     Log_Finalize(log);
@@ -415,7 +414,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     log = Log_Init(MPI_COMM_WORLD, "macsio_hdf5.log", 128, 20);
 #endif
 
-    /* Without this barrier, I get strange behavior with Silo's PMPIO interface */
+    /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* process cl args */
