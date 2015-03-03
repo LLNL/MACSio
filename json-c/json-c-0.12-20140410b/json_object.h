@@ -54,6 +54,7 @@ extern "C" {
  * A flag to drop trailing zero for float values
  */
 #define JSON_C_TO_STRING_NOZERO     (1<<2)
+#define JSON_C_TO_STRING_UNQUOTED   (1<<3)
 
 #define JSON_C_FALSE ((json_bool)0)
 #define JSON_C_TRUE ((json_bool)1)
@@ -663,14 +664,13 @@ extern char const * json_object_apath_get_string(struct json_object *src, char c
 extern struct json_object * json_object_apath_get_object(struct json_object *src, char const *key_path);
 
 /* using variadic macros here */
-extern char const *json_paste_path(char const *, ...);
-#define JSON_C_NIX -1
-#define JsonGetBool(OBJ, ...)  json_object_apath_get_boolean(OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
-#define JsonGetInt(OBJ, ...)   json_object_apath_get_int(    OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
-#define JsonGetInt64(OBJ, ...) json_object_apath_get_int64(  OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
-#define JsonGetDbl(OBJ, ...)   json_object_apath_get_double( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
-#define JsonGetStr(OBJ, ...)   json_object_apath_get_string( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
-#define JsonGetObj(OBJ, ...)   json_object_apath_get_object( OBJ, json_paste_path(__VA_ARGS__, JSON_C_NIX))
+extern char const *json_paste_path(char const *va_args_str, char const *first, ...);
+#define JsonGetBool(OBJ, ...)  json_object_apath_get_boolean(OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
+#define JsonGetInt(OBJ, ...)   json_object_apath_get_int(    OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
+#define JsonGetInt64(OBJ, ...) json_object_apath_get_int64(  OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
+#define JsonGetDbl(OBJ, ...)   json_object_apath_get_double( OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
+#define JsonGetStr(OBJ, ...)   json_object_apath_get_string( OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
+#define JsonGetObj(OBJ, ...)   json_object_apath_get_object( OBJ, json_paste_path(#__VA_ARGS__, __VA_ARGS__))
 
 /* primitive value overwrite (set) methods */
 extern json_bool json_object_set_boolean(struct json_object *bool_obj, json_bool val);

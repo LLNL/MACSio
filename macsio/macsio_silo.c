@@ -329,19 +329,19 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     json_object *dimsobj;
     char const *coordnames[] = {"X","Y","Z"};
     void const *coords[3];
-    int ndims = json_object_path_get_int(part, "Mesh/GeomDim");
+    int ndims = JsonGetInt(part, "Mesh/GeomDim");
     int dims[3] = {1,1,1};
     int dimsz[3] = {1,1,1};
 
-    dimsobj = json_object_path_get_array(part, "Mesh/LogDims");
+    dimsobj = JsonGetObj(part, "Mesh/LogDims");
 
-    coordobj = json_object_path_get_extarr(part, "Mesh/Coords/XAxisCoords");
+    coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
     coords[0] = json_object_extarr_data(coordobj);
     dims[0] = json_object_get_int(json_object_array_get_idx(dimsobj, 0));
     dimsz[0] = dims[0]-1;
     if (ndims > 1)
     {
-        coordobj = json_object_path_get_extarr(part, "Mesh/Coords/YAxisCoords");
+        coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
         coords[1] = json_object_extarr_data(coordobj);
         dims[1] = json_object_get_int(json_object_array_get_idx(dimsobj, 1));
         dimsz[1] = dims[1]-1;
@@ -349,7 +349,7 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     }
     if (ndims > 2)
     {
-        coordobj = json_object_path_get_extarr(part, "Mesh/Coords/ZAxisCoords");
+        coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
         coords[2] = json_object_extarr_data(coordobj);
         dims[2] = json_object_get_int(json_object_array_get_idx(dimsobj, 2));
         dimsz[2] = dims[2]-1;
@@ -358,33 +358,32 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     DBPutQuadmesh(dbfile, "mesh", (char**) coordnames, coords,
         dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
 
-    json_object *vars_array = json_object_path_get_array(part, "Vars");
+    json_object *vars_array = JsonGetObj(part, "Vars");
     for (int i = 0; i < json_object_array_length(vars_array); i++)
     {
         json_object *varobj = json_object_array_get_idx(vars_array, i);
-        int cent = strcmp(json_object_path_get_string(
-            varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
+        int cent = strcmp(JsonGetStr(varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
         int *d = cent==DB_NODECENT?dims:dimsz;
-        json_object *dataobj = json_object_path_get_extarr(varobj, "data");
+        json_object *dataobj = JsonGetObj(varobj, "data");
         int dtype = json_object_extarr_type(dataobj)==json_extarr_type_flt64?DB_DOUBLE:DB_INT;
         
-        DBPutQuadvar1(dbfile, json_object_path_get_string(varobj, "name"), "mesh",
+        DBPutQuadvar1(dbfile, JsonGetStr(varobj, "name"), "mesh",
             (void *)json_object_extarr_data(dataobj), d, ndims, 0, 0, dtype, cent, 0); 
     }
 }
 
 static void write_mesh_part(DBfile *dbfile, json_object *part)
 {
-    if (!strcmp(json_object_path_get_string(part, "Mesh/MeshType"), "rectilinear"))
+    if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "rectilinear"))
         write_rect_mesh_part(dbfile, part);
 }
 
 static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_baton_t *bat)
 {
     int i, j;
-    char const *file_ext = json_object_path_get_string(main_obj, "clargs/--fileext");
-    char const *file_base = json_object_path_get_string(main_obj, "clargs/--filebase");
-    int numChunks = json_object_path_get_int(main_obj, "problem/global/TotalParts");
+    char const *file_ext = JsonGetStr(main_obj, "clargs/--fileext");
+    char const *file_base = JsonGetStr(main_obj, "clargs/--filebase");
+    int numChunks = JsonGetInt(main_obj, "problem/global/TotalParts");
     char **blockNames = (char **) malloc(numChunks * sizeof(char*));
     int *blockTypes = (int *) malloc(numChunks * sizeof(int));
 
@@ -406,9 +405,9 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_
         {
 #warning USE SILO NAMESCHEMES INSTEAD
             sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/mesh",
-                json_object_path_get_string(main_obj, "clargs/--filebase"),
+                JsonGetStr(main_obj, "clargs/--filebase"),
                 groupRank, 
-                json_object_path_get_string(main_obj, "clargs/--fileext"),
+                JsonGetStr(main_obj, "clargs/--fileext"),
                 i);
         }
         blockTypes[i] = DB_QUADMESH;
@@ -421,14 +420,14 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_
     for (i = 0; i < numChunks; i++)
         free(blockNames[i]);
 
-    json_object *parts_array = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *parts_array = JsonGetObj(main_obj, "problem/parts");
     json_object *first_part = json_object_array_get_idx(parts_array, 0);
-    json_object *vars_array = json_object_path_get_array(first_part, "Vars");
+    json_object *vars_array = JsonGetObj(first_part, "Vars");
     int numVars = json_object_array_length(vars_array);
     for (j = 0; j < numVars; j++)
     {
         json_object *varobj = json_object_array_get_idx(vars_array, j);
-        char const *varname = json_object_path_get_string(varobj, "name");
+        char const *varname = JsonGetStr(varobj, "name");
 
         for (i = 0; i < numChunks; i++)
         {
@@ -444,9 +443,9 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, PMPIO_
             {
 #warning USE SILO NAMESCHEMES INSTEAD
                 sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/%s",
-                    json_object_path_get_string(main_obj, "clargs/--filebase"),
+                    JsonGetStr(main_obj, "clargs/--filebase"),
                     groupRank, 
-                    json_object_path_get_string(main_obj, "clargs/--fileext"),
+                    JsonGetStr(main_obj, "clargs/--fileext"),
                     i,varname);
             }
             blockTypes[i] = DB_QUADVAR;
@@ -485,12 +484,12 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);
 
-    rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
-    size = json_object_path_get_int(main_obj, "parallel/mpi_size");
+    rank = JsonGetInt(main_obj, "parallel/mpi_rank");
+    size = JsonGetInt(main_obj, "parallel/mpi_size");
 
 #warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
-    json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/--parallel_file_mode");
+    json_object *parfmode_obj = JsonGetObj(main_obj, "clargs/--parallel_file_mode");
     if (parfmode_obj)
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
@@ -508,13 +507,13 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     }
     else
     {
-        char const * modestr = json_object_path_get_string(main_obj, "clargs/--parallel_file_mode");
+        char const * modestr = JsonGetStr(main_obj, "clargs/--parallel_file_mode");
         if (!strcmp(modestr, "SIF"))
         {
             MACSIO_ERROR(("Silo plugin doesn't support SIF mode"), MACSIO_FATAL);
         }
         else if (!strcmp(modestr, "MIFMAX"))
-            numGroups = json_object_path_get_int(main_obj, "parallel/mpi_size");
+            numGroups = JsonGetInt(main_obj, "parallel/mpi_size");
         else if (!strcmp(modestr, "MIFAUTO"))
         {
             /* Call utility to determine optimal file count */
@@ -528,9 +527,9 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* Construct name for the silo file */
     sprintf(fileName, "%s_silo_%05d.%s",
-        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        JsonGetStr(main_obj, "clargs/--filebase"),
         PMPIO_GroupRank(bat, rank),
-        json_object_path_get_string(main_obj, "clargs/--fileext"));
+        JsonGetStr(main_obj, "clargs/--fileext"));
 
     /* Wait for write access to the file. All processors call this.
      * Some processors (the first in each group) return immediately
@@ -539,16 +538,15 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
      * the group when that processor calls "HandOffBaton" */
     siloFile = (DBfile *) PMPIO_WaitForBaton(bat, fileName, 0);
 
-    json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *parts = JsonGetObj(main_obj, "problem/parts");
     int numParts = json_object_array_length(parts);
 
     for (int i = 0; i < numParts; i++)
     {
         char domain_dir[256];
-        json_object *this_part = json_object_array_get_idx(parts, i);
+        json_object *this_part = JsonGetObj(main_obj, "problem/parts", i);
 
-        snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
-            json_object_path_get_int(this_part, "Mesh/ChunkID"));
+        snprintf(domain_dir, sizeof(domain_dir), "domain_%07d", JsonGetInt(this_part, "Mesh/ChunkID"));
  
         DBMkDir(siloFile, domain_dir);
         DBSetDir(siloFile, domain_dir);

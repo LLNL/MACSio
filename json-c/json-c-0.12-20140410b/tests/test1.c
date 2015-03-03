@@ -170,6 +170,8 @@ int main(int argc, char **argv)
                 json_object_apath_get_int(filobj, "array/2"));
             printf("\"array2/6/cameron/a\" = %d\n",
                 JsonGetInt(filobj, "array2",6,"cameron/a"));
+            printf("\"array2/6/cameron/a\" = %d\n",
+                JsonGetInt(filobj, "array2/",6,"/cameron/a"));
             printf("\"array2/2\" = \"%s\"\n",
                 json_object_apath_get_string(filobj, "array2/2"));
         }

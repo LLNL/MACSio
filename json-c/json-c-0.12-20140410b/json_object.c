@@ -703,9 +703,11 @@ static int json_object_string_to_json_string(struct json_object* jso,
 					     int level,
 						 int flags)
 {
-  sprintbuf(pb, "\"");
+  if (!(flags & JSON_C_TO_STRING_UNQUOTED))
+      sprintbuf(pb, "\"");
   json_escape_str(pb, jso->o.c_string.str, jso->o.c_string.len);
-  sprintbuf(pb, "\"");
+  if (!(flags & JSON_C_TO_STRING_UNQUOTED))
+      sprintbuf(pb, "\"");
   return 0;
 }
 
@@ -1483,7 +1485,7 @@ char const *json_object_apath_get_string(struct json_object *obj, char const *ke
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
     if (leafobj)
     {
-        CIRCBUF_RET(json_object_to_json_string_ext(leafobj,0));
+        CIRCBUF_RET(json_object_to_json_string_ext(leafobj,JSON_C_TO_STRING_UNQUOTED));
     }
     else
     {
@@ -1498,23 +1500,31 @@ struct json_object *json_object_apath_get_object(struct json_object *obj, char c
     return 0;
 }
 
-char const *json_paste_path(char const *first, ...)
+char const *json_paste_path(char const *va_args_str, char const *first, ...)
 {
     static char retbuf[4096];
-    int n = sizeof(retbuf);
+    int nargs = 1, i = 0, n = sizeof(retbuf);
     static char tmpstr[32];
     int val;
     char *str;
 
+    /* count the number of args using commas in va_args_str */
+    while (va_args_str[i] != '\0')
+    {
+        if (va_args_str[i] == ',') nargs++;
+        i++;
+    }
+    
     va_list ap;
     va_start(ap, first);
+    nargs--;
 
     retbuf[0] = '\0';
     strncat(retbuf, first, n);
     n -= strlen(first);
     val = va_arg(ap, int);
 
-    while (val != JSON_C_NIX && n)
+    while (nargs > 0)
     {
         snprintf(tmpstr, sizeof(tmpstr), "%d", val);
         tmpstr[sizeof(tmpstr)-1] = '\0';
@@ -1526,9 +1536,17 @@ char const *json_paste_path(char const *first, ...)
         strncat(retbuf, tmpstr, n);
         n -= strlen(tmpstr);
         str = va_arg(ap, char*);
+        nargs--;
+        if (nargs == 0) break;
+        if (str[0] != '/')
+        {
+            strncat(retbuf, "/", n);
+            n -= 1;
+        }
         strncat(retbuf, str, n);
         n -= strlen(str);
         val = va_arg(ap, int);
+        nargs--;
     }
     va_end(ap);
 
