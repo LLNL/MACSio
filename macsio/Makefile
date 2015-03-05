@@ -46,7 +46,7 @@ COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
 BASIC_SRC = macsio_main.c
-BASIC_HDR= macsio_main.h
+BASIC_HDR=$(BASIC_SRC:.c=.h)
 BASIC_OBJ=$(BASIC_SRC:.c=.o)
 
 # Unix stdio and sec2 drivers always present
@@ -155,7 +155,7 @@ tstlog: tstlog.o $(COMMON_OBJ)
 # the PDB Lite driver code is #included from PDB driver code
 ioperf_pdbl.o: ioperf_pdb.c
 
-macsio.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
+macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
 macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
 	$(LINK) $< -o $@ $(LDFLAGS) $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS)

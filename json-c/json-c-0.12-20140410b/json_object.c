@@ -1312,31 +1312,48 @@ static void *json_object_path_get_voidptr(struct json_object *src, char const *k
 }
 #endif
 
-/* "apath" methods handle paths with possible array indexes in them */
+/* "apath" methods handle paths with possible array indexes embedded within them
+   (e.g. "/foo/bar/123/front/567/back") */
 static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char *key_path)
 {
 #warning we need to support . and .. notation here too
     int idx;
     struct json_object *sub_object = 0;
     char *slash_char_p, *next = 0;
+    int add1 = key_path[0]=='/'?1:0;
 
     if (!src) return 0;
     if (!key_path) return src;
 
-    slash_char_p = strchr(key_path, '/');
+    slash_char_p = strchr(key_path+add1, '/');
     if (slash_char_p)
     {
         *slash_char_p = '\0';
         next = slash_char_p+1;
     }
     errno = 0;
-    idx = (int) strtol(key_path, 0, 10);
+    idx = (int) strtol(key_path+add1, 0, 10);
     
     if (json_object_is_type(src, json_type_array) && errno == 0 &&
         0 <= idx && idx < json_object_array_length(src))
-        return json_object_apath_get_leafobj_recurse(json_object_array_get_idx(src, idx), next);
+    {
+        if ((sub_object = json_object_array_get_idx(src, idx)) && sub_object)
+        {
+            if (next)
+                return json_object_apath_get_leafobj_recurse(sub_object, next);
+            else 
+                return sub_object;
+        }
+    }
+
     if (json_object_object_get_ex(src, key_path, &sub_object) && sub_object)
-        return json_object_apath_get_leafobj_recurse(sub_object, next);
+    {
+        if (next)
+            return json_object_apath_get_leafobj_recurse(sub_object, next);
+        else
+            return sub_object;
+    }
+
     return src;
 }
 
@@ -1485,11 +1502,11 @@ char const *json_object_apath_get_string(struct json_object *obj, char const *ke
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
     if (leafobj)
     {
-        CIRCBUF_RET(json_object_to_json_string_ext(leafobj,JSON_C_TO_STRING_UNQUOTED));
+        CIRCBUF_RET(json_object_to_json_string_ext(leafobj, JSON_C_TO_STRING_UNQUOTED));
     }
     else
     {
-        CIRCBUF_RET("");
+        CIRCBUF_RET("null");
     }
 }
 
@@ -1500,7 +1517,7 @@ struct json_object *json_object_apath_get_object(struct json_object *obj, char c
     return 0;
 }
 
-char const *json_paste_path(char const *va_args_str, char const *first, ...)
+char const *json_paste_apath(char const *va_args_str, char const *first, ...)
 {
     static char retbuf[4096];
     int nargs = 1, i = 0, n = sizeof(retbuf);

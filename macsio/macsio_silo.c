@@ -325,24 +325,21 @@ static void CloseSiloFile(void *file, void *userData)
 static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
 {
     json_object *coordobj;
-    json_object *dimsobj;
     char const *coordnames[] = {"X","Y","Z"};
     void const *coords[3];
     int ndims = JsonGetInt(part, "Mesh/GeomDim");
     int dims[3] = {1,1,1};
     int dimsz[3] = {1,1,1};
 
-    dimsobj = JsonGetObj(part, "Mesh/LogDims");
-
     coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
     coords[0] = json_object_extarr_data(coordobj);
-    dims[0] = json_object_get_int(json_object_array_get_idx(dimsobj, 0));
+    dims[0] = JsonGetInt(part, "Mesh/LogDims", 0);
     dimsz[0] = dims[0]-1;
     if (ndims > 1)
     {
         coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
         coords[1] = json_object_extarr_data(coordobj);
-        dims[1] = json_object_get_int(json_object_array_get_idx(dimsobj, 1));
+        dims[1] = JsonGetInt(part, "Mesh/LogDims", 1);
         dimsz[1] = dims[1]-1;
         
     }
@@ -350,7 +347,7 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     {
         coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
         coords[2] = json_object_extarr_data(coordobj);
-        dims[2] = json_object_get_int(json_object_array_get_idx(dimsobj, 2));
+        dims[2] = JsonGetInt(part, "Mesh/LogDims", 2);
         dimsz[2] = dims[2]-1;
     }
 
@@ -415,24 +412,17 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
     /* Write the multi-block objects */
     DBPutMultimesh(siloFile, "multi_mesh", numChunks, blockNames, blockTypes, 0);
 
-    /* Clean up */
-    for (i = 0; i < numChunks; i++)
-        free(blockNames[i]);
-
     json_object *first_part = JsonGetObj(main_obj, "problem/parts", 0);
     json_object *vars_array = JsonGetObj(first_part, "Vars");
     int numVars = json_object_array_length(vars_array);
     for (j = 0; j < numVars; j++)
     {
-#warning CANNOT DO JsonGetObj(obj, i)
-        json_object *varobj = json_object_array_get_idx(vars_array, j);
-        char const *varname = JsonGetStr(varobj, "name");
+        char const *varname = JsonGetStr(vars_array, "", j, "name");
 
         for (i = 0; i < numChunks; i++)
         {
             int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
             int groupRank = MACSIO_MIF_GroupRank(bat, rank_owning_chunk);
-            blockNames[i] = (char *) malloc(1024);
             if (groupRank == 0)
             {
                 /* this mesh block is in the file 'root' owns */
@@ -453,11 +443,11 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
         /* Write the multi-block objects */
         DBPutMultivar(siloFile, varname, numChunks, blockNames, blockTypes, 0);
 
-        /* Clean up */
-        for (i = 0; i < numChunks; i++)
-            free(blockNames[i]);
     }
 
+    /* Clean up */
+    for (i = 0; i < numChunks; i++)
+        free(blockNames[i]);
     free(blockNames);
     free(blockTypes);
 }

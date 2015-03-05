@@ -152,6 +152,7 @@ int main(int argc, char **argv)
 
         {
             json_object *filobj = json_object_from_file("foo.json");
+            json_object *tmpobj;
 	    printf("filobj=%s\n", json_object_to_json_string(filobj));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_path_get_int(filobj, "steve/cameron/b"),
@@ -172,6 +173,9 @@ int main(int argc, char **argv)
                 JsonGetInt(filobj, "array2",6,"cameron/a"));
             printf("\"array2/6/cameron/a\" = %d\n",
                 JsonGetInt(filobj, "array2/",6,"/cameron/a"));
+            tmpobj = JsonGetObj(filobj, "array2");
+            printf("\"6/cameron/a\" = %d\n",
+                JsonGetInt(tmpobj, "",6,"/cameron/a"));
             printf("\"array2/2\" = \"%s\"\n",
                 json_object_apath_get_string(filobj, "array2/2"));
         }
