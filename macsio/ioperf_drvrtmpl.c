@@ -32,8 +32,8 @@ static int identify_file_stdio(char const *pathname, IOPoptlist_t const *opts)
 
 static void register_this_interface()
 {
-    unsigned int id = bjhash(iface_name, strlen(iface_name), 0) % MAX_IFACES;
-    if (strlen(iface_name) >= MAX_IFACE_NAME);
+    unsigned int id = bjhash(iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
+    if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME);
         IOP_ERROR(("interface name \"%s\" too long",iface_name) , IOP_FATAL);
     if (iface_map[id].slot_used != 0)
         IOP_ERROR(("hash collision for interface name \"%s\"",iface_name) , IOP_FATAL);

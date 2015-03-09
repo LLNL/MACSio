@@ -12,7 +12,7 @@
 #include <options.h>
 #include <util.h>
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #endif
 
@@ -123,7 +123,7 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 
 static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 {
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     int ndims;
     int i, v, p;
     char const *mesh_type = json_object_path_get_string(main_obj, "clargs/--part_type");

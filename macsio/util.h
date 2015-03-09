@@ -27,7 +27,7 @@ typedef struct _MACSIO_ArgvFlags_t
 #define FREE(M) if(M){free(M);(M)=0;} 
 
 /* two variants of MACSIO_ERROR2 for MPI_Abort or just abort */
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
 #define MACSIO_ERROR2(LINEMSG, ACTION, ERRNO, THEFILE, THELINE)                          \
 {                                                                                       \
     fprintf(stderr, "Encountered error in file \"%s\" at line %d\n", THEFILE, THELINE); \

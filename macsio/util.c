@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #endif
 #include <util.h>
@@ -222,7 +222,7 @@ MACSIO_ProcessCommandLine(
    va_list ap;
    json_object *ret_json_obj = 0;
 
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
@@ -249,7 +249,7 @@ MACSIO_ProcessCommandLine(
       }
    }
 
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
 #warning DO JUST ONE BCAST HERE
    MPI_Bcast(&helpWasRequested, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #endif
@@ -388,7 +388,7 @@ MACSIO_ProcessCommandLine(
    }
    va_end(ap);
 
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
    MPI_Bcast(&invalidArgTypeFound, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #endif
    if (invalidArgTypeFound)
@@ -404,7 +404,7 @@ MACSIO_ProcessCommandLine(
       return MACSIO_ARGV_HELP;
 
    /* ok, now broadcast the whole argc, argv data */ 
-#ifdef HAVE_PARALLEL
+#ifdef HAVE_MPI
    {
       int argvLen;
       char *p;

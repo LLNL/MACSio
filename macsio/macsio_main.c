@@ -17,8 +17,7 @@
 
 #include <json-c/json.h>
 
-#warning CHANGE PARALLEL SYMBOL TO HAVE_MPI
-#ifdef PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #endif
 
@@ -26,7 +25,12 @@
 
 extern char **enviornp;
 
-static int best_2d_factors(int val, int *x, int *y)
+static int
+best_2d_factors(
+    int val,
+    int *x,
+    int *y
+)
 {
     int root = (int) sqrt((double)val);
     while (root)
@@ -815,7 +819,7 @@ static void handle_help_request_and_exit(int argi, int argc, char **argv)
             (*(iface->processArgsFunc))(argi, argc, argv);
         }
     }
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
@@ -842,7 +846,7 @@ static void handle_list_request_and_exit()
     }
     fprintf(outFILE, "List of available I/O-library drivers...\n");
     fprintf(outFILE, "%s\n", names_buf);
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
@@ -978,7 +982,7 @@ main(int argc, char *argv[])
     char outfName[64];
     FILE *outf;
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Comm macsio_io_comm = MPI_COMM_WORLD;
     MPI_Init(&argc, &argv);
     MPI_Comm_dup(MPI_COMM_WORLD, &macsio_io_comm);
@@ -1016,7 +1020,12 @@ main(int argc, char *argv[])
     fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
     fclose(outf);
 
-    /* Start total timer */
+
+#warning INITIALIZE LOG FILES. LOGS HANDLES SHOULD BE PASSED TO PLUGINS
+
+#warning START TOTAL TIMER
+
+#warning WE'RE NOT GENERATING OR WRITING ANY METADATA STUFF
 
     dumpTime = 0.0;
     for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/--num_dumps"); dumpNum++)
@@ -1039,7 +1048,7 @@ main(int argc, char *argv[])
 
     /* stop total timer */
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Finalize();
 #endif
 

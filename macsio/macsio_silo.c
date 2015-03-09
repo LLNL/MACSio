@@ -18,7 +18,7 @@
 
 #include <silo.h>
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #endif
 

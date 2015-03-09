@@ -32,7 +32,7 @@ HDF5_LDFLAGS=-lhdf5
 
 # Typically, only for linking w/HDF5
 
-#CFLAGS=-DPARALLEL
+#CFLAGS=-DHAVE_MPI
 #CC=mpixlc
 #LINK=mpixlcxx
 

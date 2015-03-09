@@ -86,8 +86,8 @@ static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t c
 
 static int register_this_interface()
 {
-    unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MAX_IFACES;
-    if (strlen(iface_name) >= MAX_IFACE_NAME)
+    unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
+    if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
         MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
     if (iface_map[id].slotUsed!= 0)
         MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);

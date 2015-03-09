@@ -1,7 +1,7 @@
 #ifndef _LOG_H
 #define _LOG_H
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #else
 typedef int MPI_Comm;

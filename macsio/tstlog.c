@@ -1,6 +1,6 @@
 #include <log.h>
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
 #include <mpi.h>
 #endif
 
@@ -9,7 +9,7 @@ int main (int argc, char **argv)
     int rank=0, size=1;
     MACSIO_LogHandle_t *log;
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -41,7 +41,7 @@ int main (int argc, char **argv)
 
     Log_Finalize(log);
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Finalize();
 #endif
 

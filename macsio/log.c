@@ -48,7 +48,7 @@ MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int 
     int rank=0, size=1;
     MACSIO_LogHandle_t *retval;
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Comm_size(comm, &size);
     MPI_Comm_rank(comm, &rank);
 #endif
@@ -72,7 +72,7 @@ MACSIO_LogHandle_t *Log_Init(MPI_Comm comm, char const *path, int line_len, int 
         close(filefd);
     }
 
-#ifdef PARALLEL
+#ifdef HAVE_MPI
     MPI_Barrier(comm);
 #endif
 
