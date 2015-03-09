@@ -226,7 +226,7 @@ MACSIO_ProcessCommandLine(
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_ERROR("MPI is not initialized", flags.error_mode);
+         MACSIO_ERROR(("MPI is not initialized"), flags.error_mode);
          return MACSIO_ARGV_ERROR;
       }
    }

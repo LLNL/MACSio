@@ -28,26 +28,29 @@ typedef struct _MACSIO_ArgvFlags_t
 
 /* two variants of MACSIO_ERROR2 for MPI_Abort or just abort */
 #ifdef HAVE_MPI
-#define MACSIO_ERROR2(LINEMSG, ACTION, ERRNO, THEFILE, THELINE)                          \
+#include <mpi.h>
+#define MACSIO_ERROR2(LINEMSG, ACTION, ERRNO, THEFILE, THELINE)                         \
 {                                                                                       \
     fprintf(stderr, "Encountered error in file \"%s\" at line %d\n", THEFILE, THELINE); \
-    fprintf(stderr, "MACSIO %s error message:\n\t\"%s\"\n", (ACTION&MACSIO_FATAL)?"fatal":"warning",_iop_errmsg LINEMSG);             \
+    fprintf(stderr, "MACSIO %s error message:\n\t\"%s\"\n",                             \
+        (ACTION&MACSIO_FATAL)?"fatal":"warning",_iop_errmsg LINEMSG);                   \
     if (ERRNO)                                                                          \
         fprintf(stderr, "Most recent system error message:\n\t\"%s\"\n", strerror(ERRNO));\
     fprintf(stderr, "\t'macsio --help' may provide additional information\n");          \
-    if (ACTION & MACSIO_FATAL)                                                     \
-        MPI_Abort();                                                                    \
+    if (ACTION & MACSIO_FATAL)                                                          \
+        MPI_Abort(MPI_COMM_WORLD,errno);                                                \
     ERRNO = 0;                                                                          \
 }
 #else
-#define MACSIO_ERROR2(LINEMSG, ACTION, ERRNO, THEFILE, THELINE)                          \
+#define MACSIO_ERROR2(LINEMSG, ACTION, ERRNO, THEFILE, THELINE)                         \
 {                                                                                       \
     fprintf(stderr, "Encountered error in file \"%s\" at line %d\n", THEFILE, THELINE); \
-    fprintf(stderr, "MACSIO %s error message:\n\t\"%s\"\n", (ACTION&MACSIO_FATAL)?"fatal":"warn",_iop_errmsg LINEMSG);             \
+    fprintf(stderr, "MACSIO %s error message:\n\t\"%s\"\n",                             \
+        (ACTION&MACSIO_FATAL)?"fatal":"warn",_iop_errmsg LINEMSG);                      \
     if (ERRNO)                                                                          \
         fprintf(stderr, "Most recent system error message:\n\t\"%s\"\n", strerror(ERRNO));\
     fprintf(stderr, "\t'macsio --help' may provide additional information\n");          \
-    if (ACTION & MACSIO_FATAL)                                                     \
+    if (ACTION & MACSIO_FATAL)                                                          \
         abort();                                                                        \
     ERRNO = 0;                                                                          \
 }
