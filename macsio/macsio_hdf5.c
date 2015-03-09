@@ -20,6 +20,7 @@
 #include <silo.h> /* for the Silo block based VFD option */
 #endif
 
+#include <H5pubconf.h>
 #include <hdf5.h>
 
 /* convenient name mapping macors */
@@ -144,7 +145,9 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning INCLUDE ARGS FOR ISTORE AND K_SYM
 #warning INCLUDE ARG PROCESS FOR HINTS
 #warning FAPL PROPS: ALIGNMENT 
+#if H5_HAVE_PARALLEL
     H5Pset_fapl_mpio(fapl_id, MPI_COMM_WORLD, mpiInfo);
+#endif
 
 #warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
     /* Construct name for the HDF5 file */
@@ -174,7 +177,9 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
 #warning XFER PL: independent, collective
     /* Used in all H5Dwrite calls */
+#if H5_HAVE_PARALLEL
     H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
+#endif
 
     /* Loop over vars and then over parts */
 #warning CURRENTLY ASSUMES ALL VARS EXIST ON ALL RANKS. BUT NOT ALL PARTS
