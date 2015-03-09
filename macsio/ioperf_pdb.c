@@ -3,6 +3,8 @@
 #include <options.h>
 #include <util.h>
 
+#define HAVE_MEMMOVE
+
 #ifdef USING_PDB_LITE
 #include <lite_pdb.h> /* will re-map all PDB functions to lite variants */
 #else

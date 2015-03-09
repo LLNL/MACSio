@@ -1015,10 +1015,12 @@ main(int argc, char *argv[])
 
 #warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
+#if 0
     snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", rank);
     outf = fopen(outfName, "w");
     fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
     fclose(outf);
+#endif
 
 
 #warning INITIALIZE LOG FILES. LOGS HANDLES SHOULD BE PASSED TO PLUGINS

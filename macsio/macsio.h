@@ -32,15 +32,15 @@ typedef struct MACSIO_FileHandlePublic_t
     char const *(*getNamespaceFunc)(struct MACSIO_FileHandle_t *fh, MACSIO_optlist_t const *moreopts);
 
     /* Named array methods */
-    int (*createArrayFunc)(MACSIO_FileHandle_t *fh, char const *arrname, int type,
+    int (*createArrayFunc)(struct MACSIO_FileHandle_t *fh, char const *arrname, int type,
         int const dims[4], MACSIO_optlist_t const *moreopts);
     /* use 'init' and 'next' as special names to manage iteration over all arrays */
-    int (*getArrayInfoFunc)(MACSIO_FileHandle_t *fh, char const *arrname, int *type, int *dims[4], MACSIO_optlist_t const *moreopts);
+    int (*getArrayInfoFunc)(struct MACSIO_FileHandle_t *fh, char const *arrname, int *type, int *dims[4], MACSIO_optlist_t const *moreopts);
     /* use a buf that points to null to indicate a read and a buf that points to non-null as a write */
-    int (*defineArrayPartFunc)(MACSIO_FileHandle_t *fh, char const *arrname,
+    int (*defineArrayPartFunc)(struct MACSIO_FileHandle_t *fh, char const *arrname,
         int const starts[4], int const counts[4], int strides[4], void **buf, MACSIO_optlist_t const *moreopts);
-    int (*startPendingArraysFunc)(MACSIO_FileHandle_t *fh);
-    int (*finishPendingArraysFunc)(MACSIO_FileHandle_t *fh);
+    int (*startPendingArraysFunc)(struct MACSIO_FileHandle_t *fh);
+    int (*finishPendingArraysFunc)(struct MACSIO_FileHandle_t *fh);
 
 } MACSIO_FileHandlePublic_t;
 

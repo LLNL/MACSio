@@ -36,10 +36,10 @@ HDF5_LDFLAGS=-lhdf5
 #CC=mpixlc
 #LINK=mpixlcxx
 
-CFLAGS += -g
-CXX ?= g++
-CC ?= gcc
-LINK ?= g++
+CFLAGS += -g -DPARALLEL -DHAVE_MPI
+CXX ?= mpicxx
+CC ?= mpicc
+LINK ?= mpicxx
 
 COMMON_SRC = macsio_mif.c macsio_params.c options.c ifacemap.c util.c timing.c log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
@@ -142,15 +142,15 @@ probe: probe.o
 
 tsttiming.o: tsttiming.c $(COMMON_HDR)
 tsttiming: tsttiming.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
 tstopts.o: tstopts.c $(COMMON_HDR)
 tstopts: tstopts.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
 tstlog.o: tstlog.c $(COMMON_HDR)
 tstlog: tstlog.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(LDFLAGS) $(COMMON_OBJ)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
 # the PDB Lite driver code is #included from PDB driver code
 ioperf_pdbl.o: ioperf_pdb.c
@@ -158,7 +158,7 @@ ioperf_pdbl.o: ioperf_pdb.c
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
 macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
-	$(LINK) $< -o $@ $(LDFLAGS) $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS)
+	$(LINK) $< -o $@ $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(LDFLAGS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
