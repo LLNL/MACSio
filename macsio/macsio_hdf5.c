@@ -342,7 +342,7 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
 {
     int size, rank;
-    int numGroups = 3;
+    int numaroups = 3;
     hid_t *h5File_ptr;
     hid_t h5File;
     hid_t h5Group;
@@ -363,7 +363,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     /* Construct name for the silo file */
     sprintf(fileName, "%s_hdf5_%05d.%s",
         json_object_path_get_string(main_obj, "clargs/--filebase"),
-        MACSIO_MIF_GroupRank(bat, rank),
+        MACSIO_MIF_RankOfGroup(bat, rank),
         json_object_path_get_string(main_obj, "clargs/--fileext"));
 
     h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);

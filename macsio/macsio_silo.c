@@ -390,7 +390,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
     for (i = 0; i < numChunks; i++)
     {
         int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
-        int groupRank = MACSIO_MIF_GroupRank(bat, rank_owning_chunk);
+        int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
         blockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
         {
@@ -422,7 +422,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
         for (i = 0; i < numChunks; i++)
         {
             int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
-            int groupRank = MACSIO_MIF_GroupRank(bat, rank_owning_chunk);
+            int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
             if (groupRank == 0)
             {
                 /* this mesh block is in the file 'root' owns */
@@ -517,7 +517,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     /* Construct name for the silo file */
     sprintf(fileName, "%s_silo_%05d.%s",
         JsonGetStr(main_obj, "clargs/--filebase"),
-        MACSIO_MIF_GroupRank(bat, rank),
+        MACSIO_MIF_RankOfGroup(bat, rank),
         JsonGetStr(main_obj, "clargs/--fileext"));
 
     /* Wait for write access to the file. All processors call this.
