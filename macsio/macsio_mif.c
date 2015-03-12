@@ -9,6 +9,8 @@
 
 #define MACSIO_MIF_BATON_OK  0
 #define MACSIO_MIF_BATON_ERR 1
+#define MACSIO_MIF_MIFMAX -1
+#define MACSIO_MIF_MIFAUTO -2
 
 typedef struct _MACSIO_MIF_baton_t
 {
@@ -35,20 +37,36 @@ typedef struct _MACSIO_MIF_baton_t
 } MACSIO_MIF_baton_t;
 
 /*!
-\brief Begin a MACSIO_MIF code-block
+\brief Initialize MACSIO_MIF for a MIF I/O operation
+
+Creates and returns a MACSIO_MIF \em baton object establishing the mapping
+between MPI ranks and file groups for a MIF I/O operation.
+
+All processors in the \c mpiComm communicator must call this function
+collectively with identical values for \c numFiles, \c ioMode, and \c mpiTag.
+
+The resultant \em baton object is used in subsequent calls to WaitFor and
+HandOff the baton to the next processor in each group.
+
 */
+#warning ADD A THROTTLE OPTION HERE FOR TOT FILES VS CONCURRENT FILES
+#warning FOR AUTO MODE, MUST HAVE A CALL TO QUERY FILE COUNT
 MACSIO_MIF_baton_t *MACSIO_MIF_Init(
     int numFiles,                   /**< [in] Number of resultant files. Note: this is entirely independent of
-                                    number of processors. Typically, this number is chosen to match
-                                    the number of independent I/O pathways between the nodes the
-                                    application is executing on and the filesystem. */
-    MACSIO_MIF_iomode_t ioMode,     /**< [in] Indicate if the operation is for reading or writing files */
-    MPI_Comm mpiComm,               /**< [in] The MPI communicator being used for I/O */
-    int mpiTag,                     /**< [in] MPI message tag used by all messaging in MACSIO_MIF */
-    MACSIO_MIF_CreateCB createCb,   /**< [in] Callback MACSIO_MIF uses to create a group's file */
-    MACSIO_MIF_OpenCB openCb,       /**< [in] Callback MACSIO_MIF uses to open a group's file */
-    MACSIO_MIF_CloseCB closeCb,     /**< [in] Callback MACSIO_MIF uses to close a group's file */
-    void *clientData                /**< [in] Client specific data MACSIO_MIF will pass to callbacks */
+                                         number of processors. Typically, this number is chosen to match
+                                         the number of independent I/O pathways between the nodes the
+                                         application is executing on and the filesystem. Pass MACSIO_MIF_MAX for
+                                         file-per-processor. Pass MACSIO_MIF_AUTO (currently not supported) to
+                                         request that MACSIO_MIF determine and use an optimum file count. */
+    MACSIO_MIF_iomode_t ioMode,     /**< [in] Pass either MACSIO_MIF_READ or MACSIO_MIF_WRITE */
+    MPI_Comm mpiComm,               /**< [in] The MPI communicator containing all the MPI ranks that will
+                                         marshall data in the MIF I/O operation. */
+    int mpiTag,                     /**< [in] MPI message tag MACSIO_MIF will use in all MPI messages for
+                                         this MIF I/O operation. */
+    MACSIO_MIF_CreateCB createCb,   /**< [in] Callback MACSIO_MIF should use to create a group's file */
+    MACSIO_MIF_OpenCB openCb,       /**< [in] Callback MACSIO_MIF should use to open a group's file */
+    MACSIO_MIF_CloseCB closeCb,     /**< [in] Callback MACSIO_MIF should use to close a group's file */
+    void *clientData                /**< [in] Optional, client specific data MACSIO_MIF will pass to callbacks */
 )
 {
     int numGroups = numFiles;
@@ -111,7 +129,7 @@ MACSIO_MIF_baton_t *MACSIO_MIF_Init(
 }
 
 /*!
-\brief End a MACSIO_MIF code-block
+\brief End a MACSIO_MIF I/O operation and free resources
 */
 void MACSIO_MIF_Finish(
     MACSIO_MIF_baton_t *bat /**< [in] The MACSIO_MIF baton handle */
@@ -121,7 +139,7 @@ void MACSIO_MIF_Finish(
 }
 
 /*!
-\brief Wait for exclusive access to the group's file.
+\brief Wait for exclusive access to the group's file
 */
 void * MACSIO_MIF_WaitForBaton(
     MACSIO_MIF_baton_t *Bat, /**< [in] The MACSIO_MIF baton handle */
@@ -156,7 +174,7 @@ void * MACSIO_MIF_WaitForBaton(
 }
 
 /*!
-\brief Release exclusive access to the group's file.
+\brief Release exclusive access to the group's file
 */
 void MACSIO_MIF_HandOffBaton(
     MACSIO_MIF_baton_t const *Bat, /**< [in] The MACSIO_MIF baton handle */ 
