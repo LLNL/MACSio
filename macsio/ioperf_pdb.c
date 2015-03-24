@@ -1,7 +1,7 @@
 #include <ifacemap.h>
-#include <macsio.h>
+#include <macsio_log.h>
+#include <macsio_utils.h>
 #include <options.h>
-#include <util.h>
 
 #define HAVE_MEMMOVE
 
@@ -88,20 +88,16 @@ static int FNAME(close_file)(struct MACSIO_FileHandle_t *_fh, MACSIO_optlist_t c
 
 static int register_this_interface()
 {
-    unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
+    unsigned int id = MACSIO_UTILS_BJHash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
     if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
-        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("interface name \"%s\" too long",iface_name));
     if (iface_map[id].slotUsed!= 0)
-        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
 
     /* Take this slot in the map */
     iface_map[id].slotUsed = 1;
     strcpy(iface_map[id].name, iface_name);
     strcpy(iface_map[id].ext, iface_ext);
-
-    /* Must define at least these two methods */
-    iface_map[id].createFileFunc = FNAME(create_file);
-    iface_map[id].openFileFunc = FNAME(open_file);
 
     return 0;
 }

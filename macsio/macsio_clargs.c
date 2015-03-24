@@ -4,12 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
 #ifdef HAVE_MPI
 #include <mpi.h>
 #endif
-#include <util.h>
 
 #include <json-c/json.h>
+
+#include <macsio_clargs.h>
+#include <macsio_log.h>
 
 typedef struct _knownArgInfo {
    char *helpStr;		/* the help string for this command line argument */
@@ -33,98 +36,6 @@ static int GetSizeFromModifierChar(char c)
         default:  n=1; break;
     }
     return n;
-}
-
-/*-------------------------------------------------------------------------
-  Function: bjhash 
-
-  Purpose: Hash a variable length stream of bytes into a 32-bit value.
-
-  Programmer: By Bob Jenkins, 1996.  bob_jenkins@burtleburtle.net.
-
-  You may use this code any way you wish, private, educational, or
-  commercial.  It's free. However, do NOT use for cryptographic purposes.
-
-  See http://burtleburtle.net/bob/hash/evahash.html
- *-------------------------------------------------------------------------*/
-
-#define bjhash_mix(a,b,c) \
-{ \
-  a -= b; a -= c; a ^= (c>>13); \
-  b -= c; b -= a; b ^= (a<<8); \
-  c -= a; c -= b; c ^= (b>>13); \
-  a -= b; a -= c; a ^= (c>>12);  \
-  b -= c; b -= a; b ^= (a<<16); \
-  c -= a; c -= b; c ^= (b>>5); \
-  a -= b; a -= c; a ^= (c>>3);  \
-  b -= c; b -= a; b ^= (a<<10); \
-  c -= a; c -= b; c ^= (b>>15); \
-}
-
-unsigned int bjhash(const unsigned char *k, unsigned int length, unsigned int initval)
-{
-   unsigned int a,b,c,len;
-
-   len = length;
-   a = b = 0x9e3779b9;
-   c = initval;
-
-   while (len >= 12)
-   {
-      a += (k[0] +((unsigned int)k[1]<<8) +((unsigned int)k[2]<<16) +((unsigned int)k[3]<<24));
-      b += (k[4] +((unsigned int)k[5]<<8) +((unsigned int)k[6]<<16) +((unsigned int)k[7]<<24));
-      c += (k[8] +((unsigned int)k[9]<<8) +((unsigned int)k[10]<<16)+((unsigned int)k[11]<<24));
-      bjhash_mix(a,b,c);
-      k += 12; len -= 12;
-   }
-
-   c += length;
-
-   switch(len)
-   {
-      case 11: c+=((unsigned int)k[10]<<24);
-      case 10: c+=((unsigned int)k[9]<<16);
-      case 9 : c+=((unsigned int)k[8]<<8);
-      case 8 : b+=((unsigned int)k[7]<<24);
-      case 7 : b+=((unsigned int)k[6]<<16);
-      case 6 : b+=((unsigned int)k[5]<<8);
-      case 5 : b+=k[4];
-      case 4 : a+=((unsigned int)k[3]<<24);
-      case 3 : a+=((unsigned int)k[2]<<16);
-      case 2 : a+=((unsigned int)k[1]<<8);
-      case 1 : a+=k[0];
-   }
-
-   bjhash_mix(a,b,c);
-
-   return c;
-}
-
-/* really just an internal function called via MACSIO_ERROR macro */
-char const *
-_iop_errmsg(const char *format, /* A printf-like error message. */
-            ...                 /* Variable length debugging info specified by
-                                 * format to be printed out. */
-            )
-{
-  static char error_buffer[1024];
-  static int error_buffer_ptr = 0;
-  size_t L,Lmax;
-  char   tmp[sizeof(error_buffer)];
-  va_list ptr;
-
-  va_start(ptr, format);
-
-  vsprintf(tmp, format, ptr);
-  L    = strlen(tmp);
-  Lmax = sizeof(error_buffer) - error_buffer_ptr - 1;
-  if (Lmax < L)
-     tmp[Lmax-1] = '\0';
-  strcpy(error_buffer + error_buffer_ptr,tmp);
-
-  va_end(ptr);
-
-  return error_buffer;
 }
 
 /* Handles adding one or more params for a single key. If the key doesn't
@@ -175,7 +86,7 @@ add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addo
  *		      "-dims %d %f %d %f",
  *		         "specify size (logical and geometric) of mesh",
  *		         &Ni, &Xi, &Nj, &Xj
- *		      MACSIO_END_OF_ARGS);
+ *		      MACSIO_CLARGS_END_OF_ARGS);
  *
  *		After the argc,argv arguments, the remaining arguments come in groups of 3. The first of the three is a
  *		argument format specifier much like a printf statement. It indicates the type of each parameter to the
@@ -196,15 +107,15 @@ add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addo
  * Parallel:    This function must be called collectively in MPI_COMM_WORLD. Parallel and serial behavior is identical except in
  *		the
  *
- * Return:	MACSIO_ARGV_OK, MACSIO_ARGV_ERROR or MACSIO_ARGV_HELP
+ * Return:	MACSIO_CLARGS_OK, MACSIO_CLARGS_ERROR or MACSIO_CLARGS_HELP
  *
  * Programmer:	Mark Miller, LLNL, Thu Dec 19, 2001 
  *---------------------------------------------------------------------------------------------------------------------------------
  */
 int
-MACSIO_ProcessCommandLine(
+MACSIO_CLARGS_ProcessCmdline(
    void **retobj,       /* returned object (for cases that need it) */
-   MACSIO_ArgvFlags_t flags, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
+   MACSIO_CLARGS_ArgvFlags_t flags, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
    int argi,            /* first arg index to start processing at */
    int argc,		/* argc from main */
    char **argv,		/* argv from main */
@@ -226,8 +137,8 @@ MACSIO_ProcessCommandLine(
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_ERROR(("MPI is not initialized"), flags.error_mode);
-         return MACSIO_ARGV_ERROR;
+         MACSIO_LOG_MSGV(flags.error_mode, ("MPI is not initialized"));
+         return MACSIO_CLARGS_ERROR;
       }
    }
    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -270,7 +181,7 @@ MACSIO_ProcessCommandLine(
       fmtStr = va_arg(ap, char *);
 
       /* check to see if we're done */
-      if (!strcmp(fmtStr, MACSIO_END_OF_ARGS))
+      if (!strcmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS))
 	 break;
 
       /* get this arg's help string */
@@ -342,7 +253,7 @@ MACSIO_ProcessCommandLine(
 	    if (fmtStr[i] == '%' && fmtStr[i+1] != '%')
 	    {
 	       paramTypes[k] = fmtStr[i+1];
-               if (flags.route_mode == MACSIO_ARGV_TOMEM)
+               if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                {
 	           switch (paramTypes[k])
 	           {
@@ -363,7 +274,7 @@ MACSIO_ProcessCommandLine(
 	 argNameLength = n;
 	 paramTypes = NULL;
 	 paramPtrs = (void **) malloc (sizeof(void*));
-         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+         if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 	     paramPtrs[0] = va_arg(ap, int *);
       }
 
@@ -394,14 +305,14 @@ MACSIO_ProcessCommandLine(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          MACSIO_ERROR(("invalid argument type encountered at position %d",invalidArgTypeFound), flags.error_mode);
+          MACSIO_LOG_MSGV(flags.error_mode, ("invalid argument type encountered at position %d",invalidArgTypeFound));
 #warning FIX WARN FAILURE BEHAVIOR HERE
-      return MACSIO_ARGV_ERROR;
+      return MACSIO_CLARGS_ERROR;
    }
 
    /* exit if help was requested */
    if (helpWasRequested)
-      return MACSIO_ARGV_HELP;
+      return MACSIO_CLARGS_HELP;
 
    /* ok, now broadcast the whole argc, argv data */ 
 #ifdef HAVE_MPI
@@ -412,8 +323,9 @@ MACSIO_ProcessCommandLine(
       /* processor zero computes size of linearized argv and builds it */
       if (rank == 0)
       {
-	 if (getenv("MACSIO_IGNORE_UNKNOWN_ARGS"))
-	    flags.error_mode = MACSIO_WARN;
+#warning MAKE THIS A CLARG
+	 if (getenv("MACSIO_CLARGS_IGNORE_UNKNOWN_ARGS"))
+	    flags.error_mode = MACSIO_CLARGS_WARN;
 
          /* compute size of argv */
          argvLen = 0;
@@ -457,7 +369,7 @@ MACSIO_ProcessCommandLine(
 #endif
 
    /* And now, finally, we can process the arguments and assign them */
-   if (flags.route_mode == MACSIO_ARGV_TOJSON)
+   if (flags.route_mode == MACSIO_CLARGS_TOJSON)
        ret_json_obj = json_object_new_object();
    i = argi;
    while (i < argc)
@@ -492,7 +404,7 @@ MACSIO_ProcessCommandLine(
 	    for (j = 0; j < p->paramCount; j++)
 	    {
                if (i == argc - 1)
-                   MACSIO_ERROR(("too few arguments for command-line options"),MACSIO_FATAL);
+                   MACSIO_LOG_MSG(Die, ("too few arguments for command-line options"));
 	       switch (p->paramTypes[j])
 	       {
 	          case 'd':
@@ -506,13 +418,13 @@ MACSIO_ProcessCommandLine(
                      tmpDbl = tmpInt * n;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         MACSIO_ERROR(("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]), flags.error_mode);
+                         MACSIO_LOG_MSGV(flags.error_mode, ("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]));
                      }
                      else
                      {
-                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                         if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                              *pInt = (int) tmpDbl;
-                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                              add_param_to_json_retobj(ret_json_obj, argName, json_object_new_int((int)tmpDbl));
                      }
 		     break;
@@ -522,12 +434,12 @@ MACSIO_ProcessCommandLine(
 		     char **pChar = (char **) (p->paramPtrs[j]);
 		     if (pChar && *pChar == NULL)
 		     {
-                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                         if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                          {
 		             *pChar = (char*) malloc(strlen(argv[++i]+1));
 		             strcpy(*pChar, argv[i]);
                          }
-                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                          {
                              add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[i+1]));
                              i++;
@@ -535,9 +447,9 @@ MACSIO_ProcessCommandLine(
 		     }
 		     else
                      {
-                         if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                         if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		             strcpy(*pChar, argv[++i]);
-                         else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                         else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                              add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[++i]));
                      }
 		     break;
@@ -545,18 +457,18 @@ MACSIO_ProcessCommandLine(
 	          case 'f':
 	          {
 		     double *pDouble = (double *) (p->paramPtrs[j]);
-                     if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                     if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		         *pDouble = atof(argv[++i]);
-                     else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                     else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                          add_param_to_json_retobj(ret_json_obj, argName, json_object_new_double(atof(argv[++i])));
 		     break;
 	          }
 	          case 'n': /* special case to return arg index */
 	          {
 		     int *pInt = (int *) (p->paramPtrs[j]);
-                     if (flags.route_mode == MACSIO_ARGV_TOMEM)
+                     if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		         *pInt = i++;
-                     else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+                     else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                          add_param_to_json_retobj(ret_json_obj, "argi", json_object_new_int(i++));
 		     break;
 	          }
@@ -566,9 +478,9 @@ MACSIO_ProcessCommandLine(
 	 else
 	 {
             int *pInt = (int *) (p->paramPtrs[0]);
-            if (flags.route_mode == MACSIO_ARGV_TOMEM)
+            if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                 *pInt = 1; 
-            else if (flags.route_mode == MACSIO_ARGV_TOJSON)
+            else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                 add_param_to_json_retobj(ret_json_obj, argName, json_object_new_boolean((json_bool)1));
 	 }
       }
@@ -578,8 +490,8 @@ MACSIO_ProcessCommandLine(
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
-             MACSIO_ERROR(("%s: unknown argument %s. Type %s --help for help",p,argv[i],p), flags.error_mode);
-         return MACSIO_ARGV_ERROR; 
+             MACSIO_LOG_MSGV(flags.error_mode, ("%s: unknown argument %s. Type %s --help for help",p,argv[i],p));
+         return MACSIO_CLARGS_ERROR; 
       }
 
       /* move to next argument */
@@ -607,8 +519,8 @@ MACSIO_ProcessCommandLine(
       knownArgs = next;
    }
 
-   if (flags.route_mode == MACSIO_ARGV_TOJSON)
+   if (flags.route_mode == MACSIO_CLARGS_TOJSON)
        *retobj = ret_json_obj;
 
-   return MACSIO_ARGV_OK;
+   return MACSIO_CLARGS_OK;
 }

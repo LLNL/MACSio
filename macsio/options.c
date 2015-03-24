@@ -8,17 +8,24 @@
 #include <util.h>
 #include <options.h>
 
+/* helpful memory allocation wrappers */
+#define ALLOC(T) ((T*)calloc((size_t)1,sizeof(T)))
+#define ALLOC_N(T,N) ((T*)((N)>0?calloc((size_t)(N),sizeof(T)):0))
+#define REALLOC(P,T,N) REALLOC_N((P),(T),(N))
+#define REALLOC_N(P,T,N) ((T*)((N)>0?realloc((P),(size_t)((N)*sizeof(T))):0))
+#define FREE(M) if(M){free(M);(M)=0;}
+
 MACSIO_optlist_t *MACSIO_MakeOptlist()
 {
     MACSIO_optlist_t *optlist = 0;
     const int maxopts = 100;
 
     if (0 == (optlist = ALLOC(MACSIO_optlist_t)))
-        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
+        return 0;
     if (0 == (optlist->options = ALLOC_N(MACSIO_optid_t, maxopts)))
-        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
+        return 0;
     if (0 == (optlist->values = ALLOC_N(void *, maxopts)))
-        MACSIO_ERROR(("optlist alloc failed"), MACSIO_FATAL);
+        return 0;
 
     optlist->numopts = 0;
     optlist->maxopts = maxopts;
@@ -31,7 +38,6 @@ int MACSIO_FreeOptlist(MACSIO_optlist_t *optlist)
     int i;
     if (!optlist)
     {
-        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
     MACSIO_ClearOptlist(optlist);
@@ -47,7 +53,6 @@ int MACSIO_ClearOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option)
 
     if (!optlist)
     {
-        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
@@ -68,7 +73,7 @@ int MACSIO_ClearOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option)
     }
 
     if (!foundit)
-        MACSIO_ERROR(("non-existent option specified"), MACSIO_WARN);
+        return 0;
 
     optlist->numopts--;
     optlist->options[optlist->numopts] = OPTID_NOT_SET;
@@ -83,7 +88,6 @@ int MACSIO_ClearOptlist(MACSIO_optlist_t *optlist)
 
     if (!optlist)
     {
-        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
@@ -102,7 +106,6 @@ int MACSIO_AddOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, void *val
 {
     if (!optlist)
     {
-        MACSIO_ERROR(("bad MACSIO_optlist_t pointer"), MACSIO_WARN);
         return 0;
     }
 
@@ -110,9 +113,9 @@ int MACSIO_AddOption(MACSIO_optlist_t *optlist, MACSIO_optid_t option, void *val
     {
         int maxopts = 2*optlist->maxopts;
         if (0 == (optlist->options = REALLOC_N(optlist->options,MACSIO_optid_t,maxopts)))
-            MACSIO_ERROR(("optlist realloc failed"), MACSIO_FATAL);
+            return 0;
         if (0 == (optlist->values = REALLOC_N(optlist->values, void *,maxopts)))
-            MACSIO_ERROR(("optlist realloc failed"), MACSIO_FATAL);
+            return 0;
         optlist->maxopts = maxopts;
     }
 

@@ -1,4 +1,6 @@
-#include <log.h>
+#include <errno.h>
+
+#include <macsio_log.h>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -7,7 +9,6 @@
 int main (int argc, char **argv)
 {
     int rank=0, size=1;
-    MACSIO_LogHandle_t *log;
 
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
@@ -15,31 +16,37 @@ int main (int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-    log = Log_Init(MPI_COMM_WORLD, "tstlog.log", 128, 20);
+    MACSIO_LOG_DebugLevel = 2; /* should only see debug messages level 1 and 2 */
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tstlog.log", 128, 20);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MPI_COMM_WORLD, 0, 0, 0);
 
     if (rank == 1)
     {
-        Log(log, "I am staring with processor 1");
-        Log(log, "Test output of a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line");
+        MACSIO_LOG_MSG(Dbg1, ("I am staring with processor 1"));
+        MACSIO_LOG_MSG(Dbg2, ("Test output of a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line"));
     }
     else if (rank == 2)
     {
-        Log(log, "Starting on proc 2");
+        MACSIO_LOG_MSG(Warn, ("Starting on proc 2"));
+        MACSIO_LOG_LogMsg(MACSIO_LOG_StdErr, "Logging a message to stderr for rank %d", rank);
     }
     else if (rank == 0)
     {
-        Log(log, "I am here on proc 0");
+        errno = EOVERFLOW;
+        mpi_errno = MPI_ERR_COMM;
+        MACSIO_LOG_MSG(Err, ("I am here on proc 0"));
     }
     else
     {
         int i;
         for (i = 0; i < 25; i++)
         {
-            Log(log, "Outputing line %d for rank %d\n", i, rank);
+            MACSIO_LOG_MSG(Dbg3, ("Outputing line %d for rank %d\n", i, rank));
         }
     }
 
-    Log_Finalize(log);
+    MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
+    MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
 
 #ifdef HAVE_MPI
     MPI_Finalize();

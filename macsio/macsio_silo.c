@@ -10,11 +10,12 @@
 #endif
 
 #include <ifacemap.h>
+#include <macsio_clargs.h>
+#include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
-#include <log.h>
+#include <macsio_utils.h>
 #include <options.h>
-#include <util.h>
 
 #include <silo.h>
 
@@ -219,19 +220,11 @@ static int StringToDriver(const char *str)
  */
 
 /* convenient name mapping macors */
-#define FHNDL2(A) MACSIO_FileHandle_ ## A ## _t
 #define FHNDL FHNDL2(silo)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,silo)
 #define INAME2(A) #A
 #define INAME INAME2(silo)
-
-/* The driver's file handle "inherits" from the public handle */
-typedef struct FHNDL
-{
-    MACSIO_FileHandlePublic_t pub;
-    DBfile *dbfile;
-} FHNDL;
 
 /* the name you want to assign to the interface */
 static char const *iface_name = INAME;
@@ -243,11 +236,11 @@ static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 #warning MOVE LOG HANDLE TO IO CONTEXT
-static MACSIO_LogHandle_t *log;
+static MACSIO_LOG_LogHandle_t *log;
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const MACSIO_ArgvFlags_t argFlags = {MACSIO_WARN, MACSIO_ARGV_TOMEM};
+    const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
     char driver_str[128];
     char compression_str[512];
     int cksums = 0;
@@ -256,7 +249,7 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 
     strcpy(driver_str, "DB_HDF5");
     strcpy(compression_str, "");
-    MACSIO_ProcessCommandLine(0, argFlags, argi, argc, argv,
+    MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--driver %s",
             "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants) [DB_HDF5]",
             &driver_str,
@@ -272,7 +265,7 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
         "--show-all-errors",
             "Show all errors Silo encounters",
             &show_all_errors,
-    MACSIO_END_OF_ARGS);
+    MACSIO_CLARGS_END_OF_ARGS);
 
 #warning MOVE THIS STUFF TO register METHOD
     driver = StringToDriver(driver_str);
@@ -389,7 +382,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
     /* Construct the lists of individual object names */
     for (i = 0; i < numChunks; i++)
     {
-        int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
+        int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
         int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
         blockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
@@ -421,7 +414,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
 
         for (i = 0; i < numChunks; i++)
         {
-            int rank_owning_chunk = MACSIO_GetRankOwningPart(main_obj, i);
+            int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
             int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
             if (groupRank == 0)
             {
@@ -463,12 +456,12 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning MAKE LOGGING A CL OPTION
 #if 0
-    log = Log_Init(MPI_COMM_WORLD, "macsio_silo.log", 128, 20);
+    log = Log_Init(MACSIO_MAIN_Comm, "macsio_silo.log", 128, 20);
 #endif
 
 #warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);
@@ -486,11 +479,11 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 #warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
         if (!strcmp(json_object_get_string(modestr), "SIF"))
         {
-            MACSIO_ERROR(("Silo plugin doesn't support SIF mode"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("Silo plugin doesn't support SIF mode"));
         }
         else if (strcmp(json_object_get_string(modestr), "MIF"))
         {
-            MACSIO_ERROR(("Ignoring non-standard MIF mode"), MACSIO_WARN);
+            MACSIO_LOG_MSG(Warn, ("Ignoring non-standard MIF mode"));
         }
         numGroups = json_object_get_int(filecnt);
     }
@@ -499,7 +492,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         char const * modestr = JsonGetStr(main_obj, "clargs/--parallel_file_mode");
         if (!strcmp(modestr, "SIF"))
         {
-            MACSIO_ERROR(("Silo plugin doesn't support SIF mode"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("Silo plugin doesn't support SIF mode"));
         }
         else if (!strcmp(modestr, "MIFMAX"))
             numGroups = JsonGetInt(main_obj, "parallel/mpi_size");
@@ -511,7 +504,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     }
 
     /* Initialize MACSIO_MIF, pass a pointer to the driver type as the user data. */
-    bat = MACSIO_MIF_Init(numGroups, MACSIO_MIF_WRITE, MPI_COMM_WORLD, 1,
+    bat = MACSIO_MIF_Init(numGroups, MACSIO_MIF_WRITE, MACSIO_MAIN_Comm, 1,
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */
@@ -564,11 +557,11 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 static int register_this_interface()
 {
-    unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
+    unsigned int id = MACSIO_UTILS_BJHash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
     if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
-        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("interface name \"%s\" too long",iface_name));
     if (iface_map[id].slotUsed!= 0)
-        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
 
     /* Take this slot in the map */
     iface_map[id].slotUsed = 1;

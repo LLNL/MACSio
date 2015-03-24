@@ -7,7 +7,15 @@
 extern "C" {
 #endif
 
-extern int MACSIO_GetRankOwningPart(json_object *main_obj, int chunkId);
+#ifdef HAVE_MPI
+extern MPI_Comm MACSIO_MAIN_Comm;
+#else
+extern int MACSIO_MAIN_Comm;
+#endif
+extern int MACSIO_MAIN_Size;
+extern int MACSIO_MAIN_Rank;
+
+extern int MACSIO_MAIN_GetRankOwningPart(json_object *main_obj, int chunkId);
 
 #ifdef __cplusplus
 }

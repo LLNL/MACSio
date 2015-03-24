@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include <util.h>
+#include <macsio_log.h>
 #include <options.h>
 
 #define TEST_INT_OPT_VAL 5
@@ -32,45 +32,45 @@ int main(int argc, char **argv)
 
     /* check the scalar options */
     if (MACSIO_GetIntOption(opts, TEST_INT_OPTID) != TEST_INT_OPT_VAL)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     if (MACSIO_GetDblOption(opts, TEST_DBL_OPTID) != TEST_DBL_OPT_VAL)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     if (strcmp(MACSIO_GetStrOption(opts, TEST_STR_OPTID), TEST_STR_OPT_VAL))
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
 
     /* check the int array option */
     if ((cnt = MACSIO_GetIntOption(opts, TEST_INTARR_SIZE)) != INTARR_SIZE)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     pi = MACSIO_GetIntArrOption(opts, TEST_INTARR);
     if (!pi)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     for (i = 0; i < cnt; i++)
     {
         if (pi[i] != intarr[i])
-            MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("incorrect option value"));
     }
 
     /* check the dbl array option */
     if ((cnt = MACSIO_GetIntOption(opts, TEST_DBLARR_SIZE)) != DBLARR_SIZE)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     pd = MACSIO_GetDblArrOption(opts, TEST_DBLARR);
     if (!pd)
-        MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("incorrect option value"));
     for (i = 0; i < cnt; i++)
     {
         if (pd[i] != dblarr[i])
-            MACSIO_ERROR(("incorrect option value"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("incorrect option value"));
     }
 
     /* clear some options */
     MACSIO_ClearOption(opts, TEST_DBL_OPTID);
     MACSIO_ClearArrOption(opts, TEST_INTARR);
     if (MACSIO_GetOption(opts, TEST_DBL_OPTID))
-        MACSIO_ERROR(("option was not cleared"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("option was not cleared"));
     if (MACSIO_GetOption(opts, TEST_INTARR_SIZE))
-        MACSIO_ERROR(("option was not cleared"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("option was not cleared"));
     if (MACSIO_GetOption(opts, TEST_INTARR))
-        MACSIO_ERROR(("option was not cleared"), MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("option was not cleared"));
 
     /* Try to write new data via backdoor */
     {
@@ -79,11 +79,11 @@ int main(int argc, char **argv)
 
         *p = -5;
         if (MACSIO_GetIntOption(opts, TEST_INT_OPTID) != -5)
-            MACSIO_ERROR(("backdoor write failed"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("backdoor write failed"));
 
         strcpy(ps, "kram");
         if (strcmp(MACSIO_GetStrOption(opts, TEST_STR_OPTID), "kram"))
-            MACSIO_ERROR(("backdoor write failed"), MACSIO_FATAL);
+            MACSIO_LOG_MSG(Die, ("backdoor write failed"));
     }
 
     MACSIO_FreeOptlist(opts);

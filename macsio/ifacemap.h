@@ -18,17 +18,13 @@ extern "C" {
  */
 
 /* Required methods */
-typedef int                     (*InitInterfaceFunc) (MACSIO_optlist_t const *opts);
-typedef struct MACSIO_FileHandle_t* (*CreateFileFunc)   (char const *pathname, int flags, 
-    MACSIO_optlist_t const *moreopts);
-typedef struct MACSIO_FileHandle_t* (*OpenFileFunc)     (char const *pathname, int flags,
-    MACSIO_optlist_t const *moreopts);
+typedef int               (*InitInterfaceFunc) (MACSIO_optlist_t const *opts);
+typedef void              (*DumpFunc)(int argi, int argc, char **argv, json_object *main_obj, int dumpNum, double dumpTime);
 
 /* Optional methods */
-typedef MACSIO_optlist_t*           (*ProcessArgsFunc)  (int argi, int argc, char **argv);
-typedef void                        (*DumpFunc)(int argi, int argc, char **argv, json_object *main_obj, int dumpNum, double dumpTime);
-typedef MACSIO_optlist_t*           (*QueryFeaturesFunc)(void);
-typedef int                     (*IdentifyFileFunc) (char const *pathname, MACSIO_optlist_t const *moreopts);
+typedef MACSIO_optlist_t* (*ProcessArgsFunc)  (int argi, int argc, char **argv);
+typedef MACSIO_optlist_t* (*QueryFeaturesFunc)(void);
+typedef int               (*IdentifyFileFunc) (char const *pathname, MACSIO_optlist_t const *moreopts);
 
 #warning MAKE THE MAKEFILE LINK ANY .o FILES WITH A GIVEN NAME SCHEME
 typedef struct MACSIO_IFaceHandle_t
@@ -40,8 +36,6 @@ typedef struct MACSIO_IFaceHandle_t
     DumpFunc             dumpFunc;
     QueryFeaturesFunc    queryFeaturesFunc;
     IdentifyFileFunc     identifyFileFunc;
-    CreateFileFunc       createFileFunc;
-    OpenFileFunc         openFileFunc;
 } MACSIO_IFaceHandle_t;
 
 /*

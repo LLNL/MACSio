@@ -5,12 +5,13 @@
 #include <string>
 
 #include <ifacemap.h>
+#include <macsio_clargs.h>
+#include <macsio_log.h>
 #include <macsio_main.h>
-#include <macsio_params.h>
 #include <macsio_mif.h>
-#include <log.h>
+#include <macsio_params.h>
+#include <macsio_utils.h>
 #include <options.h>
-#include <util.h>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -24,7 +25,6 @@
 #include <hdf5.h>
 
 /* convenient name mapping macors */
-#define FHNDL2(A) MACSIO_FileHandle_ ## A ## _t
 #define FHNDL FHNDL2(hdf5)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,hdf5)
@@ -45,7 +45,7 @@ static int lbuf_size = 0;
 static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
-static MACSIO_LogHandle_t *log;
+static MACSIO_LOG_LogHandle_t *log;
 static int show_errors = 0;
 
 static hid_t make_fapl()
@@ -93,8 +93,8 @@ static hid_t make_fapl()
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
-    const MACSIO_ArgvFlags_t argFlags = {MACSIO_WARN, MACSIO_ARGV_TOMEM};
-    MACSIO_ProcessCommandLine(0, argFlags, argi, argc, argv,
+    const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
+    MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--show_errors",
             "Show low-level HDF5 errors",
             &show_errors,
@@ -115,7 +115,7 @@ static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
             "Use Silo's block-based VFD and specify block size and block count", 
             &silo_block_size, &silo_block_count,
 #endif
-           MACSIO_END_OF_ARGS);
+           MACSIO_CLARGS_END_OF_ARGS);
 
     if (!show_errors)
         H5Eset_auto1(0,0);
@@ -146,7 +146,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning INCLUDE ARG PROCESS FOR HINTS
 #warning FAPL PROPS: ALIGNMENT 
 #if H5_HAVE_PARALLEL
-    H5Pset_fapl_mpio(fapl_id, MPI_COMM_WORLD, mpiInfo);
+    H5Pset_fapl_mpio(fapl_id, MACSIO_MAIN_Comm, mpiInfo);
 #endif
 
 #warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
@@ -354,7 +354,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 #warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 #warning SET FILE AND DATASET PROPERTIES
 #warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
-    MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, MACSIO_MIF_WRITE, MPI_COMM_WORLD, 3,
+    MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, MACSIO_MIF_WRITE, MACSIO_MAIN_Comm, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
@@ -402,9 +402,6 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
 
-#if 0
-    Log_Finalize(log);
-#endif
 }
 
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj,
@@ -414,13 +411,13 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning SET ERROR MODE OF HDF5 LIBRARY
 
-#warning MAKE LOGGING A CL OPTION
+#warning MAKE PLUGIN LOGGING A CL OPTION
 #if 0
-    log = Log_Init(MPI_COMM_WORLD, "macsio_hdf5.log", 128, 20);
+    log = Log_Init(MACSIO_MAIN_Comm, "macsio_hdf5.log", 128, 20);
 #endif
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);
@@ -457,9 +454,9 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
             else
             {
 #warning CURRENTLY, SIF CAN WORK ONLY ON WHOLE PART COUNTS
-                MACSIO_ERROR(("HDF5 plugin cannot currently handle SIF mode where "
+                MACSIO_LOG_MSG(Die, ("HDF5 plugin cannot currently handle SIF mode where "
                     "there are different numbers of parts on each MPI rank. "
-                    "Set --avg_num_parts to an integral value." ), MACSIO_FATAL);
+                    "Set --avg_num_parts to an integral value." ));
             }
         }
         else if (!strcmp(modestr, "MIFMAX"))
@@ -480,11 +477,11 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 static int register_this_interface()
 {
-    unsigned int id = bjhash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
+    unsigned int id = MACSIO_UTILS_BJHash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
     if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
-        MACSIO_ERROR(("interface name \"%s\" too long",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("interface name \"%s\" too long",iface_name));
     if (iface_map[id].slotUsed!= 0)
-        MACSIO_ERROR(("hash collision for interface name \"%s\"",iface_name) , MACSIO_FATAL);
+        MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
 
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 

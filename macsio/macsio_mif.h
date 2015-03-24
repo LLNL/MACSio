@@ -27,7 +27,7 @@ onus is on the application to manage the distribution of data across potentially
 files. In truth, this illuminates the only salient distinction between Single Shared
 File (SSF) and MIF. In either paradigm, if you dig deep enough into the I/O stack, you
 soon discover that data is always being distributed across multiple files. The only
-difference is where in the stack is the distribution into files handled. In the MIF
+difference is where in the stack the distribution into files is handled. In the MIF
 paradigm, it is handled explicitly by the application itself. In a typical SSF paradigm,
 it is handled by the underling filesystem.
 
