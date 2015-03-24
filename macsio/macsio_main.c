@@ -28,7 +28,7 @@
 extern char **enviornp;
 
 #ifdef HAVE_MPI
-MPI_Comm MACSIO_Main_Comm;
+MPI_Comm MACSIO_MAIN_Comm;
 #else
 int MACSIO_MAIN_Comm;
 #endif
