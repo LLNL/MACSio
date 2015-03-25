@@ -39,7 +39,7 @@ groups.
 
 \image html pmpio_diagram.png
 
-A call to MACSIO_MIF_Init() establishes this mapping of MPI tasks to file groups.
+A call to \c MACSIO_MIF_Init() establishes this mapping of MPI tasks to file groups.
 
 Within a group, access to the group's file is handled in a round-robin fashion. The first
 MPI task in the group creates the file and then iterates over all mesh pieces it has.
@@ -50,14 +50,14 @@ That MPI task opens the file and iterates over all domains in the same way. Excl
 access to the file is then handed off to the next task. This process continues until
 all processors in the group have written their domains to unique sub-directories in the file.
 
-Calls to MACSIO_MIF_WaitForBaton() and MACSIO_MIF_HandOffBaton() handle this handshaking
+Calls to \c MACSIO_MIF_WaitForBaton() and \c MACSIO_MIF_HandOffBaton() handle this handshaking
 of file creations and/or opens and bracket blocks of code that are performing MIF I/O.
 
 After all groups have finished with their files, an optional final step may involve creating
 a master file which contains special metadata objects that point at all the pieces of
 mesh (domains) scattered about in the N files.
 
-A call to MACSIO_MIF_Finalize() frees up resources associated with handling MIF mappings.
+A call to \c MACSIO_MIF_Finalize() frees up resources associated with handling MIF mappings.
 
 The basic coding structure for a MIF I/O operation is as follows. . .
 
@@ -132,6 +132,9 @@ typedef void  (*MACSIO_MIF_CloseCB) (void *file, void *udata);
 
 #ifdef HAVE_MPI
 extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_iomode_t ioMode, MPI_Comm mpiComm, int mpiTag,
+    MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb, void *userData);
+#else
+extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_iomode_t ioMode, int mpiComm, int mpiTag,
     MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb, void *userData);
 #endif
 extern void   MACSIO_MIF_Finish(MACSIO_MIF_baton_t *bat);

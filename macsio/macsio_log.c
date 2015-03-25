@@ -14,12 +14,22 @@ int mpi_errno = MPI_SUCCESS;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;
 
-/* really just an internal function called via MACSIO_ERROR macro */
+/*!
+\addtogroup MACSIO_LOG
+@{
+*/
+
+/*!
+\brief Internal convenience method to build a message from a format string and args.
+
+The method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
+
+*/
 char const *
-MACSIO_LOG_make_msg(const char *format, /* A printf-like error message. */
-         ...                 /* Variable length debugging info specified by
-                              * format to be printed out. */
-         )
+MACSIO_LOG_make_msg(
+    char const *format, /**< [in] A printf-like error message format string. */
+    ...                 /**< [in] Optional, variable length set of arguments for format to be printed out. */
+)
 {
   static char error_buffer[1024];
   static int error_buffer_ptr = 0;
@@ -41,63 +51,24 @@ MACSIO_LOG_make_msg(const char *format, /* A printf-like error message. */
   return error_buffer;
 }
 
-void MACSIO_LOG_LogMsg(MACSIO_LOG_LogHandle_t *log, char const *fmt, ...)
-{
-    int i = 0;
-    int is_stderr = log->logfile == fileno(stderr);
-    char *msg, *buf;
-    va_list ptr;
+/*!
+\brief Initialize a log
 
-    msg = (char *) malloc(log->log_line_length);
-    buf = (char *) malloc(log->log_line_length);
+All processors in the \c comm communicator must call this function
+collectively with identical values for \c path, \c line_len, and \c lines_per_proc.
 
-    if (is_stderr) sprintf(msg, "%06d: ", log->rank);
-    va_start(ptr, fmt);
-    vsnprintf(log?msg:&msg[8], log->log_line_length-1, fmt, ptr);
-    va_end(ptr);
-    msg[log->log_line_length-1] = '\0';
-
-    while (i < strlen(msg) && i < log->log_line_length)
-    {
-        if (msg[i] == '\n')
-            buf[i] = ' ';
-        else
-            buf[i] = msg[i];
-        i++;
-    }
-    if (is_stderr)
-    {
-        buf[i++] = '\n';
-        buf[i++] = '\0';
-    }
-    else
-    {
-        while (i < log->log_line_length)
-            buf[i++] = ' ';
-        buf[log->log_line_length-1] = '\n';
-    }
-
-    if (is_stderr)
-    {
-        write(log->logfile, buf, sizeof(char) * strlen(buf));
-    }
-    else
-    {
-        off_t seek_offset = (log->rank * log->lines_per_proc + log->current_line) * log->log_line_length;
-        pwrite(log->logfile, buf, sizeof(char) * log->log_line_length, seek_offset);
-    }
-    free(buf);
-
-    log->current_line++;
-    if (log->current_line == log->lines_per_proc)
-        log->current_line = 1;
-}
-
+*/
+MACSIO_LOG_LogHandle_t*
+MACSIO_LOG_LogInit(
 #ifdef HAVE_MPI
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(MPI_Comm comm, char const *path, int line_len, int lines_per_proc)
+    MPI_Comm comm,        /**< [in] MPI Communicator of tasks that will issue messages to this log */
 #else
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_len, int lines_per_proc)
+    int comm,             /**< [in] Dummy arg for non-MPI compilation */
 #endif
+    char const *path,     /**< [in] The name of the log file */
+    int line_len,         /**< [in] The length of each message line in the log file */
+    int lines_per_proc    /**< [in] The number of message lines for each MPI task */
+)
 {
     int rank=0, size=1;
     MACSIO_LOG_LogHandle_t *retval;
@@ -141,10 +112,86 @@ MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_
     return retval;
 }
 
-#warning ADD ATEXIT FUNCTIONALITY TO CLOSE LOGS
-void MACSIO_LOG_LogFinalize(MACSIO_LOG_LogHandle_t *log)
+/*!
+\brief Issue a message to a log
+
+May be called independently by any processor in the communicator used to initialize the log.
+
+*/
+
+void
+MACSIO_LOG_LogMsg(
+    MACSIO_LOG_LogHandle_t *log, /**< [in] The handle for the specified log */
+    char const *fmt,             /**< [in] A printf-style format string for the log message */
+    ...                          /**< [in] Optional, variable list of arguments for the format string. */
+)
 {
+    int i = 0;
+    int is_stderr = log->logfile == fileno(stderr);
+    char *msg, *buf;
+    va_list ptr;
+
+    msg = (char *) malloc(log->log_line_length);
+    buf = (char *) malloc(log->log_line_length);
+
+    if (is_stderr) sprintf(msg, "%06d: ", log->rank);
+    va_start(ptr, fmt);
+    vsnprintf(log?msg:&msg[8], log->log_line_length-1, fmt, ptr);
+    va_end(ptr);
+    msg[log->log_line_length-1] = '\0';
+
+    while (i < strlen(msg) && i < log->log_line_length)
+    {
+        if (msg[i] == '\n')
+            buf[i] = '!';
+        else
+            buf[i] = msg[i];
+        i++;
+    }
+    if (is_stderr)
+    {
+        buf[i++] = '\n';
+        buf[i++] = '\0';
+    }
+    else
+    {
+        while (i < log->log_line_length)
+            buf[i++] = ' ';
+        buf[log->log_line_length-1] = '\n';
+    }
+
+    if (is_stderr)
+    {
+        write(log->logfile, buf, sizeof(char) * strlen(buf));
+    }
+    else
+    {
+        off_t seek_offset = (log->rank * log->lines_per_proc + log->current_line) * log->log_line_length;
+        pwrite(log->logfile, buf, sizeof(char) * log->log_line_length, seek_offset);
+    }
+    free(buf);
+
+    log->current_line++;
+    if (log->current_line == log->lines_per_proc)
+        log->current_line = 1;
+}
+
+/*!
+\brief Finalize and close an open log
+
+Should be called by all processors that created the log.
+
+*/
+
+void
+MACSIO_LOG_LogFinalize(
+    MACSIO_LOG_LogHandle_t *log /**< [in] The log to be closed */
+)
+{
+#warning ADD ATEXIT FUNCTIONALITY TO CLOSE LOGS
     if (log->logfile != fileno(stderr))
         close(log->logfile);
     free(log);
 }
+
+/*!@}*/

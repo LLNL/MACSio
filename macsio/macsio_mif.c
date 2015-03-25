@@ -2,15 +2,15 @@
 
 #include <macsio_mif.h>
 
-/*!
-\addtogroup MACSIO_MIF
-@{
-*/
-
 #define MACSIO_MIF_BATON_OK  0
 #define MACSIO_MIF_BATON_ERR 1
 #define MACSIO_MIF_MIFMAX -1
 #define MACSIO_MIF_MIFAUTO -2
+
+/*!
+\addtogroup MACSIO_MIF
+@{
+*/
 
 typedef struct _MACSIO_MIF_baton_t
 {
@@ -28,8 +28,8 @@ typedef struct _MACSIO_MIF_baton_t
     int rankInGroup;            /**< Rank of this processor within its group */
     int procBeforeMe;           /**< Rank of processor before this processor in the group */
     int procAfterMe;            /**< Rank of processor after this processor in the group */
-    mutable int mifErr;                 /**< MIF error value */
-    mutable int mpiErr;                 /**< MPI error value */
+    mutable int mifErr;         /**< MIF error value */
+    mutable int mpiErr;         /**< MPI error value */
     int mpiTag;                 /**< MPI message tag used for all messages here */
     MACSIO_MIF_CreateCB createCb; /**< Create file callback */
     MACSIO_MIF_OpenCB openCb;   /**< Open file callback */
