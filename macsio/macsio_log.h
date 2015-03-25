@@ -58,6 +58,8 @@ Examples of the use of MACSIO_LOG can be found in tstlog.c
 @{
 */
 
+#ifndef DOXYGEN_IGNORE_THIS /*[*/
+
 #ifdef HAVE_MPI
 #define MACSIO_LOG_MSG2(LOG, MSG, SEVVAL, SEVSTR, ERRNO, MPI_ERRNO, THEFILE, THELINE) \
 do{                                                                                   \
@@ -75,17 +77,26 @@ do{                                                                             
 }while(0)
 #endif
 
-#define MACSIO_LOG_MSG(SEV, MSG) \
-    MACSIO_LOG_MSG2(MACSIO_LOG_MainLog, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
+#endif /*] DOXYGEN_IGNORE_THIS */
+
+/*!
+\def MACSIO_LOG_MSG
+\brief Convenience macro for logging a message to the main log
+\param [in] SEV Abbreviated message severity (e.g. 'Dbg1', 'Warn')
+\param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
+*/
+#define MACSIO_LOG_MSG(SEV,MSG) MACSIO_LOG_MSG2(MACSIO_LOG_MainLog, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
 
 /*!
 \def MACSIO_LOG_MSGV
-\breif Convenience macro for logging messages with variable severity to the main log
+\breif Alterantive to \c MACSIO_LOG_MSG when severity is a runtime variable
+\param [in] VSEV Runtime variable in which message severity is stored
+\param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
 */
-#define MACSIO_LOG_MSGV(VSEVERITY, MSG)                              \
+#define MACSIO_LOG_MSGV(VSEV, MSG)                                   \
 do                                                                   \
 {                                                                    \
-    switch (VSEVERITY)                                               \
+    switch (VSEV)                                                    \
     {                                                                \
         case MACSIO_LOG_MsgDbg1: {MACSIO_LOG_MSG(Dbg1, MSG); break;} \
         case MACSIO_LOG_MsgDbg2: {MACSIO_LOG_MSG(Dbg2, MSG); break;} \
@@ -96,13 +107,26 @@ do                                                                   \
     }                                                                \
 }while(0)
 
-#define MACSIO_LOG_MSGL(LOG, SEV, MSG) \
-    MACSIO_LOG_MSG2(LOG, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
+/*!
+\def MACSIO_LOG_MSGL
+\brief Convenience macro for logging a message to any specific log
+\param [in] LOG The log handle
+\param [in] SEV Abbreviated message severity (e.g. 'Dbg1', 'Warn')
+\param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
+*/
+#define MACSIO_LOG_MSGL(LOG, SEV, MSG) MACSIO_LOG_MSG2(LOG, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
 
-#define MACSIO_LOG_MSGLV(LOG, VSEVERITY, MSG)                        \
+/*!
+\def MACSIO_LOG_MSGLV
+\brief Convenience macro for logging a message with variable severity to any specific log
+\param [in] LOG The log handle
+\param [in] VSEV Runtime variable in which message severity is stored
+\param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
+*/
+#define MACSIO_LOG_MSGLV(LOG, VSEV, MSG)                             \
 do                                                                   \
 {                                                                    \
-    switch (VSEVERITY)                                               \
+    switch (VSEV)                                                    \
     {                                                                \
         case MACSIO_LOG_MsgDbg1: {MACSIO_LOG_MSGL(LOG, Dbg1, MSG); break;} \
         case MACSIO_LOG_MsgDbg2: {MACSIO_LOG_MSGL(LOG, Dbg2, MSG); break;} \
@@ -119,12 +143,12 @@ extern "C" {
 
 typedef enum _MACSIO_LOG_MsgSeverity_t
 {
-    MACSIO_LOG_MsgDbg1,
-    MACSIO_LOG_MsgDbg2,
-    MACSIO_LOG_MsgDbg3,
-    MACSIO_LOG_MsgWarn,
-    MACSIO_LOG_MsgErr,
-    MACSIO_LOG_MsgDie
+    MACSIO_LOG_MsgDbg1,  /**< Debug level 1: For coarse grained debugging messages */
+    MACSIO_LOG_MsgDbg2,  /**< Debug level 2: For moderate grained debugging messages */
+    MACSIO_LOG_MsgDbg3,  /**< Debug level 3: For fine grained debugging messages */
+    MACSIO_LOG_MsgWarn,  /**< Warnings of minor problems that can be recovered from without undue effects */
+    MACSIO_LOG_MsgErr,   /**< Error conditions that result in a change in expected/anticipated behavior */
+    MACSIO_LOG_MsgDie    /**< Unrecoverable errors */
 } MACSIO_LOG_MsgSeverity_t;
 
 typedef struct _MACSIO_LOG_LogHandle_t MACSIO_LOG_LogHandle_t;
