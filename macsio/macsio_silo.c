@@ -461,7 +461,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
-    MPI_Barrier(MACSIO_MAIN_Comm);
+    mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
     FNAME(process_args)(argi, argc, argv);

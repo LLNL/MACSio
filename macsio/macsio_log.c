@@ -9,10 +9,10 @@
 
 #include <macsio_log.h>
 
-/*!
-\addtogroup MACSIO_LOG
-@{
-*/
+int                     mpi_errno = MPI_SUCCESS;
+int                     MACSIO_LOG_DebugLevel = 0;
+MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
+MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;
 
 typedef struct _MACSIO_LOG_LogHandle_t
 {
@@ -25,15 +25,15 @@ typedef struct _MACSIO_LOG_LogHandle_t
                                    which the next message will be written */
 } MACSIO_LOG_LogHandle_t;
 
-int MACSIO_LOG_DebugLevel = 0;                  /**< Global variable holding maximum debug level to report to log files */
-int mpi_errno = MPI_SUCCESS;                    /**< Global most recent MPI error code */
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0; /**< Global main log handle */
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;  /**< Global stderr log handle */
+/*!
+\addtogroup MACSIO_LOG
+@{
+*/
 
 /*!
-\brief Internal convenience method to build a message from a format string and args.
+\brief Internal convenience method to build a message from a printf-style format string and args.
 
-This method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
+This method is public only because it is used within the \c MACSIO_LOG_MSG convenience macro.
 */
 char const *
 MACSIO_LOG_MakeMsg(
@@ -108,7 +108,7 @@ MACSIO_LOG_LogInit(
     }
 
 #ifdef HAVE_MPI
-    MPI_Barrier(comm);
+    mpi_errno = MPI_Barrier(comm);
 #endif
 
     retval = (MACSIO_LOG_LogHandle_t *) malloc(sizeof(MACSIO_LOG_LogHandle_t));
@@ -123,12 +123,10 @@ MACSIO_LOG_LogInit(
 }
 
 /*!
-\brief Issue a message to a log
+\brief Issue a printf-style message to a log
 
 May be called independently by any processor in the communicator used to initialize the log.
-
 */
-
 void
 MACSIO_LOG_LogMsg(
     MACSIO_LOG_LogHandle_t const *log, /**< [in] The handle for the specified log */
@@ -187,16 +185,15 @@ MACSIO_LOG_LogMsg(
 }
 
 /*!
-\brief Internal convenience method for building a detailed message for a log 
-This method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
+\brief Convenience method for building a detailed message for a log.
 */
 void
 MACSIO_LOG_LogMsgWithDetails(
     MACSIO_LOG_LogHandle_t const *log, /**< [in] Log handle to issue message to */
     char const *linemsg,               /**< [in] Caller's message string */
     MACSIO_LOG_MsgSeverity_t sevVal,   /**< [in] Caller's message severity value */
-    char const *sevStr,                /**< [in] Caller's abbreviated message string */
-    int sysErrno,                      /**< [in] Current system's errno */
+    char const *sevStr,                /**< [in] Caller's message severity abbreviation string */
+    int sysErrno,                      /**< [in] Current (most recnet) system's errno */
     int mpiErrno,                      /**< [in] Current (most recent) MPI error */
     char const *theFile,               /**< [in] Caller's file name */
     int theLine                        /**< [in] Caller's line number within the file */
@@ -235,7 +232,6 @@ MACSIO_LOG_LogMsgWithDetails(
 \brief Finalize and close an open log
 Should be called by all processors that created the log.
 */
-
 void
 MACSIO_LOG_LogFinalize(
     MACSIO_LOG_LogHandle_t *log /**< [in] The log to be closed */
