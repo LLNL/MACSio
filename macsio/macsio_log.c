@@ -9,24 +9,34 @@
 
 #include <macsio_log.h>
 
-int MACSIO_LOG_DebugLevel = 0;
-int mpi_errno = MPI_SUCCESS;
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
-MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;
-
 /*!
 \addtogroup MACSIO_LOG
 @{
 */
 
+typedef struct _MACSIO_LOG_LogHandle_t
+{
+    int logfile;              /**< Log file file descriptor */
+    int rank;                 /**< Rank of the processor that created this log handle */
+    int size;                 /**< Size of the communicator that created this log handle */
+    int log_line_length;      /**< Maximum length of a message line in the log file */
+    int lines_per_proc;       /**< Number of message lines allocated in the file for each processor */
+    mutable int current_line; /**< Index into this processor's group of lines in the log file at
+                                   which the next message will be written */
+} MACSIO_LOG_LogHandle_t;
+
+int MACSIO_LOG_DebugLevel = 0;                  /**< Global variable holding maximum debug level to report to log files */
+int mpi_errno = MPI_SUCCESS;                    /**< Global most recent MPI error code */
+MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0; /**< Global main log handle */
+MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;  /**< Global stderr log handle */
+
 /*!
 \brief Internal convenience method to build a message from a format string and args.
 
-The method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
-
+This method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
 */
 char const *
-MACSIO_LOG_make_msg(
+MACSIO_LOG_MakeMsg(
     char const *format, /**< [in] A printf-like error message format string. */
     ...                 /**< [in] Optional, variable length set of arguments for format to be printed out. */
 )
@@ -121,7 +131,7 @@ May be called independently by any processor in the communicator used to initial
 
 void
 MACSIO_LOG_LogMsg(
-    MACSIO_LOG_LogHandle_t *log, /**< [in] The handle for the specified log */
+    MACSIO_LOG_LogHandle_t const *log, /**< [in] The handle for the specified log */
     char const *fmt,             /**< [in] A printf-style format string for the log message */
     ...                          /**< [in] Optional, variable list of arguments for the format string. */
 )
@@ -177,10 +187,53 @@ MACSIO_LOG_LogMsg(
 }
 
 /*!
+\brief Internal convenience method for building a detailed message for a log 
+This method is public because it is used within the \c MACSIO_LOG_MSG convenience macro.
+*/
+void
+MACSIO_LOG_LogMsgWithDetails(
+    MACSIO_LOG_LogHandle_t const *log, /**< [in] Log handle to issue message to */
+    char const *linemsg,               /**< [in] Caller's message string */
+    MACSIO_LOG_MsgSeverity_t sevVal,   /**< [in] Caller's message severity value */
+    char const *sevStr,                /**< [in] Caller's abbreviated message string */
+    int sysErrno,                      /**< [in] Current system's errno */
+    int mpiErrno,                      /**< [in] Current (most recent) MPI error */
+    char const *theFile,               /**< [in] Caller's file name */
+    int theLine                        /**< [in] Caller's line number within the file */
+)
+{
+    char _sig[512], _msg[512], _err[512];
+    char _mpistr[MPI_MAX_ERROR_STRING+1], _mpicls[MPI_MAX_ERROR_STRING+1];
+    _sig[0] = _msg[0] = _err[0] = _mpistr[0] = _mpicls[0] = '\0';
+    if (sevVal <= MACSIO_LOG_MsgDbg3 && sevVal >= MACSIO_LOG_DebugLevel)
+        return;
+    snprintf(_sig, sizeof(_sig), "%.4s:\"%s\":%d", sevStr, theFile, theLine);
+    snprintf(_msg, sizeof(_msg), "%s", linemsg);
+    if (sysErrno)
+        snprintf(_err, sizeof(_err), "%d:\"%s\"", sysErrno, strerror(sysErrno));
+#ifdef HAVE_MPI
+    if (mpiErrno != MPI_SUCCESS)
+    {
+        int mpi_errcls, len;
+        MPI_Error_class(mpiErrno, &mpi_errcls);
+        MPI_Error_string(mpi_errcls, _mpicls, &len);
+        _mpicls[len] = '\0';
+        MPI_Error_string(mpiErrno, _mpistr, &len);
+        _mpistr[len] = '\0';
+    }
+#endif
+    MACSIO_LOG_LogMsg(log, "%s:%s:%s:%s:%s", _sig, _msg, _err, _mpistr, _mpicls);
+    if (sevVal == MACSIO_LOG_MsgDie)
+#ifdef HAVE_MPI
+        MPI_Abort(MPI_COMM_WORLD, 0);
+#else
+        abort(sysErrno);
+#endif
+}
+
+/*!
 \brief Finalize and close an open log
-
 Should be called by all processors that created the log.
-
 */
 
 void
