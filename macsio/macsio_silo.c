@@ -220,7 +220,6 @@ static int StringToDriver(const char *str)
  */
 
 /* convenient name mapping macors */
-#define FHNDL FHNDL2(silo)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,silo)
 #define INAME2(A) #A

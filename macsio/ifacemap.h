@@ -7,7 +7,6 @@
 
 #define MACSIO_MAX_IFACES 128
 #define MACSIO_MAX_IFACE_NAME 64
-#define MACSIO_MAX_DUMP_CLASSES 32
 
 #ifdef __cplusplus
 extern "C" {

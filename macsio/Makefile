@@ -41,7 +41,7 @@ CXX ?= mpicxx
 CC ?= mpicc
 LINK ?= mpicxx
 
-COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_params.c options.c ifacemap.c macsio_utils.c timing.c macsio_log.c
+COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_params.c options.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
@@ -154,6 +154,8 @@ tstlog: tstlog.o $(COMMON_OBJ)
 
 # the PDB Lite driver code is #included from PDB driver code
 ioperf_pdbl.o: ioperf_pdb.c
+
+macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 

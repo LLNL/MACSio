@@ -41,6 +41,7 @@ MACSIO_LOG_MakeMsg(
     ...                 /**< [in] Optional, variable length set of arguments for format to be printed out. */
 )
 {
+#warning MAKE THIS THREAD SAFE BY ALLOCATING THE RETURNED STRING OR USE A LARGE CIRCULAR BUFFER
   static char error_buffer[1024];
   static int error_buffer_ptr = 0;
   size_t L,Lmax;

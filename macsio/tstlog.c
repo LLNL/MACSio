@@ -39,9 +39,10 @@ int main (int argc, char **argv)
     else
     {
         int i;
+        MACSIO_LOG_MsgSeverity_t sev = rank%2?MACSIO_LOG_MsgDbg2:MACSIO_LOG_MsgDbg3;
         for (i = 0; i < 25; i++)
         {
-            MACSIO_LOG_MSG(Dbg3, ("Outputing line %d for rank %d\n", i, rank));
+            MACSIO_LOG_MSGV(sev, ("Outputing line %d for rank %d\n", i, rank));
         }
     }
 
