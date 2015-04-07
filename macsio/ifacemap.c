@@ -1,5 +1,5 @@
 #include <ifacemap.h>
-#include <util.h>
+#include <macsio_utils.h>
 
 /* Ensure this object is initialized during static initializations */
 MACSIO_IFaceHandle_t iface_map[MACSIO_MAX_IFACES] =

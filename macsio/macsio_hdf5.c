@@ -312,7 +312,7 @@ static void CloseHDF5File(void *file, void *userData)
 
 static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 {
-#warning WE'RE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
+#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
     int i;
     json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
     for (i = 0; i < json_object_array_length(vars_array); i++)

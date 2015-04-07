@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <util.h>
+#include <macsio_utils.h>
 #include <options.h>
 
 /* helpful memory allocation wrappers */

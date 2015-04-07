@@ -1,5 +1,6 @@
-#include <unistd.h>
+#include <malloc.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <macsio_log.h>
 #include <macsio_timing.h>
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-    MACSIO_LOG_DebugLevel = 1; /* should only see debug messages level 1 */
+    MACSIO_LOG_DebugLevel = 1; /* should only see debug messages level 1 and 2 */
 
     if (size > 8)
     {
@@ -96,13 +97,14 @@ int main(int argc, char **argv)
     MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimer_strs, &maxstrlen);
 
 #ifdef HAVE_MPI
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "foobar.log", ntimer_strs+4, maxstrlen+4);
+    {
+        int rbuf[2], sbuf[2] = {ntimer_strs, maxstrlen};
+        MPI_Allreduce(sbuf, rbuf, 2, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+        MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tsttiming.log", rbuf[1]+4, rbuf[0]+4);
+    }
 #else
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(0, "tsttiming.log", ntimer_strs+4, maxstrlen+4);
 #endif
-
-#if 0
-    printf("ntimer_strs = %d, maxstrlen = %d\n", ntimer_strs, maxstrlen);
 
     for (i = 0; i < ntimer_strs; i++)
     {
@@ -110,7 +112,6 @@ int main(int argc, char **argv)
         free(timer_strs[i]);
     }
     free(timer_strs);
-#endif
     
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
 

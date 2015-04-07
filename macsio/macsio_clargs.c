@@ -137,7 +137,7 @@ MACSIO_CLARGS_ProcessCmdline(
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_LOG_MSGV(flags.error_mode, ("MPI is not initialized"));
+         MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn, ("MPI is not initialized"));
          return MACSIO_CLARGS_ERROR;
       }
    }
@@ -305,7 +305,8 @@ MACSIO_CLARGS_ProcessCmdline(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          MACSIO_LOG_MSGV(flags.error_mode, ("invalid argument type encountered at position %d",invalidArgTypeFound));
+          MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+              ("invalid argument type encountered at position %d",invalidArgTypeFound));
 #warning FIX WARN FAILURE BEHAVIOR HERE
       return MACSIO_CLARGS_ERROR;
    }
@@ -418,7 +419,8 @@ MACSIO_CLARGS_ProcessCmdline(
                      tmpDbl = tmpInt * n;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         MACSIO_LOG_MSGV(flags.error_mode, ("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]));
+                         MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                             ("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]));
                      }
                      else
                      {
@@ -490,7 +492,8 @@ MACSIO_CLARGS_ProcessCmdline(
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
-             MACSIO_LOG_MSGV(flags.error_mode, ("%s: unknown argument %s. Type %s --help for help",p,argv[i],p));
+             MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                 ("%s: unknown argument %s. Type %s --help for help",p,argv[i],p));
          return MACSIO_CLARGS_ERROR; 
       }
 
