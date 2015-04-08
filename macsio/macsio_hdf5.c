@@ -151,8 +151,9 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
 #warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
     /* Construct name for the HDF5 file */
-    sprintf(fileName, "%s_hdf5.%s",
+    sprintf(fileName, "%s_hdf5_%03d.%s",
         json_object_path_get_string(main_obj, "clargs/--filebase"),
+        dumpn,
         json_object_path_get_string(main_obj, "clargs/--fileext"));
 
     h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
@@ -361,9 +362,10 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
 
     /* Construct name for the silo file */
-    sprintf(fileName, "%s_hdf5_%05d.%s",
+    sprintf(fileName, "%s_hdf5_%05d_%03d.%s",
         json_object_path_get_string(main_obj, "clargs/--filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
+        dumpn,
         json_object_path_get_string(main_obj, "clargs/--fileext"));
 
     h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);

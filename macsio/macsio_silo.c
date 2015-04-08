@@ -507,9 +507,10 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */
-    sprintf(fileName, "%s_silo_%05d.%s",
+    sprintf(fileName, "%s_silo_%05d_%03d.%s",
         JsonGetStr(main_obj, "clargs/--filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
+        dumpn,
         JsonGetStr(main_obj, "clargs/--fileext"));
 
     /* Wait for write access to the file. All processors call this.
