@@ -115,9 +115,9 @@ int main(int argc, char **argv)
     free(timer_strs);
 
     MACSIO_TIMING_ReduceTimers(MPI_COMM_WORLD, 0);
-    MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimer_strs, &maxstrlen);
     if (!rank)
     {
+        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimer_strs, &maxstrlen);
         MACSIO_LOG_MSG(Dbg1, ("#####################Reduced Timer Values######################"));
         for (i = 0; i < ntimer_strs; i++)
         {

@@ -133,7 +133,8 @@ group_mask_from_name(char const *grpName)
     if (timerGroupCount == maxTimerGroups)
         return 0;
 
-    timerGroupNames[timerGroupCount++] = strdup(grpName);
+    timerGroupNames[timerGroupCount] = strdup(grpName);
+    timerGroupCount++;
     return ((MACSIO_TIMING_GroupMask_t)1)<<(timerGroupCount-1);
 }
 
@@ -588,4 +589,5 @@ void MACSIO_TIMING_DumpReducedTimersToStrings(
 void MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask)
 {
     clear_timers(timerHashTable, gmask);
+    clear_timers(reducedTimerTable, MACSIO_TIMING_ALL_GROUPS);
 }

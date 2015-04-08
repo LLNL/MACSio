@@ -92,7 +92,7 @@ of the timer explicitly.
 \def MACSIO_TIMING_ALL_GROUPS
 \brief Group mask representing all groups
 */
-#define MACSIO_TIMING_ALL_GROUPS (~((MACSIO_TIMING_GroupMask_t)0x0))
+#define MACSIO_TIMING_ALL_GROUPS (~((MACSIO_TIMING_GroupMask_t)0))
 
 /*!
 \def MT_StartTimer
@@ -127,7 +127,7 @@ extern int                       MACSIO_TIMING_UseMPI_Wtime;
 A small number of groups (less than 64) can be defined into which timers can be grouped
 Timers can be assigned to multiple groups by or'ing the resulting group masks.
 */
-extern MACSIO_TIMING_GroupMask_t MACSIO_TIMING_GroupName(
+extern MACSIO_TIMING_GroupMask_t MACSIO_TIMING_GroupMask(
     char const *grpName /**< Name of the group for which group mask is needed */
 );
 

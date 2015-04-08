@@ -15,6 +15,7 @@
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_params.h>
+#include <macsio_timing.h>
 #include <macsio_utils.h>
 
 #include <json-c/json.h>
@@ -788,6 +789,8 @@ main(int argc, char *argv[])
     json_object *parallel_obj = json_object_new_object();
     json_object *problem_obj = 0;
     json_object *clargs_obj = 0;
+    MACSIO_TIMING_TimerId_t main_tid;
+    MACSIO_TIMING_GroupMask_t main_grp;
     const MACSIO_IFaceHandle_t *ioiface;
     double         t0,t1;
     int            argi;
@@ -807,7 +810,7 @@ main(int argc, char *argv[])
 #endif
 
     errno = 0;
-    MACSIO_LOG_DebugLevel = 0;
+    MACSIO_LOG_DebugLevel = 1;
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 256, 64);
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
@@ -834,20 +837,22 @@ main(int argc, char *argv[])
 
 #warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
-#if 0
+#if 1
     snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", rank);
     outf = fopen(outfName, "w");
     fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
     fclose(outf);
 #endif
 
-#warning START TOTAL TIMER
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
+    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
 #warning WE'RE NOT GENERATING OR WRITING ANY METADATA STUFF
 
     dumpTime = 0.0;
     for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/--num_dumps"); dumpNum++)
     {
+        MACSIO_TIMING_TimerId_t heavy_dump_tid;
 
 #warning ADD DUMP DIR CREATION OPTION HERE
 
@@ -858,16 +863,40 @@ main(int argc, char *argv[])
         /* log dump start */
 
         /* Start dump timer */
+        heavy_dump_tid = MT_StartTimer("heavy dump", main_grp, dumpNum);
 
         /* do the dump */
+#warning OVERRIGHTING SAME TIMESTEP FILE
         (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 
         /* stop timer */
+        MT_StopTimer(heavy_dump_tid);
 
         /* log dump completion */
     }
 
     /* stop total timer */
+    MT_StopTimer(main_tid);
+
+    MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
+
+    if (!rank)
+    {
+        char **timer_strs;
+        int i, ntimers, maxlen;
+
+        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
+        for (i = 0; i < ntimers; i++)
+        {
+            /* For now, just log to stderr */
+#warning NEED A LOG FILE FOR SPECIFIC SET OF PROCESSORS, OR JUST ONE
+            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Dbg1, (timer_strs[i]));
+            free(timer_strs[i]);
+        }
+        free(timer_strs);
+    }
+
+    MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
 #warning ATEXIT THESE
     MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
