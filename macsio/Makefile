@@ -172,5 +172,5 @@ dataclean: clean
 allclean: dataclean
 	rm -rf ../json-c/{install,build}
 
-check:
+check: macsio
 	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo

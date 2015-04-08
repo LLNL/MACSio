@@ -330,11 +330,11 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
 
     n = 0;
     srandom(0xBabeFace);
-    for (i = 0; i < dims2[0]; i++)
+    for (k = 0; k < dims2[2]; k++)
     {
         for (j = 0; j < dims2[1]; j++)
         {
-            for (k = 0; k < dims2[2]; k++)
+            for (i = 0; i < dims2[0]; i++)
             {
 #warning PUT THESE INTO A GENERATOR FUNCTION
 #warning ACCOUNT FOR HALF ZONE OFFSETS
@@ -343,17 +343,17 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                 else if (!strcmp(kind, "random"))
                     valdp[n++] = (double) (random() % 1000) / 1000;
                 else if (!strcmp(kind, "xramp"))
-                    valdp[n++] = i * MACSIO_UTILS_XDelta(dims, bounds);
+                    valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                 else if (!strcmp(kind, "spherical"))
                 {
-                    double x = i * MACSIO_UTILS_XDelta(dims, bounds);
-                    double y = j * MACSIO_UTILS_YDelta(dims, bounds);
-                    double z = k * MACSIO_UTILS_ZDelta(dims, bounds);
+                    double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
+                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
+                    double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = sqrt(x*x+y*y+z*z);
                 }
                 else if (!strcmp(kind, "ysin"))
                 {
-                    double y = j * MACSIO_UTILS_YDelta(dims, bounds);
+                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     valdp[n++] = sin(y*3.1415266);
                 }
                 else if (!strcmp(kind, "xlayers"))

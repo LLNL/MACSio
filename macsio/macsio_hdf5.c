@@ -484,6 +484,7 @@ static int register_this_interface()
         MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
 
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
+#warning ADD LINDSTROM COMPRESSION STUFF
 
     /* Take this slot in the map */
     iface_map[id].slotUsed = 1;

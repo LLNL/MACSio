@@ -432,7 +432,6 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
             blockTypes[i] = DB_QUADVAR;
         }
 
-printf("Putting multivar named \"%s\"\n", varname);
         /* Write the multi-block objects */
         DBPutMultivar(siloFile, varname, numChunks, blockNames, blockTypes, 0);
 
