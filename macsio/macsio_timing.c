@@ -85,11 +85,6 @@ static double get_current_time()
 #endif
 }
 
-/* Ensure wall-clock timer routine is initialized at load time. Again,
-   this approach *requires* C++ compiler because it involves
-   initialization with non-constant expressions. */
-static int dummy = get_current_time();
-
 /* A small collection of strings to be associated with different
    timer groups. That is, collections of timers that are used to
    time different phases of some larger class of activity. For

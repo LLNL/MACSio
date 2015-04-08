@@ -163,11 +163,19 @@ static void sscanf_is_broken_test()
 
 	(void)sscanf(" -01234567890123456789012345", "%" SCNd64, &num64);
 	ret_errno = errno;
+#ifdef INT64_MIN
 	is_int64_min = (num64 == INT64_MIN);
+#else
+	is_int64_min = (num64 == INT_MIN);
+#endif
 
 	(void)sscanf(" 01234567890123456789012345", "%" SCNd64, &num64);
 	ret_errno2 = errno;
+#ifdef INT64_MAX
 	is_int64_max = (num64 == INT64_MAX);
+#else
+	is_int64_max = (num64 == INT_MAX);
+#endif
 
 	if (ret_errno != ERANGE || !is_int64_min ||
 	    ret_errno2 != ERANGE || !is_int64_max)
@@ -256,9 +264,17 @@ int json_parse_int64(const char *buf, int64_t *retval)
 	if (saved_errno == ERANGE)
 	{
 		if (orig_has_neg)
+#ifdef INT64_MIN
 			num64 = INT64_MIN;
+#else
+			num64 = INT_MIN;
+#endif
 		else
+#ifdef INT64_MAX
 			num64 = INT64_MAX;
+#else
+			num64 = INT_MAX;
+#endif
 	}
 	*retval = num64;
 	return 0;

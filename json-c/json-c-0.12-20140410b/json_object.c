@@ -401,7 +401,7 @@ void json_object_object_add(struct json_object* jso, const char *key,
 		lh_table_insert(jso->o.c_object, strdup(key), val);
 		return;
 	}
-	existing_value = (void *)existing_entry->v;
+	existing_value = (json_object *)existing_entry->v;
 	if (existing_value)
 		json_object_put(existing_value);
 	existing_entry->v = val;
@@ -525,10 +525,17 @@ int32_t json_object_get_int(struct json_object *jso)
   switch(o_type) {
   case json_type_int:
 	/* Make sure we return the correct values for out of range numbers. */
+#ifdef INT32_MIN
 	if (cint64 <= INT32_MIN)
 		return INT32_MIN;
 	else if (cint64 >= INT32_MAX)
 		return INT32_MAX;
+#else
+	if (cint64 <= INT_MIN)
+		return INT_MIN;
+	else if (cint64 >= INT_MAX)
+		return INT_MAX;
+#endif
 	else
 		return (int32_t)cint64;
   case json_type_double:
@@ -636,8 +643,8 @@ struct json_object* json_object_new_double_s(double d, const char *ds)
 int json_object_userdata_to_json_string(struct json_object *jso,
 	struct printbuf *pb, int level, int flags)
 {
-	int userdata_len = strlen(jso->_userdata);
-	printbuf_memappend(pb, jso->_userdata, userdata_len);
+	int userdata_len = strlen((char*)jso->_userdata);
+	printbuf_memappend(pb, (char*)jso->_userdata, userdata_len);
 	return userdata_len;
 }
 
@@ -879,7 +886,7 @@ int json_object_extarr_nvals(struct json_object* jso)
     if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
     for (i = 0, nvals=1; i < json_object_extarr_ndims(jso); i++)
     {
-        struct json_object* dimobj = array_list_get_idx(jso->o.c_extarr.dims, i);
+        struct json_object* dimobj = (struct json_object*) array_list_get_idx(jso->o.c_extarr.dims, i);
         nvals *= json_object_get_int(dimobj);
     }
     return nvals;
@@ -896,7 +903,7 @@ int json_object_extarr_dim(struct json_object* jso, int dimidx)
     struct json_object *dimobj;
     if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
     if (dimidx < 0) return 0;
-    dimobj = array_list_get_idx(jso->o.c_extarr.dims, dimidx);
+    dimobj = (struct json_object *) array_list_get_idx(jso->o.c_extarr.dims, dimidx);
     if (!dimobj) return 0;
     return json_object_get_int(dimobj);
 }
@@ -1075,7 +1082,7 @@ void json_object_enum_add(struct json_object* jso, char const *choice_name, int6
     lh_table_insert(jso->o.c_enum.choices, strdup(choice_name), json_object_new_int(choice_val));
     return;
   }
-  existing_value = (void *)existing_entry->v;
+  existing_value = (json_object *)existing_entry->v;
   if (existing_value)
     json_object_put(existing_value);
   existing_entry->v = json_object_new_int(choice_val);
@@ -1360,7 +1367,7 @@ static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char
 static struct json_object* json_object_apath_get_leafobj(struct json_object *obj, char const *key_path)
 {
     char *kp = strdup(key_path);
-    struct json_object *retval = json_object_apath_get_leafobj_recurse(obj, kp);
+    struct json_object *retval = (struct json_object *) json_object_apath_get_leafobj_recurse(obj, kp);
     free(kp);
     return retval;
 }
@@ -1602,7 +1609,7 @@ static void *json_object_path_get_leafobj_recurse(struct json_object *src, char 
 static struct json_object* json_object_path_get_leafobj(struct json_object *obj, char const *key_path, json_type jtype)
 {
     char *kp = strdup(key_path);
-    struct json_object *retval = json_object_path_get_leafobj_recurse(obj, kp, jtype);
+    struct json_object *retval = (struct json_object *) json_object_path_get_leafobj_recurse(obj, kp, jtype);
     free(kp);
     return retval;
 }

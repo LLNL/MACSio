@@ -133,7 +133,7 @@ json-c: ../json-c/install
 	cd ../json-c; \
 	mkdir build install; \
 	cd build; \
-	../json-c-0.12-20140410b/configure CC=$(CC) --prefix=`pwd`/../install; \
+	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install; \
         make install
 	
 probe.o: probe.c
@@ -172,5 +172,6 @@ dataclean: clean
 allclean: dataclean
 	rm -rf ../json-c/{install,build}
 
+#srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 5 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
 check: macsio
 	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo

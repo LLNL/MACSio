@@ -19,6 +19,13 @@ typedef __int64 int64_t;
 #else
 
 #ifdef JSON_C_HAVE_INTTYPES_H
+#ifndef PRId64
+#define PRId64 "I64d"
+#endif
+#ifndef SCNd64
+#define SCNd64 "I64d"
+#endif
+#include <stdint.h>
 #include <inttypes.h>
 #endif
 /* inttypes.h includes stdint.h */

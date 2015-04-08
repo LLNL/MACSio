@@ -1,5 +1,7 @@
 SILO_HOME=/usr/gapps/silo/4.9.1/bgqos_0_bgxlc
 HDF5_HOME=/usr/gapps/silo/hdf5/1.8.10/bgqos_0_bgxlc
+ZLIB_HOME=/usr/gapps/silo/zlib/1.2.3/bgqos_0_bgxlc
+SZIP_HOME=/usr/gapps/silo/szip/2.1/bgqos_0_bgxlc
 CXX=mpixlcxx_r -qsourcetype=c++
 CC=mpixlcxx_r -qsourcetype=c++
 CFLAGS=-DHAVE_MPI -all-static -qsourcetype=c++

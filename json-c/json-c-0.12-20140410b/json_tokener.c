@@ -292,7 +292,11 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
      so the function limits the maximum string size to INT32_MAX (2GB).
      If the function is called with len == -1 then strlen is called to check
      the string length is less than INT32_MAX (2GB) */
+#ifdef INT32_MAX
   if ((len < -1) || (len == -1 && strlen(str) > INT32_MAX)) {
+#else
+  if ((len < -1) || (len == -1 && strlen(str) > INT_MAX)) {
+#endif
     tok->err = json_tokener_error_size;
     return NULL;
   }
@@ -872,7 +876,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
           else if (json_object_array_length(current) == ndims + 2)
           {
               int i, *dims;
-              dims = malloc(ndims * sizeof(int));
+              dims = (int*) malloc(ndims * sizeof(int));
               for (i = 0; i < ndims; i++)
               {
                   struct json_object* dimobj = json_object_array_get_idx(current, 2+i);
