@@ -810,6 +810,7 @@ main(int argc, char *argv[])
 #endif
 
     errno = 0;
+#warning MAKE DEBUG LEVEL CL ARG
     MACSIO_LOG_DebugLevel = 1;
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 256, 64);
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);

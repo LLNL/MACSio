@@ -45,7 +45,6 @@ static int lbuf_size = 0;
 static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
-static MACSIO_LOG_LogHandle_t *log;
 static int show_errors = 0;
 
 static hid_t make_fapl()

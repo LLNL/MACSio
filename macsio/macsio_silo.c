@@ -235,7 +235,6 @@ static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 #warning MOVE LOG HANDLE TO IO CONTEXT
-static MACSIO_LOG_LogHandle_t *log;
 
 static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
 {
@@ -295,9 +294,7 @@ static void *OpenSiloFile(const char *fname, const char *nsname, MACSIO_MIF_iomo
     void *userData)
 {
     int driverId = *((int*) userData);
-    /*Log(log, "DBOpen(\"%s\", %d, %d)", fname, driverId, ioMode==MACSIO_MIF_WRITE ? DB_APPEND : DB_READ);*/
     DBfile *siloFile = DBOpen(fname, driverId, ioMode==MACSIO_MIF_WRITE ? DB_APPEND : DB_READ);
-    /*Log(log, "siloFile = %p", siloFile);*/
     if (siloFile && nsname)
     {
         if (ioMode == MACSIO_MIF_WRITE)
@@ -366,7 +363,7 @@ static void write_mesh_part(DBfile *dbfile, json_object *part)
         write_rect_mesh_part(dbfile, part);
 }
 
-static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO_MIF_baton_t *bat)
+static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int dumpn, MACSIO_MIF_baton_t *bat)
 {
     int i, j;
     char const *file_ext = JsonGetStr(main_obj, "clargs/--fileext");
@@ -392,9 +389,9 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
         else
         {
 #warning USE SILO NAMESCHEMES INSTEAD
-            sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/mesh",
+            sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/mesh",
                 JsonGetStr(main_obj, "clargs/--filebase"),
-                groupRank, 
+                groupRank, dumpn,
                 JsonGetStr(main_obj, "clargs/--fileext"),
                 i);
         }
@@ -423,9 +420,9 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, MACSIO
             else
             {
 #warning USE SILO NAMESCHEMES INSTEAD
-                sprintf(blockNames[i], "%s_silo_%05d.%s:/domain_%07d/%s",
+                sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/%s",
                     JsonGetStr(main_obj, "clargs/--filebase"),
-                    groupRank, 
+                    groupRank, dumpn,
                     JsonGetStr(main_obj, "clargs/--fileext"),
                     i,varname);
             }
@@ -454,9 +451,6 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     MACSIO_MIF_baton_t *bat;
 
 #warning MAKE LOGGING A CL OPTION
-#if 0
-    log = Log_Init(MACSIO_MAIN_Comm, "macsio_silo.log", 128, 20);
-#endif
 
 #warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
@@ -540,7 +534,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */
     if (rank == 0)
-        WriteMultiXXXObjects(main_obj, siloFile, bat);
+        WriteMultiXXXObjects(main_obj, siloFile, dumpn, bat);
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
@@ -549,10 +543,6 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
-
-#if 0
-    Log_Finalize(log);
-#endif
 }
 
 static int register_this_interface()

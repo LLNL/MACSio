@@ -146,6 +146,8 @@ MACSIO_TIMING_GroupMask(char const *grpName)
 
 typedef struct _timerInfo_t
 {
+    /* If you change this structure in any way, you need to change the code that
+       creates its MPI datatype in ReduceTimers */
     int __line__;                    /**< Source file line # of StartTimer call */ 
     int iter_count;                  /**< Total number of iterations this timer was invoked. */
     int min_iter;                    /**< Iteration at which min time was seen */           
@@ -510,7 +512,7 @@ dump_timers_to_strings(
 {
     char **_strs;
     int pass, _nstrs, _maxlen = 0;
-    int const MAX_STR_SIZE = 1024;
+    int const max_str_size = 1024;
 
     for (pass = 0; pass < 2; pass++)
     {
@@ -528,9 +530,9 @@ dump_timers_to_strings(
             if (!(table[i].gmask & gmask)) continue;
 
             _nstrs++;
-            if (pass == 0) continue;
+            if (pass == 0) continue; /* only count the strings on first pass */
 
-            _strs[_nstrs-1] = (char *) malloc(MAX_STR_SIZE);
+            _strs[_nstrs-1] = (char *) malloc(max_str_size);
 
             dev = sqrt(table[i].running_var);
             if (dev > 0)
@@ -541,7 +543,7 @@ dump_timers_to_strings(
 
 #warning USE COLUMN HEADINGS INSTEAD
 #warning HANDLE INDENTATION HERE
-            len = snprintf(_strs[_nstrs-1], MAX_STR_SIZE,
+            len = snprintf(_strs[_nstrs-1], max_str_size,
                 "TOT=%10.5f,CNT=%04d,MIN=%8.5f(%4.2f):%06d,AVG=%8.5f,MAX=%8.5f(%4.2f):%06d,DEV=%8.8f:FILE=%s:LINE=%d:LAB=%s",
                 table[i].total_time,
                 table[i].iter_count,
