@@ -37,6 +37,162 @@ int MACSIO_MAIN_Comm;
 int MACSIO_MAIN_Size = 1;
 int MACSIO_MAIN_Rank = 0;
 
+static json_object *
+make_random_int()
+{
+    return json_object_new_int(random() % 100000);
+}
+
+static json_object *
+make_random_double()
+{
+     return json_object_new_double(
+         (double) (random() % 100000) / (random() % 100000 + 1));
+}
+
+static json_object *
+make_random_primitive()
+{
+    int rval = random() % 100;
+    if (rval < 33) /* favor doubles over ints 2:1 */
+        return make_random_int();
+    else
+        return make_random_double();
+}
+
+static json_object *
+make_random_string(int nthings)
+{
+    int i;
+    char *rval = (char *) malloc(nthings);
+    json_object *retval;
+
+    for (i = 0; i < nthings-1; i++)
+        rval[i] = 'A' + (random() % 61);
+    rval[nthings-1] = '\0';
+    retval = json_object_new_string(rval);
+    free(rval);
+
+    return retval;
+}
+
+static json_object *
+make_random_array(int nthings)
+{
+    int i, rval = random() % 100;
+    json_object *retval = json_object_new_array();
+    for (i = 0; i < nthings; i++)
+    {
+        if (rval < 33) /* favor double arrays over int arrays 2:1 */
+            json_object_array_add(retval, make_random_int());
+        else
+            json_object_array_add(retval, make_random_double());
+    }
+    return retval;
+}
+
+static json_object *
+make_random_extarr(int nthings)
+{
+    
+    int dims[2], ndims = random() % 2 + 1;
+    int rval = random() % 100;
+    json_extarr_type dtype;
+    void *data;
+
+    dims[0] = nthings;
+    if (ndims == 2)
+        MACSIO_UTILS_Best2DFactors(nthings, &dims[0], &dims[1]);
+
+    if (rval < 33) /* favor double arrays over int arrays 2:1 */
+    {
+        int i, *vals = (int *) malloc(nthings * sizeof(int));
+        for (i = 0; i < nthings; i++)
+            vals[i] = i % 11 ? i : random() % nthings;
+        dtype = json_extarr_type_int32;
+        data = vals;
+    }
+    else
+    {
+        int i;
+        double *vals = (double *) malloc(nthings * sizeof(double));
+        for (i = 0; i < nthings; i++)
+            vals[i] = (double) (random() % 100000) / (random() % 100000 + 1);
+        dtype = json_extarr_type_flt64;
+        data = vals;
+    }
+
+    return json_object_new_extarr(data, dtype, ndims, dims);
+}
+
+static json_object *
+make_random_object(int nthings_target, int *nthings_used)
+{
+    int breadth, prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
+    int rval = random() % 100;
+
+    /* adjust cutoffs to affect odds of different kinds of objects depending on total size */
+    if (nthings_target > 10000)
+    {
+        breadth = random() % 100 + 1;
+        prim_cutoff = 5; string_cutoff = 10; array_cutoff = 30; extarr_cutoff = 95;
+    }
+    else if (nthings_target > 1000)
+    {
+        breadth = random() % 25 + 1;
+        prim_cutoff = 15; string_cutoff = 30; array_cutoff = 50; extarr_cutoff = 80;
+    }
+    else if (nthings_target > 100)
+    {
+        breadth = random() % 10 + 1;
+        prim_cutoff = 25; string_cutoff = 40; array_cutoff = 50; extarr_cutoff = 70;
+    }
+    else if (nthings_target > 10)
+    {
+        breadth = random() % 3 + 1;
+        prim_cutoff = 50; string_cutoff = 55; array_cutoff = 60; extarr_cutoff = 65;
+    }
+    else
+    {
+        prim_cutoff = 100;
+    }
+
+    if (rval < prim_cutoff)
+    {
+        *nthings_used = 1;
+        return make_random_primitive();
+    }
+    else if (rval < string_cutoff)
+    {
+        *nthings_used = nthings_target;
+        return make_random_string(nthings_target);
+    }
+    else if (rval < array_cutoff)
+    {
+        *nthings_used = nthings_target;
+        return make_random_array(nthings_target);
+    }
+    else if (rval < extarr_cutoff)
+    {
+        *nthings_used = nthings_target;
+        return make_random_extarr(nthings_target);
+    }
+    else 
+    {
+        int i = 0, n, nused = 0;
+        json_object *new_object = json_object_new_object();
+        while (n < nthings_target)
+        {
+            char name[32];
+            snprintf(name, sizeof(name), "member%04d", i++);
+            json_object_object_add(new_object, name, make_random_object(nthings_target/breadth, &n));
+            nused += n;
+        }
+        *nthings_used = nused;
+        return new_object;
+    }
+}
+
 #warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
 static json_object *
 make_uniform_mesh_coords(int ndims, int const *dims, double const *bounds)
@@ -372,16 +528,19 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
 static json_object *
 make_vector_var(int ndims, int const *dims, double const *bounds)
 {
+    return 0;
 }
 
 static json_object *
 make_tensor_var(int ndims, int const *dims, double const *bounds)
 {
+    return 0;
 }
 
 static json_object *
 make_subset_var(int ndims, int const *dims, double const *bounds)
 {
+    return 0;
 }
 
 static json_object *
@@ -839,10 +998,13 @@ main(int argc, char *argv[])
 #warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
 #if 1
-    snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
-    outf = fopen(outfName, "w");
-    fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
-    fclose(outf);
+    if (MACSIO_MAIN_Size <= 64)
+    {
+        snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
+        outf = fopen(outfName, "w");
+        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+        fclose(outf);
+    }
 #endif
 
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");

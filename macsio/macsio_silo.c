@@ -406,8 +406,6 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     int numVars = json_object_array_length(vars_array);
     for (j = 0; j < numVars; j++)
     {
-        char const *varname = JsonGetStr(vars_array, "", j, "name");
-
         for (i = 0; i < numChunks; i++)
         {
             int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
@@ -415,22 +413,25 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
             if (groupRank == 0)
             {
                 /* this mesh block is in the file 'root' owns */
-                sprintf(blockNames[i], "/domain_%07d/%s", i, varname);
+                sprintf(blockNames[i], "/domain_%07d/%s", i,
+                    JsonGetStr(vars_array, "", j, "name"));
             }
             else
             {
 #warning USE SILO NAMESCHEMES INSTEAD
                 sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/%s",
                     JsonGetStr(main_obj, "clargs/--filebase"),
-                    groupRank, dumpn,
+                    groupRank,
+                    dumpn,
                     JsonGetStr(main_obj, "clargs/--fileext"),
-                    i,varname);
+                    i,
+                    JsonGetStr(vars_array, "", j, "name"));
             }
             blockTypes[i] = DB_QUADVAR;
         }
 
         /* Write the multi-block objects */
-        DBPutMultivar(siloFile, varname, numChunks, blockNames, blockTypes, 0);
+        DBPutMultivar(siloFile, JsonGetStr(vars_array, "", j, "name"), numChunks, blockNames, blockTypes, 0);
 
     }
 

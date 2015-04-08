@@ -1,8 +1,6 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <map>
-#include <string>
 
 #include <ifacemap.h>
 #include <macsio_clargs.h>
@@ -128,6 +126,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     int i, v, p;
     char const *mesh_type = json_object_path_get_string(main_obj, "clargs/--part_type");
     char fileName[256];
+    int use_part_count;
 
     hid_t h5file_id;
     hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -205,7 +204,8 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
         /* Loop to make write calls for this var for each part on this rank */
 #warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
-        for (p = 0; p < json_object_array_length(part_array); p++)
+        use_part_count = (int) ceil(json_object_path_get_double(main_obj, "clargs/--avg_num_parts"));
+        for (p = 0; p < use_part_count; p++)
         {
             json_object *part_obj = json_object_array_get_idx(part_array, p);
             json_object *var_obj = 0;
@@ -233,6 +233,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                     counts[i] = json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
                         counts[i]--;
+printf("start[%d]=%d,count[%d]=%d\n", (int) starts[i], i, (int) counts[i], i);
                 }
 
                 /* set selection of filespace */
