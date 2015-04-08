@@ -1482,7 +1482,7 @@ double json_object_apath_get_double(struct json_object *obj, char const *key_pat
     return 0.0;
 }
 
-#define CIRCBUF_SIZE 16
+#define CIRCBUF_SIZE 1024 
 #define CIRCBUF_RET(STR)                       \
 {                                              \
     if (circbuf_retval[circbuf_idx] != 0)      \
