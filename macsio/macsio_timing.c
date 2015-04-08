@@ -149,6 +149,8 @@ typedef struct _timerInfo_t
     int iter_count;                  /**< Total number of iterations this timer was invoked. */
     int min_iter;                    /**< Iteration at which min time was seen */           
     int max_iter;                    /**< Iteration at which max time was seen */
+    int min_rank;                    /**< MPI rank of processor with minimum time (only used in reductions) */
+    int max_rank;                    /**< MPI rank of processor with maximum time (only used in reductions) */
     int iter_num;                    /**< Iteration number of current timer */
     int depth;                       /**< Depth of this timer relative to other active timers */
     int is_restart;                  /**< Is this timer restarting the current iteration */
@@ -380,12 +382,14 @@ reduce_a_timerinfo(
         {
             b_info[i].min_time = a_info[i].min_time;
             b_info[i].min_iter = a_info[i].min_iter;
+            b_info[i].min_rank = a_info[i].min_rank;
         }
 
         if (a_info[i].max_time > b_info[i].max_time)
         {
             b_info[i].max_time = a_info[i].max_time;
             b_info[i].max_iter = a_info[i].max_iter;
+            b_info[i].max_rank = a_info[i].max_rank;
         }
 
         /* Handle running update to mean and variance */
@@ -431,10 +435,14 @@ MACSIO_TIMING_ReduceTimers(
 )
 {
     static int first = 1;
+#ifdef HAVE_MPI
     static MPI_Op timerinfo_reduce_op;
     static MPI_Datatype str_32_mpi_type;
     static MPI_Datatype str_64_mpi_type;
     static MPI_Datatype timerinfo_mpi_type;
+    int i, rank = 0;
+
+    MPI_Comm_rank(comm, &rank);
 
     if (root == -1)
     {
@@ -459,7 +467,7 @@ MACSIO_TIMING_ReduceTimers(
         MPI_Type_contiguous(64, MPI_CHAR, &str_64_mpi_type);
         MPI_Type_commit(&str_64_mpi_type);
 
-        lengths[0] = 7;
+        lengths[0] = 9;
         types[0] = MPI_INT;
         MPI_Address(&timerHashTable[0], offsets);
         lengths[1] = 7;
@@ -482,10 +490,12 @@ MACSIO_TIMING_ReduceTimers(
     }
 
     clear_timers(reducedTimerTable, MACSIO_TIMING_ALL_GROUPS);
+    for (i = 0; i < MACSIO_TIMING_HASH_TABLE_SIZE; i++)
+        timerHashTable[i].min_rank = timerHashTable[i].max_rank = rank;
 
     MPI_Reduce(timerHashTable, reducedTimerTable, MACSIO_TIMING_HASH_TABLE_SIZE,
         timerinfo_mpi_type, timerinfo_reduce_op, root, comm);
-
+#endif
 }
 
 static void
@@ -528,14 +538,15 @@ dump_timers_to_strings(
                 max_in_stddev_steps_from_mean = (table[i].max_time - table[i].running_mean) / dev;
             }
 
+#warning USE COLUMN HEADINGS INSTEAD
 #warning HANDLE INDENTATION HERE
             len = snprintf(_strs[_nstrs-1], MAX_STR_SIZE,
-                "TOT=%10.5f,CNT=%04d,MIN=%8.5f(%4.2f),AVG=%8.5f,MAX=%8.5f(%4.2f),DEV=%8.8f:FILE=%s:LINE=%d:LAB=%s",
+                "TOT=%10.5f,CNT=%04d,MIN=%8.5f(%4.2f):%06d,AVG=%8.5f,MAX=%8.5f(%4.2f):%06d,DEV=%8.8f:FILE=%s:LINE=%d:LAB=%s",
                 table[i].total_time,
                 table[i].iter_count,
-                table[i].min_time, min_in_stddev_steps_from_mean,
+                table[i].min_time, min_in_stddev_steps_from_mean, table[i].min_rank,
                 table[i].running_mean,
-                table[i].max_time, max_in_stddev_steps_from_mean,
+                table[i].max_time, max_in_stddev_steps_from_mean, table[i].max_rank,
                 dev,
                 table[i].__file__,
                 table[i].__line__,
