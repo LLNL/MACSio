@@ -1,4 +1,5 @@
 #include <malloc.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -10,7 +11,7 @@ void func2();
 void func4()
 {
     static int iter = 0;
-    int nanoSecsOfSleeps = 200000;
+    int nanoSecsOfSleeps = random() % 200000;
     struct timespec ts = {0, nanoSecsOfSleeps};
     MACSIO_TIMING_TimerId_t tid = MT_StartTimer("func4", MACSIO_TIMING_ALL_GROUPS, iter++);
     nanosleep(&ts, 0);
@@ -64,6 +65,7 @@ int main(int argc, char **argv)
 #endif
 
     MACSIO_LOG_DebugLevel = 1; /* should only see debug messages level 1 and 2 */
+    srandom(0xDeadBeef); /* used to vary length of some timers */
 
     if (size > 8)
     {
@@ -100,10 +102,10 @@ int main(int argc, char **argv)
     {
         int rbuf[2], sbuf[2] = {ntimer_strs, maxstrlen};
         MPI_Allreduce(sbuf, rbuf, 2, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-        MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tsttiming.log", rbuf[1]+4, rbuf[0]+4);
+        MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tsttiming.log", rbuf[1]+32, 2*rbuf[0]+4);
     }
 #else
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(0, "tsttiming.log", ntimer_strs+4, maxstrlen+4);
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(0, "tsttiming.log", maxstrlen+4, ntimer_strs+4);
 #endif
 
     for (i = 0; i < ntimer_strs; i++)
@@ -112,8 +114,23 @@ int main(int argc, char **argv)
         free(timer_strs[i]);
     }
     free(timer_strs);
-    
+
+    MACSIO_TIMING_ReduceTimers(MPI_COMM_WORLD, 0);
+    MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimer_strs, &maxstrlen);
+    if (!rank)
+    {
+        MACSIO_LOG_MSG(Dbg1, ("#####################Reduced Timer Values######################"));
+        for (i = 0; i < ntimer_strs; i++)
+        {
+            MACSIO_LOG_MSG(Dbg1, (timer_strs[i]));
+            free(timer_strs[i]);
+        }
+        free(timer_strs);
+    }
+
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
+
+    MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
 #ifdef HAVE_MPI
     MPI_Finalize();

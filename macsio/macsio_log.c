@@ -220,6 +220,7 @@ MACSIO_LOG_LogMsgWithDetails(
         _mpistr[len] = '\0';
     }
 #endif
+#warning CLEAN UP SO ONLY PRINT NON-EMPTY STRINGS
     MACSIO_LOG_LogMsg(log, "%s:%s:%s:%s:%s", _sig, _msg, _err, _mpistr, _mpicls);
     if (sevVal == MACSIO_LOG_MsgDie)
 #ifdef HAVE_MPI

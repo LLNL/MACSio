@@ -13,6 +13,8 @@
 #include <string.h>
 #include <sys/time.h>
 
+#define MACSIO_TIMING_HASH_TABLE_SIZE 10007
+
 int MACSIO_TIMING_UseMPI_Wtime = 1;
 
 static double get_current_time()
@@ -298,35 +300,35 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
     return timer_time;
 }
 
-void
-MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask)
+static void
+clear_timers(timerInfo_t *table, MACSIO_TIMING_GroupMask_t gmask)
 {
     int i;
     for (i = 0; i < MACSIO_TIMING_HASH_TABLE_SIZE; i++)
     {
-        if (!strlen(timerHashTable[i].label)) continue;
+        if (!strlen(table[i].label)) continue;
 
-        if (!(timerHashTable[i].gmask & gmask)) continue;
+        if (!(table[i].gmask & gmask)) continue;
 
-        memset(timerHashTable[i].label, 0, sizeof(timerHashTable[i].label));
-        memset(timerHashTable[i].__file__, 0, sizeof(timerHashTable[i].__file__));
-        timerHashTable[i].__line__ = 0;
-        timerHashTable[i].gmask = 0;
+        memset(table[i].label, 0, sizeof(table[i].label));
+        memset(table[i].__file__, 0, sizeof(table[i].__file__));
+        table[i].__line__ = 0;
+        table[i].gmask = 0;
 
-        timerHashTable[i].total_time = 0;
-        timerHashTable[i].iter_count = 0;
-        timerHashTable[i].min_time =  DBL_MAX;
-        timerHashTable[i].max_time = -DBL_MAX;
-        timerHashTable[i].min_iter =  INT_MAX;
-        timerHashTable[i].max_iter = -INT_MAX;
-        timerHashTable[i].running_mean = 0;
-        timerHashTable[i].running_var = 0;
-        timerHashTable[i].iter_num = 0;
-        timerHashTable[i].total_time_this_iter = 0;
+        table[i].total_time = 0;
+        table[i].iter_count = 0;
+        table[i].min_time =  DBL_MAX;
+        table[i].max_time = -DBL_MAX;
+        table[i].min_iter =  INT_MAX;
+        table[i].max_iter = -INT_MAX;
+        table[i].running_mean = 0;
+        table[i].running_var = 0;
+        table[i].iter_num = 0;
+        table[i].total_time_this_iter = 0;
 
-        timerHashTable[i].is_restart = 0;
-        timerHashTable[i].depth = 0;
-        timerHashTable[i].start_time = 0;
+        table[i].is_restart = 0;
+        table[i].depth = 0;
+        table[i].start_time = 0;
     }
 }
 
@@ -335,78 +337,85 @@ static void
 reduce_a_timerinfo(
     void *a,		/**< [in] first input for MPI_User_function */
     void *b,		/**< [in,out] second input arg for MPI_User_function and reduced output */
-    int *len,		/**< [in] number of values in A and B buffers
-                             (should always be 1 to avoid buffer splits) */
+    int *len,		/**< [in] number of values in A and B buffers */
     MPI_Datatype *type	/**< [in] type of values in A and B buffers */
 )
 {
+    int i;
     timerInfo_t *a_info = (timerInfo_t*) a;
     timerInfo_t *b_info = (timerInfo_t*) b;
 
-    if (a_info->label == 0 && b_info->label == 0)
-        return;
-
-    /* If filenames don't match, record that fact by setting b (out) to all '~' chars */
-    if (strcmp(a_info->__file__, b_info->__file__))
+    for (i = 0; i < *len; i++)
     {
-        int i = 0;
-        while (b_info->__file__[i])
-            b_info->__file__[i++] = '~';
-    }
+        if (strlen(a_info[i].label) == 0 && strlen(b_info[i].label) == 0)
+            continue;
+
+        /* If filenames don't match, record that fact by setting b (out) to all '~' chars */
+        if (strcmp(a_info[i].__file__, b_info[i].__file__))
+        {
+            int j = 0;
+            while (b_info[i].__file__[j])
+                b_info[i].__file__[j++] = '~';
+        }
     
-    /* If line numbers don't match, record that fact as INT_MAX */
-    if (a_info->__line__ != b_info->__line__)
-        b_info->__line__ = INT_MAX;
+        /* If line numbers don't match, record that fact as INT_MAX */
+        if (a_info[i].__line__ != b_info[i].__line__)
+            b_info[i].__line__ = INT_MAX;
 
-    /* If labels don't match, record that fact by setting b (out) to all '~' chars */
-    if (strcmp(a_info->label, b_info->label))
-    {
-        int i = 0;
-        while (b_info->label[i])
-            b_info->label[i++] = '~';
-    }
+        /* If labels don't match, record that fact by setting b (out) to all '~' chars */
+        if (strcmp(a_info[i].label, b_info[i].label))
+        {
+            int j = 0;
+            while (b_info[i].label[j])
+                b_info[i].label[j++] = '~';
+        }
     
-    /* If line numbers don't match, record that fact as INT_MAX */
-    if (a_info->gmask != b_info->gmask)
-        b_info->gmask = MACSIO_TIMING_ALL_GROUPS;
+        /* If groups don't match, record that fact as ALL_GROUPS */
+        if (a_info[i].gmask != b_info[i].gmask)
+            b_info[i].gmask = MACSIO_TIMING_ALL_GROUPS;
 
-    b_info->total_time += a_info->total_time;
+        b_info[i].total_time += a_info[i].total_time;
 
-    if (a_info->min_time < b_info->min_time)
-    {
-        b_info->min_time = a_info->min_time;
-        b_info->min_iter = a_info->min_iter;
-    }
+        if (a_info[i].min_time < b_info[i].min_time)
+        {
+            b_info[i].min_time = a_info[i].min_time;
+            b_info[i].min_iter = a_info[i].min_iter;
+        }
 
-    if (a_info->max_time > b_info->max_time)
-    {
-        b_info->max_time = a_info->max_time;
-        b_info->max_iter = a_info->max_iter;
-    }
+        if (a_info[i].max_time > b_info[i].max_time)
+        {
+            b_info[i].max_time = a_info[i].max_time;
+            b_info[i].max_iter = a_info[i].max_iter;
+        }
 
-    {
-        double cnt_a = a_info->iter_count;
-        double cnt_b = b_info->iter_count;
-        double avg_a = a_info->running_mean;
-        double avg_b = b_info->running_mean;
-        double var_a = a_info->running_var;
-        double var_b = b_info->running_var;
+        /* Handle running update to mean and variance */
+        {
+            double cnt_a = a_info[i].iter_count;
+            double cnt_b = b_info[i].iter_count;
+            double avg_a = a_info[i].running_mean;
+            double avg_b = b_info[i].running_mean;
+            double var_a = a_info[i].running_var;
+            double var_b = b_info[i].running_var;
 
-        double avg, var;
-        double cnt = cnt_a + cnt_b;
-        double cnt_ratio = cnt_a > cnt_b ? cnt_a / cnt_b : cnt_b / cnt_a;
-        double delta = avg_b - avg_a;
+            double avg, var;
+            double cnt = cnt_a + cnt_b;
+            double cnt_ratio = cnt_a > cnt_b ? cnt_a / cnt_b : cnt_b / cnt_a;
+            double delta = avg_b - avg_a;
 
-        if (cnt_ratio < 1.03 && cnt_a > 1e+4)
-            avg = (cnt_a * avg_a + cnt_b * avg_b) / cnt;
-        else
-            avg = avg_a + delta * cnt_b / cnt;
+            if (cnt_ratio < 1.01 && cnt_a > 1e+4)
+                avg = (cnt_a * avg_a + cnt_b * avg_b) / cnt;
+            else
+                avg = avg_a + delta * cnt_b / cnt;
 
-        var = var_a + var_b + delta * delta * cnt_a * cnt_b / cnt;
+            if (cnt < 2)
+                var = 0;
+            else
+                var = var_a + var_b + delta * delta * cnt_a * cnt_b / cnt;
 
-        b_info->iter_count = cnt;
-        b_info->running_mean = avg;
-        b_info->running_var = var;
+            b_info[i].iter_count = cnt;
+            b_info[i].running_mean = avg;
+            b_info[i].running_var = var;
+        }
     }
 }
 #endif
@@ -418,8 +427,7 @@ MACSIO_TIMING_ReduceTimers(
 #else
     int comm,
 #endif
-    int root,
-    MACSIO_TIMING_GroupMask_t gmask
+    int root
 )
 {
     static int first = 1;
@@ -466,12 +474,14 @@ MACSIO_TIMING_ReduceTimers(
         lengths[4] = 1;
         types[4] = str_64_mpi_type;
         MPI_Address(&timerHashTable[0].label[0], offsets+4);
-        for (i = 0; i < 5; i++) offsets[i] -= offsets[0];
+        for (i = 4; i >= 0; offsets[i] -= offsets[0], i--);
         MPI_Type_struct(5, lengths, offsets, types, &timerinfo_mpi_type);
         MPI_Type_commit(&timerinfo_mpi_type);
 
         first = 0;
     }
+
+    clear_timers(reducedTimerTable, MACSIO_TIMING_ALL_GROUPS);
 
     MPI_Reduce(timerHashTable, reducedTimerTable, MACSIO_TIMING_HASH_TABLE_SIZE,
         timerinfo_mpi_type, timerinfo_reduce_op, root, comm);
@@ -499,7 +509,8 @@ dump_timers_to_strings(
         for (i = 0; i < MACSIO_TIMING_HASH_TABLE_SIZE; i++)
         {
             int len;
-            double min_in_stddev_steps_from_mean, max_in_stddev_steps_from_mean;
+            double min_in_stddev_steps_from_mean = 0, max_in_stddev_steps_from_mean = 0;
+            double dev;
 
             if (!strlen(table[i].label)) continue;
 
@@ -510,23 +521,25 @@ dump_timers_to_strings(
 
             _strs[_nstrs-1] = (char *) malloc(MAX_STR_SIZE);
 
-            min_in_stddev_steps_from_mean = (table[i].running_mean - table[i].min_time) /
-                sqrt(table[i].running_var);
-            max_in_stddev_steps_from_mean = (table[i].max_time - table[i].running_mean) /
-                sqrt(table[i].running_var);
+            dev = sqrt(table[i].running_var);
+            if (dev > 0)
+            {
+                min_in_stddev_steps_from_mean = (table[i].running_mean - table[i].min_time) / dev;
+                max_in_stddev_steps_from_mean = (table[i].max_time - table[i].running_mean) / dev;
+            }
 
 #warning HANDLE INDENTATION HERE
             len = snprintf(_strs[_nstrs-1], MAX_STR_SIZE,
-                "FILE=%s:LINE=%d:LAB=%s:TOT=%f,CNT=%d,MIN=%f(%f),AVG=%f,MAX=%f(%f),DEV=%f",
-                table[i].__file__,
-                table[i].__line__,
-                table[i].label,
+                "TOT=%10.5f,CNT=%04d,MIN=%8.5f(%4.2f),AVG=%8.5f,MAX=%8.5f(%4.2f),DEV=%8.8f:FILE=%s:LINE=%d:LAB=%s",
                 table[i].total_time,
                 table[i].iter_count,
                 table[i].min_time, min_in_stddev_steps_from_mean,
                 table[i].running_mean,
                 table[i].max_time, max_in_stddev_steps_from_mean,
-                sqrt(table[i].running_var));
+                dev,
+                table[i].__file__,
+                table[i].__line__,
+                table[i].label);
 
             if (len > _maxlen) _maxlen = len;
         }
@@ -561,5 +574,7 @@ void MACSIO_TIMING_DumpReducedTimersToStrings(
     dump_timers_to_strings(reducedTimerTable, gmask, strs, nstrs, maxlen);
 }
 
-
-    
+void MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask)
+{
+    clear_timers(timerHashTable, gmask);
+}
