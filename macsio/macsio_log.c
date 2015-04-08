@@ -62,6 +62,7 @@ MACSIO_LOG_MakeMsg(
   return error_buffer;
 }
 
+#warning ADD OPTION TO SPECIFY MORE LINES AT THE ROOT/MASTER PROCESSOR
 /*!
 \brief Initialize a log
 
