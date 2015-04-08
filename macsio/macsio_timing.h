@@ -62,13 +62,37 @@ instead use \c gettimeofday().
 extern "C" {
 #endif
 
+/*!
+\def MACSIO_TIMING_ITER_AUTO
+\brief Automatic iteration numbering
+Use for \c iter argument to \c StartTimer() when you don't want to manager iteration numbering
+of the timer explicitly.
+*/
 #define MACSIO_TIMING_ITER_AUTO -1
+
+/*!
+\def MACSIO_TIMING_ITER_IGNORE
+\brief What is this?
+*/
 #define MACSIO_TIMING_ITER_IGNORE -2
+
+/*!
+\def MACSIO_TIMING_INVALID_TIMER
+\brief Maybe returned from \c StartTimer()
+*/
 #define MACSIO_TIMING_INVALID_TIMER (~((MACSIO_TIMING_TimerId_t)0x0))
+
+/*!
+\def MACSIO_TIMING_NO_GROUP
+\brief Group mask when timer is not assigned to any group
+*/
 #define MACSIO_TIMING_NO_GROUP (((MACSIO_TIMING_GroupMask_t)0x0)
+
+/*!
+\def MACSIO_TIMING_ALL_GROUPS
+\brief Group mask representing all groups
+*/
 #define MACSIO_TIMING_ALL_GROUPS (~((MACSIO_TIMING_GroupMask_t)0x0))
-
-
 
 /*!
 \def MT_StartTimer
@@ -84,15 +108,17 @@ extern "C" {
 \brief Convenience macro for stopping a timer
 \param [in] ID The timer's hash id returned from a call to \c MT_StartTimer().
 */
-#define MT_StopTimer(ID)                MACSIO_TIMING_StopTimer(ID)
+#define MT_StopTimer(ID) MACSIO_TIMING_StopTimer(ID)
 
-/*!
-\typedef
-\brief Timer id
-*/
 typedef unsigned int             MACSIO_TIMING_TimerId_t;
 typedef unsigned long long       MACSIO_TIMING_GroupMask_t;
 
+/*!
+\brief Integer variable to control function used to get timer values
+
+A non-zero value indicates that MACSIO_TIMING should use \c MPI_Wtime. Otherwise, it will
+use \c gettimeofday().
+*/
 extern int                       MACSIO_TIMING_UseMPI_Wtime;
 
 /*!
@@ -101,21 +127,79 @@ extern int                       MACSIO_TIMING_UseMPI_Wtime;
 A small number of groups (less than 64) can be defined into which timers can be grouped
 Timers can be assigned to multiple groups by or'ing the resulting group masks.
 */
-extern MACSIO_TIMING_GroupMask_t MACSIO_TIMING_GroupName(char const *grpName);
+extern MACSIO_TIMING_GroupMask_t MACSIO_TIMING_GroupName(
+    char const *grpName /**< Name of the group for which group mask is needed */
+);
 
-extern MACSIO_TIMING_TimerId_t   MACSIO_TIMING_StartTimer(char const *timer_label,
-                                     MACSIO_TIMING_GroupMask_t gmask, int iter_num, char const *__file__, int __line__);
-extern double                    MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t id);
+/*!
+\brief Create/Start a timer
 
-extern void                      MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_GroupMask_t gmask,
-                                     char ***strs, int *nstrs, int *maxlen);
+This call either creates a new timer and starts it or starts a new iteration of an existing timer.
+\return A hash derived from a string catenation the \c label, \c gmask, \c file and \c line.
+*/
+extern MACSIO_TIMING_TimerId_t
+MACSIO_TIMING_StartTimer(
+    char const *label,               /**< User defined label to be assigned to the timer */
+    MACSIO_TIMING_GroupMask_t gmask, /**< Mask to indicate the timer's group membership */
+    int iter_num,                    /**< Iteration number */
+    char const *file,                /**< The source file name */
+    int line                         /**< The source file line number*/);
+
+/*!
+\brief Stop a timer
+
+This call stops a currently running timer.
+\return Returns the time for the current iteration of the timer
+*/
+extern double
+MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t id /**< The timer's ID, returned from a call to StartTimer */);
+
+/*!
+\brief Dump timers to ascii strings
+
+This call will find all used timers in the hash table matching the specified \c gmask group mask and dumps
+each timer to a string. For convenience, the maximum length of the strings is also returned. This is to
+facilitate dumping the strings to a MACSIO_LOG.
+*/
+extern void MACSIO_TIMING_DumpTimersToStrings(
+    MACSIO_TIMING_GroupMask_t gmask, /**< Group mask to filter only timers belonging to specific groups */
+    char ***strs,                    /**< An array of strings, one for each timer, returned to caller. Caller is responsible for freeing */
+    int *nstrs,                      /**< Number of strings returned to caller */
+    int *maxlen                      /**< The maximum length of all strings */); 
+
+/*!
+\brief Reduce timers across MPI tasks
+
+Computes a parallel reduction across MPI tasks of all timers.
+*/
+extern void
+MACSIO_TIMING_ReduceTimers(
 #ifdef HAVE_MPI
-extern void                      MACSIO_TIMING_ReduceTimers(MPI_Comm comm, int root);
+    MPI_Comm comm, /**< The MPI communicator to use for the reduction */
 #else
-extern void                      MACSIO_TIMING_ReduceTimers(int comm, int root);
+    int comm,      /**< Dummy value for non-parallel builds */
 #endif
-extern void                      MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_GroupMask_t gmask, char ***strs, int *nstrs, int *maxlen);
-extern void                      MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask);
+    int root       /**< The MPI rank of the root task to be used for the reduction */);
+
+/*!
+\brief Dump reduced timers to ascii strings
+
+Similar to \c DumpTimersToStrings except this call dumps reduced timers
+*/
+extern void
+MACSIO_TIMING_DumpReducedTimersToStrings(
+    MACSIO_TIMING_GroupMask_t gmask, /**< Group mask to filter only timers belonging to specific groups */
+    char ***strs,                    /**< An array of strings, one for each timer, returned to caller. Caller is responsible for freeing */
+    int *nstrs,                      /**< Number of strings returned to caller */
+    int *maxlen                      /**< The maximum length of all strings */);
+
+/*!
+\brief Clear a group of timers
+
+Clears and resets timers of specified group
+*/
+extern void MACSIO_TIMING_ClearTimers(
+    MACSIO_TIMING_GroupMask_t gmask /**< Group mask to filter only timers belonging to specific groups */);
 
 #ifdef __cplusplus
 }

@@ -85,7 +85,7 @@ do{                                                                             
 \param [in] SEV Abbreviated message severity (e.g. 'Dbg1', 'Warn')
 \param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
 */
-#define MACSIO_LOG_MSG(SEV,MSG) MACSIO_LOG_MSG2(MACSIO_LOG_MainLog, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
+#define MACSIO_LOG_MSG(SEV, MSG) MACSIO_LOG_MSG2(MACSIO_LOG_MainLog, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __FILE__, __LINE__)
 
 /*!
 \def MACSIO_LOG_MSGV
