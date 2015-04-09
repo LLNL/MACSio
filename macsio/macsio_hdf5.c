@@ -233,7 +233,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                     counts[i] = json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
                         counts[i]--;
-printf("start[%d]=%d,count[%d]=%d\n", (int) starts[i], i, (int) counts[i], i);
+printf("start[%d]=%d,count[%d]=%d\n", i, (int) starts[i], i, (int) counts[i]);
                 }
 
                 /* set selection of filespace */
@@ -413,11 +413,6 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning SET ERROR MODE OF HDF5 LIBRARY
 
-#warning MAKE PLUGIN LOGGING A CL OPTION
-#if 0
-    log = Log_Init(MACSIO_MAIN_Comm, "macsio_hdf5.log", 128, 20);
-#endif
-
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
@@ -470,11 +465,6 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         }
         main_dump_mif(main_obj, numFiles, dumpn, dumpt);
     }
-
-#if 0
-    Log_Finalize(log);
-#endif
-
 }
 
 static int register_this_interface()

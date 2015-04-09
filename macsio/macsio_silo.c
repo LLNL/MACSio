@@ -443,6 +443,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
 }
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
+#warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
@@ -502,6 +503,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */
+#warning CHANGE NAMING SCHEME SO LS WORKS BETTER
     sprintf(fileName, "%s_silo_%05d_%03d.%s",
         JsonGetStr(main_obj, "clargs/--filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
