@@ -433,6 +433,8 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
         /* Write the multi-block objects */
         DBPutMultivar(siloFile, JsonGetStr(vars_array, "", j, "name"), numChunks, blockNames, blockTypes, 0);
 
+#warning WRITE MULTIBLOCK DOMAIN ASSIGNMENT AS A TINY QUADMESH OF SAME PHYSICAL SIZE OF MESH BUT FEWER ZONES
+
     }
 
     /* Clean up */

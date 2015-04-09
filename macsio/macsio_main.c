@@ -126,31 +126,31 @@ make_random_extarr(int nthings)
 }
 
 static json_object *
-make_random_object(int nthings_target, int *nthings_used)
+make_random_object(int nthings)
 {
-    int breadth, prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
     int rval = random() % 100;
+    int prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
 
     /* adjust cutoffs to affect odds of different kinds of objects depending on total size */
-    if (nthings_target > 10000)
+    if (nthings > 10000)
     {
-        breadth = random() % 100 + 1;
-        prim_cutoff = 5; string_cutoff = 10; array_cutoff = 30; extarr_cutoff = 95;
+        prim_cutoff = 0; string_cutoff = 5; array_cutoff = 10; extarr_cutoff = 30;
     }
-    else if (nthings_target > 1000)
+    else if (nthings > 1000)
     {
-        breadth = random() % 25 + 1;
-        prim_cutoff = 15; string_cutoff = 30; array_cutoff = 50; extarr_cutoff = 80;
+        prim_cutoff = 0; string_cutoff = 10; array_cutoff = 20; extarr_cutoff = 60;
     }
-    else if (nthings_target > 100)
+    else if (nthings > 100)
     {
-        breadth = random() % 10 + 1;
-        prim_cutoff = 25; string_cutoff = 40; array_cutoff = 50; extarr_cutoff = 70;
+        prim_cutoff = 0; string_cutoff = 25; array_cutoff = 55; extarr_cutoff = 85;
     }
-    else if (nthings_target > 10)
+    else if (nthings > 10)
     {
-        breadth = random() % 3 + 1;
-        prim_cutoff = 50; string_cutoff = 55; array_cutoff = 60; extarr_cutoff = 65;
+        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 80; extarr_cutoff = 92;
+    }
+    else if (nthings > 1)
+    {
+        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 85; extarr_cutoff = 96;
     }
     else
     {
@@ -158,38 +158,35 @@ make_random_object(int nthings_target, int *nthings_used)
     }
 
     if (rval < prim_cutoff)
-    {
-        *nthings_used = 1;
         return make_random_primitive();
-    }
     else if (rval < string_cutoff)
-    {
-        *nthings_used = nthings_target;
-        return make_random_string(nthings_target);
-    }
+        return make_random_string(nthings);
     else if (rval < array_cutoff)
-    {
-        *nthings_used = nthings_target;
-        return make_random_array(nthings_target);
-    }
+        return make_random_array(nthings);
     else if (rval < extarr_cutoff)
-    {
-        *nthings_used = nthings_target;
-        return make_random_extarr(nthings_target);
-    }
+        return make_random_extarr(nthings);
     else 
     {
-        int i = 0, n, nused = 0;
-        json_object *new_object = json_object_new_object();
-        while (n < nthings_target)
+        int i;
+        int nmembers = random() % (nthings > 100000 ? 500:
+                                  (nthings > 10000  ? 100:
+                                  (nthings > 1000   ?  25:
+                                  (nthings > 100    ?  10:
+                                  (nthings > 10     ?   3:
+                                   nthings)))));
+        json_object *obj = json_object_new_object();
+
+        nthings -= nmembers;
+        for (i = 0; i < nmembers; i++)
         {
             char name[32];
+            int nthings_member = random() % nthings;
             snprintf(name, sizeof(name), "member%04d", i++);
-            json_object_object_add(new_object, name, make_random_object(nthings_target/breadth, &n));
-            nused += n;
+            json_object_object_add(obj, name, make_random_object(nthings_member));
+            nthings -= nthings_member;
+            if (nthings <= 0) break;
         }
-        *nthings_used = nused;
-        return new_object;
+        return obj;
     }
 }
 
@@ -958,9 +955,14 @@ main(int argc, char *argv[])
     char outfName[64];
     FILE *outf;
 
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
+
 #warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
+#endif
+    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+#ifdef HAVE_MPI
     MPI_Comm_dup(MPI_COMM_WORLD, &MACSIO_MAIN_Comm);
     MPI_Errhandler_set(MACSIO_MAIN_Comm, MPI_ERRORS_RETURN);
     MPI_Comm_size(MACSIO_MAIN_Comm, &MACSIO_MAIN_Size);
@@ -968,17 +970,17 @@ main(int argc, char *argv[])
     mpi_errno = MPI_SUCCESS;
 #endif
 
-    errno = 0;
-#warning MAKE DEBUG LEVEL CL ARG
-    MACSIO_LOG_DebugLevel = 1;
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 256, 64);
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
-
 #warning SET DEFAULT VALUES FOR CLARGS
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(clargs), clargs_obj);
+
+    errno = 0;
+#warning MAKE DEBUG LEVEL CL ARG
+    MACSIO_LOG_DebugLevel = 1;
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 256, 64);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Setup parallel information */
     json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_size), json_object_new_int(MACSIO_MAIN_Size));
@@ -1007,8 +1009,17 @@ main(int argc, char *argv[])
     }
 #endif
 
-    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
-    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+#if 0
+    if (!rank)
+    {
+        outf = fopen("random_object.json", "w");
+        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(15), JSON_C_TO_STRING_PRETTY));
+        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(272), JSON_C_TO_STRING_PRETTY));
+        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(5372), JSON_C_TO_STRING_PRETTY));
+        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(10210), JSON_C_TO_STRING_PRETTY));
+        fclose(outf);
+    }
+#endif
 
 #warning WE'RE NOT GENERATING OR WRITING ANY METADATA STUFF
 
