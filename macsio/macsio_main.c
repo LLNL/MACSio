@@ -126,13 +126,17 @@ make_random_extarr(int nthings)
 }
 
 static json_object *
-make_random_object(int nthings)
+make_random_object_recurse(int nthings, int depth)
 {
     int rval = random() % 100;
     int prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
 
     /* adjust cutoffs to affect odds of different kinds of objects depending on total size */
-    if (nthings > 10000)
+    if (depth == 0 && nthings > 1)
+    {
+        prim_cutoff = 0; string_cutoff = 0; array_cutoff = 0; extarr_cutoff = 0;
+    }
+    else if (nthings > 10000)
     {
         prim_cutoff = 0; string_cutoff = 5; array_cutoff = 10; extarr_cutoff = 30;
     }
@@ -177,17 +181,24 @@ make_random_object(int nthings)
         json_object *obj = json_object_new_object();
 
         nthings -= nmembers;
+        depth++;
         for (i = 0; i < nmembers; i++)
         {
             char name[32];
             int nthings_member = random() % nthings;
             snprintf(name, sizeof(name), "member%04d", i++);
-            json_object_object_add(obj, name, make_random_object(nthings_member));
+            json_object_object_add(obj, name, make_random_object_recurse(nthings_member, depth));
             nthings -= nthings_member;
             if (nthings <= 0) break;
         }
         return obj;
     }
+}
+
+static json_object *
+make_random_object(int nthings)
+{
+    return make_random_object_recurse(nthings, 0);
 }
 
 #warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
@@ -1005,18 +1016,6 @@ main(int argc, char *argv[])
         snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
         outf = fopen(outfName, "w");
         fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
-        fclose(outf);
-    }
-#endif
-
-#if 0
-    if (!rank)
-    {
-        outf = fopen("random_object.json", "w");
-        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(15), JSON_C_TO_STRING_PRETTY));
-        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(272), JSON_C_TO_STRING_PRETTY));
-        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(5372), JSON_C_TO_STRING_PRETTY));
-        fprintf(outf, "%s\n", json_object_to_json_string_ext(make_random_object(10210), JSON_C_TO_STRING_PRETTY));
         fclose(outf);
     }
 #endif
