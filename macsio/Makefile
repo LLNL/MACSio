@@ -41,7 +41,7 @@ CXX ?= mpicxx
 CC ?= mpicc
 LINK ?= mpicxx
 
-COMMON_SRC = macsio_clargs.c macsio_mif.c options.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
+COMMON_SRC = macsio_clargs.c macsio_mif.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
@@ -53,7 +53,7 @@ BASIC_OBJ=$(BASIC_SRC:.c=.o)
 DRIVER_SRC = ioperf_sec2.c ioperf_stdio.c
 CFLAGS += -DHAVE_SEC2 -DHAVE_STDIO
 
-TEST_SRC = tstopts.c tsttiming.c tstlog.c
+TEST_SRC = tsttiming.c tstlog.c
 TEST_OBJ=$(TEST_SRC:.c=.o)
 
 TOOL_SRC = probe.c
@@ -125,7 +125,7 @@ help:
 	@echo "    Use target 'dataclean' to clean + remove various data files."
 	@echo "    Use target 'allclean' to dataclean + remove json-c install."
 
-all: json-c tsttiming tstlog tstopts macsio probe
+all: json-c tsttiming tstlog macsio probe
 
 json-c: ../json-c/install
 
@@ -142,10 +142,6 @@ probe: probe.o
 
 tsttiming.o: tsttiming.c $(COMMON_HDR)
 tsttiming: tsttiming.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
-
-tstopts.o: tstopts.c $(COMMON_HDR)
-tstopts: tstopts.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
 tstlog.o: tstlog.c $(COMMON_HDR)
@@ -175,3 +171,4 @@ allclean: dataclean
 #srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
 check: macsio
 	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
+	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo

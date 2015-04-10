@@ -15,7 +15,6 @@
 #include <macsio_main.h>
 #include <macsio_mif.h>
 #include <macsio_utils.h>
-#include <options.h>
 
 #include <silo.h>
 

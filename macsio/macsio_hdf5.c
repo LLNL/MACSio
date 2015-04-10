@@ -7,9 +7,7 @@
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
-#include <macsio_params.h>
 #include <macsio_utils.h>
-#include <options.h>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
