@@ -14,7 +14,6 @@
 #include <macsio_clargs.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
-#include <macsio_params.h>
 #include <macsio_timing.h>
 #include <macsio_utils.h>
 
@@ -699,9 +698,9 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
     json_object *global_obj = rank_owning_chunkId?0:json_object_new_object();
     json_object *part_array = rank_owning_chunkId?0:json_object_new_array();
     int size = json_object_path_get_int(main_obj, "parallel/mpi_size");
-    int part_size = json_object_path_get_int(main_obj, "clargs/--part_size") / sizeof(double);
-    double avg_num_parts = json_object_path_get_double(main_obj, "clargs/--avg_num_parts");
-    int dim = json_object_path_get_int(main_obj, "clargs/--part_dim");
+    int part_size = json_object_path_get_int(main_obj, "clargs/part_size") / sizeof(double);
+    double avg_num_parts = json_object_path_get_double(main_obj, "clargs/avg_num_parts");
+    int dim = json_object_path_get_int(main_obj, "clargs/part_dim");
     double total_num_parts_d = size * avg_num_parts;
     int total_num_parts = (int) lround(total_num_parts_d);
     int myrank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
@@ -747,7 +746,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
         json_object_object_add(global_obj, "PartsLogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, part_block_dims));
         json_object_object_add(global_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, global_log_dims));
         json_object_object_add(global_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(global_bounds));
-        json_object_object_add(mesh_obj, MACSIO_MESH_KEY(global), global_obj);
+        json_object_object_add(mesh_obj, "global", global_obj);
     }
 
 #warning SHOULD MAIN OBJECT KNOW WHERE ALL CHUNKS ARE OR ONLY CHUNKS ON THIS RANK
@@ -769,7 +768,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
                     MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
-                        json_object_path_get_string(main_obj, "clargs/--part_type"));
+                        json_object_path_get_string(main_obj, "clargs/part_type"));
                     MACSIO_UTILS_SetDims(global_indices, ipart, jpart, kpart);
 #warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
 #warning GlogalLogIndices MAY NOT BE NEEDED
@@ -795,7 +794,7 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
             }
         }
     } 
-    json_object_object_add(mesh_obj, MACSIO_MESH_KEY(parts), part_array);
+    json_object_object_add(mesh_obj, "parts", part_array);
 
     return mesh_obj;
 
@@ -869,42 +868,42 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
         "--interface %s",
-            "Specify the name of the interface to be tested. Use keyword 'list'\\"
+            "Specify the name of the interface to be tested. Use keyword 'list'\n"
             "to print a list of all known interface names and then exit.",
         "--parallel_file_mode %s %d",
-            "Specify the parallel file mode. There are several choices.\\"
-            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then\\"
-            "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\\"
-            "one file per processor or 'MIFOPT' for MIF mode and let the test\\"
-            "determine the optimum file count. Use 'SIF' for SIngle shared File\\"
+            "Specify the parallel file mode. There are several choices.\n"
+            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then\n"
+            "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\n"
+            "one file per processor or 'MIFOPT' for MIF mode and let the test\n"
+            "determine the optimum file count. Use 'SIF' for SIngle shared File\n"
             "(Rich Man's) mode.",
         "--avg_num_parts %f",
-            "The average number of mesh parts per MPI rank. Non-integral values\\"
-            "are acceptable. For example, a value that is half-way between two\\"
-            "integers, K and K+1, means that half the ranks have K mesh parts\\"
-            "and half have K+1 mesh parts. As another example, a value of 2.75\\"
-            "here would mean that 75% of the ranks get 3 parts and 25% of the\\"
-            "ranks get 2 parts. Note that the total number of parts is the this\\"
-            "number multiplied by the MPI communicator size. If the result of that\\"
-            "product is non-integral, it will be rounded and a warning message will\\"
+            "The average number of mesh parts per MPI rank. Non-integral values\n"
+            "are acceptable. For example, a value that is half-way between two\n"
+            "integers, K and K+1, means that half the ranks have K mesh parts\n"
+            "and half have K+1 mesh parts. As another example, a value of 2.75\n"
+            "here would mean that 75% of the ranks get 3 parts and 25% of the\n"
+            "ranks get 2 parts. Note that the total number of parts is the this\n"
+            "number multiplied by the MPI communicator size. If the result of that\n"
+            "product is non-integral, it will be rounded and a warning message will\n"
             "be generated. [1]",
         "--part_size %d",
-            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character\\"
-            "indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes (2^20) or\\"
-            "'G'igabytes (2^30). This is then the nominal I/O request size used\\"
+            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character\n"
+            "indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes (2^20) or\n"
+            "'G'igabytes (2^30). This is then the nominal I/O request size used\n"
             "by each MPI rank when marshalling data. [1M]",
         "--part_dim %d",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s",
-            "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\\"
+            "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
             "and 'arbitrary'",
         "--part_distribution %s",
             "Specify how parts are distributed to MPI tasks. (currently ignored)",
         "--vars_per_part %d",
-            "Number of mesh variable objects in each part. The smallest this can\\"
-            "be depends on the mesh type. For rectilinear mesh it is 1. For\\"
-            "curvilinear mesh it is the number of spatial dimensions and for\\"
-            "unstructured mesh it is the number of spatial dimensions plus\\"
+            "Number of mesh variable objects in each part. The smallest this can\n"
+            "be depends on the mesh type. For rectilinear mesh it is 1. For\n"
+            "curvilinear mesh it is the number of spatial dimensions and for\n"
+            "unstructured mesh it is the number of spatial dimensions plus\n"
             "2*number of topological dimensions. [50]",
         "--num_dumps %d",
             "Total number of dumps to write or read [10]",
@@ -915,8 +914,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--fileext %s",
             "Extension of generated file(s). ['.dat']",
         "--plugin-args %n",
-            "All arguments after this sentinel are passed to the I/O driver\\"
-            "plugin. The '%n' is a special designator for the builtin 'argi'\\"
+            "All arguments after this sentinel are passed to the I/O driver\n"
+            "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
     MACSIO_CLARGS_END_OF_ARGS);
 
@@ -928,11 +927,11 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     if (cl_result == MACSIO_CLARGS_HELP)
         handle_help_request_and_exit(plugin_args_start+1, argc, argv);
 
-    if (!strcmp(json_object_path_get_string(mainJargs, MACSIO_ARGV_KEY(interface)), "list"))
+    if (!strcmp(json_object_path_get_string(mainJargs, "interface"), "list"))
         handle_list_request_and_exit();
 
     /* sanity check some values */
-    if (!strcmp(json_object_path_get_string(mainJargs, MACSIO_ARGV_KEY(interface)), ""))
+    if (!strcmp(json_object_path_get_string(mainJargs, "interface"), ""))
         MACSIO_LOG_MSG(Die, ("no io-interface specified"));
 
     if (plugin_argi)
@@ -999,7 +998,7 @@ main(int argc, char *argv[])
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
-    json_object_object_add(main_obj, MACSIO_MAIN_KEY(clargs), clargs_obj);
+    json_object_object_add(main_obj, "clargs", clargs_obj);
 
     errno = 0;
 #warning MAKE DEBUG LEVEL CL ARG
@@ -1008,9 +1007,9 @@ main(int argc, char *argv[])
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Setup parallel information */
-    json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_size), json_object_new_int(MACSIO_MAIN_Size));
-    json_object_object_add(parallel_obj, MACSIO_PARALLEL_KEY(mpi_rank), json_object_new_int(MACSIO_MAIN_Rank));
-    json_object_object_add(main_obj, MACSIO_MAIN_KEY(parallel), parallel_obj);
+    json_object_object_add(parallel_obj, "mpi_size", json_object_new_int(MACSIO_MAIN_Size));
+    json_object_object_add(parallel_obj, "mpi_rank", json_object_new_int(MACSIO_MAIN_Rank));
+    json_object_object_add(main_obj, "parallel", parallel_obj);
 
 #warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEY'RE RESTRICTED
 #warning CREATE AN IO CONTEXT OBJECT
@@ -1021,7 +1020,7 @@ main(int argc, char *argv[])
     /* Generate a static problem object to dump on each dump */
     problem_obj = MACSIO_GenerateStaticDumpObject(main_obj,0);
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
-    json_object_object_add(main_obj, MACSIO_MAIN_KEY(problem), problem_obj);
+    json_object_object_add(main_obj, "problem", problem_obj);
 
 #warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
@@ -1038,7 +1037,7 @@ main(int argc, char *argv[])
 #warning WE'RE NOT GENERATING OR WRITING ANY METADATA STUFF
 
     dumpTime = 0.0;
-    for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/--num_dumps"); dumpNum++)
+    for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
     {
         MACSIO_TIMING_TimerId_t heavy_dump_tid;
 
@@ -1046,7 +1045,7 @@ main(int argc, char *argv[])
 
         /* Use 'Fill' for read operation */
         const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
-            json_object_path_get_string(main_obj, "clargs/--interface"));
+            json_object_path_get_string(main_obj, "clargs/interface"));
 
         /* log dump start */
 

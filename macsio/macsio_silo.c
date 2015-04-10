@@ -366,8 +366,8 @@ static void write_mesh_part(DBfile *dbfile, json_object *part)
 static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int dumpn, MACSIO_MIF_baton_t *bat)
 {
     int i, j;
-    char const *file_ext = JsonGetStr(main_obj, "clargs/--fileext");
-    char const *file_base = JsonGetStr(main_obj, "clargs/--filebase");
+    char const *file_ext = JsonGetStr(main_obj, "clargs/fileext");
+    char const *file_base = JsonGetStr(main_obj, "clargs/filebase");
     int numChunks = JsonGetInt(main_obj, "problem/global/TotalParts");
     char **blockNames = (char **) malloc(numChunks * sizeof(char*));
     int *blockTypes = (int *) malloc(numChunks * sizeof(int));
@@ -390,9 +390,9 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
         {
 #warning USE SILO NAMESCHEMES INSTEAD
             sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/mesh",
-                JsonGetStr(main_obj, "clargs/--filebase"),
+                JsonGetStr(main_obj, "clargs/filebase"),
                 groupRank, dumpn,
-                JsonGetStr(main_obj, "clargs/--fileext"),
+                JsonGetStr(main_obj, "clargs/fileext"),
                 i);
         }
         blockTypes[i] = DB_QUADMESH;
@@ -420,10 +420,10 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
             {
 #warning USE SILO NAMESCHEMES INSTEAD
                 sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/%s",
-                    JsonGetStr(main_obj, "clargs/--filebase"),
+                    JsonGetStr(main_obj, "clargs/filebase"),
                     groupRank,
                     dumpn,
-                    JsonGetStr(main_obj, "clargs/--fileext"),
+                    JsonGetStr(main_obj, "clargs/fileext"),
                     i,
                     JsonGetStr(vars_array, "", j, "name"));
             }
@@ -468,7 +468,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
-    json_object *parfmode_obj = JsonGetObj(main_obj, "clargs/--parallel_file_mode");
+    json_object *parfmode_obj = JsonGetObj(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
@@ -488,7 +488,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     }
     else
     {
-        char const * modestr = JsonGetStr(main_obj, "clargs/--parallel_file_mode");
+        char const * modestr = JsonGetStr(main_obj, "clargs/parallel_file_mode");
         if (!strcmp(modestr, "SIF"))
         {
             MACSIO_LOG_MSG(Die, ("Silo plugin doesn't support SIF mode"));
@@ -509,10 +509,10 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     /* Construct name for the silo file */
 #warning CHANGE NAMING SCHEME SO LS WORKS BETTER
     sprintf(fileName, "%s_silo_%05d_%03d.%s",
-        JsonGetStr(main_obj, "clargs/--filebase"),
+        JsonGetStr(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
         dumpn,
-        JsonGetStr(main_obj, "clargs/--fileext"));
+        JsonGetStr(main_obj, "clargs/fileext"));
 
     /* Wait for write access to the file. All processors call this.
      * Some processors (the first in each group) return immediately

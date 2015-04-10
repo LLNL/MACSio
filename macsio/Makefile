@@ -41,7 +41,7 @@ CXX ?= mpicxx
 CC ?= mpicc
 LINK ?= mpicxx
 
-COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_params.c options.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
+COMMON_SRC = macsio_clargs.c macsio_mif.c options.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 

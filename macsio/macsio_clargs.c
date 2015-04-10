@@ -193,6 +193,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	 static int first = 1;
 	 char helpFmtStr[32];
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
+         int has_embedded_newlines = strchr(helpStr, '\n') != 0;
 
 	 if (first)
 	 {
@@ -203,23 +204,37 @@ MACSIO_CLARGS_ProcessCmdline(
 	 /* this arguments format string */
 	 fprintf(outFILE, "   %-s\n", fmtStr);
 
-	 /* this arguments help-line format string */
-	 sprintf(helpFmtStr, "      %%-%d.%ds", terminalWidth, terminalWidth);
+         if (has_embedded_newlines)
+         {
+	     p = helpStr;
+             while (p)
+             {
+                 char *pnext = strchr(p, '\n');
+                 int len = pnext ? pnext - p : strlen(p);
+	         fprintf(outFILE, "      %*.*s\n", len, len, p);
+                 p = pnext ? pnext+1 : 0;
+             }
+         }
+         else
+         {
+	     /* this arguments help-line format string */
+	     sprintf(helpFmtStr, "      %%-%d.%ds", terminalWidth, terminalWidth);
 
-	 /* this arguments help string */
-	 p = helpStr;
-	 n = (int)strlen(helpStr);
-	 i = 0;
-	 while (i < n)
-	 {
-	    fprintf(outFILE, helpFmtStr, p);
-	    p += terminalWidth;
-	    i += terminalWidth;
-	    if ((i < n) && (*p != ' '))
-	       fprintf(outFILE, "-\n");
-	    else
-	       fprintf(outFILE, "\n"); 
-	 }
+	     /* this arguments help string */
+	     p = helpStr;
+	     n = (int)strlen(helpStr);
+	     i = 0;
+	     while (i < n)
+	     {
+	        fprintf(outFILE, helpFmtStr, p);
+	        p += terminalWidth;
+	        i += terminalWidth;
+	        if ((i < n) && (*p != ' '))
+	           fprintf(outFILE, "-\n");
+	        else
+	           fprintf(outFILE, "\n"); 
+	     }
+         }
       }
 
       /* count number of parameters for this argument */
@@ -427,7 +442,7 @@ MACSIO_CLARGS_ProcessCmdline(
                          if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                              *pInt = (int) tmpDbl;
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
-                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_int((int)tmpDbl));
+                             add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_int((int)tmpDbl));
                      }
 		     break;
 	          }
@@ -443,7 +458,7 @@ MACSIO_CLARGS_ProcessCmdline(
                          }
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                          {
-                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[i+1]));
+                             add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_string(argv[i+1]));
                              i++;
                          }
 		     }
@@ -452,7 +467,7 @@ MACSIO_CLARGS_ProcessCmdline(
                          if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		             strcpy(*pChar, argv[++i]);
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
-                             add_param_to_json_retobj(ret_json_obj, argName, json_object_new_string(argv[++i]));
+                             add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_string(argv[++i]));
                      }
 		     break;
 	          }
@@ -462,7 +477,7 @@ MACSIO_CLARGS_ProcessCmdline(
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		         *pDouble = atof(argv[++i]);
                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
-                         add_param_to_json_retobj(ret_json_obj, argName, json_object_new_double(atof(argv[++i])));
+                         add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_double(atof(argv[++i])));
 		     break;
 	          }
 	          case 'n': /* special case to return arg index */
@@ -483,7 +498,7 @@ MACSIO_CLARGS_ProcessCmdline(
             if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                 *pInt = 1; 
             else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
-                add_param_to_json_retobj(ret_json_obj, argName, json_object_new_boolean((json_bool)1));
+                add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_boolean((json_bool)1));
 	 }
       }
       else

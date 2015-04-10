@@ -124,7 +124,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #ifdef HAVE_MPI
     int ndims;
     int i, v, p;
-    char const *mesh_type = json_object_path_get_string(main_obj, "clargs/--part_type");
+    char const *mesh_type = json_object_path_get_string(main_obj, "clargs/part_type");
     char fileName[256];
     int use_part_count;
 
@@ -150,14 +150,14 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
     /* Construct name for the HDF5 file */
     sprintf(fileName, "%s_hdf5_%03d.%s",
-        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        json_object_path_get_string(main_obj, "clargs/filebase"),
         dumpn,
-        json_object_path_get_string(main_obj, "clargs/--fileext"));
+        json_object_path_get_string(main_obj, "clargs/fileext"));
 
     h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
 
     /* Create an HDF5 Dataspace for the global whole of mesh and var objects in the file. */
-    ndims = json_object_path_get_int(main_obj, "clargs/--part_dim");
+    ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
     json_object *global_log_dims_array =
         json_object_path_get_array(main_obj, "problem/global/LogDims");
     for (i = 0; i < ndims; i++)
@@ -204,7 +204,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
         /* Loop to make write calls for this var for each part on this rank */
 #warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
-        use_part_count = (int) ceil(json_object_path_get_double(main_obj, "clargs/--avg_num_parts"));
+        use_part_count = (int) ceil(json_object_path_get_double(main_obj, "clargs/avg_num_parts"));
         for (p = 0; p < use_part_count; p++)
         {
             json_object *part_obj = json_object_array_get_idx(part_array, p);
@@ -363,10 +363,10 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
     /* Construct name for the silo file */
     sprintf(fileName, "%s_hdf5_%05d_%03d.%s",
-        json_object_path_get_string(main_obj, "clargs/--filebase"),
+        json_object_path_get_string(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
         dumpn,
-        json_object_path_get_string(main_obj, "clargs/--fileext"));
+        json_object_path_get_string(main_obj, "clargs/fileext"));
 
     h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     h5File = *h5File_ptr;
@@ -424,7 +424,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 #warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
-    json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/--parallel_file_mode");
+    json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
@@ -442,10 +442,10 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     }
     else
     {
-        char const * modestr = json_object_path_get_string(main_obj, "clargs/--parallel_file_mode");
+        char const * modestr = json_object_path_get_string(main_obj, "clargs/parallel_file_mode");
         if (!strcmp(modestr, "SIF"))
         {
-            float avg_num_parts = json_object_path_get_double(main_obj, "clargs/--avg_num_parts");
+            float avg_num_parts = json_object_path_get_double(main_obj, "clargs/avg_num_parts");
             if (avg_num_parts == (float ((int) avg_num_parts)))
                 main_dump_sif(main_obj, dumpn, dumpt);
             else
