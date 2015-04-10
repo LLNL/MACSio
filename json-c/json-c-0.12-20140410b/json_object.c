@@ -1361,7 +1361,7 @@ static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char
             return sub_object;
     }
 
-    return src;
+    return 0;
 }
 
 static struct json_object* json_object_apath_get_leafobj(struct json_object *obj, char const *key_path)
@@ -1490,6 +1490,8 @@ double json_object_apath_get_double(struct json_object *obj, char const *key_pat
 }
 
 #define CIRCBUF_SIZE 1024 
+static int circbuf_idx = 0;
+static char *circbuf_retval[CIRCBUF_SIZE];
 #define CIRCBUF_RET(STR)                       \
 {                                              \
     if (circbuf_retval[circbuf_idx] != 0)      \
@@ -1502,8 +1504,6 @@ double json_object_apath_get_double(struct json_object *obj, char const *key_pat
 
 char const *json_object_apath_get_string(struct json_object *obj, char const *key_path)
 {
-    static int circbuf_idx = 0;
-    static char *circbuf_retval[CIRCBUF_SIZE] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     char *retval;
 
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
@@ -1751,4 +1751,36 @@ struct json_object *json_object_path_get_any(struct json_object *src, char const
     free(kp);
     if (leafobj) retval = leafobj;
     return retval;
+}
+
+struct json_object *json_object_apath_find_object(struct json_object *root, char const *key_path)
+{
+    struct json_object *foundobj = json_object_apath_get_object(root, key_path);
+
+    /* if we found a matching key_path from root, we're done */
+    if (foundobj) return foundobj;
+
+    if (json_object_is_type(root, json_type_object))
+    {
+        struct json_object_iter iter;
+
+        /* Ok, we need to recurse on the members of root */
+        json_object_object_foreachC(root, iter)
+        {
+            foundobj = json_object_apath_find_object(iter.val, key_path);
+            if (foundobj) return foundobj;
+        }
+    }
+    else if (json_object_is_type(root, json_type_array))
+    {
+        int i;
+        for (i = 0; i < json_object_array_length(root); i++)
+        {
+            struct json_object *arrmember = json_object_array_get_idx(root, i);
+            foundobj = json_object_apath_find_object(arrmember, key_path);
+            if (foundobj) return foundobj;
+        }
+    }
+
+    return 0;
 }

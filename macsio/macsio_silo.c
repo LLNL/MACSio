@@ -473,16 +473,18 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
         json_object *filecnt = json_object_array_get_idx(parfmode_obj, 1);
-#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
-        if (!strcmp(json_object_get_string(modestr), "SIF"))
+        if (modestr && !strcmp(json_object_get_string(modestr), "SIF"))
         {
             MACSIO_LOG_MSG(Die, ("Silo plugin doesn't support SIF mode"));
         }
-        else if (strcmp(json_object_get_string(modestr), "MIF"))
+        else if (modestr && strcmp(json_object_get_string(modestr), "MIF"))
         {
             MACSIO_LOG_MSG(Warn, ("Ignoring non-standard MIF mode"));
         }
-        numGroups = json_object_get_int(filecnt);
+        if (filecnt)
+            numGroups = json_object_get_int(filecnt);
+        else
+            numGroups = size;
     }
     else
     {

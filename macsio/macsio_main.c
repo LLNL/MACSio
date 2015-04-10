@@ -1006,6 +1006,7 @@ main(int argc, char *argv[])
 
     /* Generate a static problem object to dump on each dump */
     problem_obj = MACSIO_GenerateStaticDumpObject(main_obj,0);
+#warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, MACSIO_MAIN_KEY(problem), problem_obj);
 
 #warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
