@@ -3,7 +3,6 @@
 
 #include <ifacemap.h>
 #include <json-c/json.h>
-#include <macsio.h>
 
 #define MACSIO_MAX_IFACES 128
 #define MACSIO_MAX_IFACE_NAME 64
@@ -17,20 +16,18 @@ extern "C" {
  */
 
 /* Required methods */
-typedef int               (*InitInterfaceFunc) (MACSIO_optlist_t const *opts);
 typedef void              (*DumpFunc)(int argi, int argc, char **argv, json_object *main_obj, int dumpNum, double dumpTime);
 
 /* Optional methods */
-typedef MACSIO_optlist_t* (*ProcessArgsFunc)  (int argi, int argc, char **argv);
-typedef MACSIO_optlist_t* (*QueryFeaturesFunc)(void);
-typedef int               (*IdentifyFileFunc) (char const *pathname, MACSIO_optlist_t const *moreopts);
+typedef int (*ProcessArgsFunc)  (int argi, int argc, char **argv);
+typedef int (*QueryFeaturesFunc)(void);
+typedef int (*IdentifyFileFunc) (char const *pathname);
 
 #warning MAKE THE MAKEFILE LINK ANY .o FILES WITH A GIVEN NAME SCHEME
 typedef struct MACSIO_IFaceHandle_t
 {   char                 name[MACSIO_MAX_IFACE_NAME];
     char                 ext[MACSIO_MAX_IFACE_NAME];
     int                  slotUsed;
-    InitInterfaceFunc    initInterfaceFunc;
     ProcessArgsFunc      processArgsFunc;
     DumpFunc             dumpFunc;
     QueryFeaturesFunc    queryFeaturesFunc;

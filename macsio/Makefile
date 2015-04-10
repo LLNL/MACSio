@@ -49,10 +49,6 @@ BASIC_SRC = macsio_main.c
 BASIC_HDR=$(BASIC_SRC:.c=.h)
 BASIC_OBJ=$(BASIC_SRC:.c=.o)
 
-# Unix stdio and sec2 drivers always present
-DRIVER_SRC = ioperf_sec2.c ioperf_stdio.c
-CFLAGS += -DHAVE_SEC2 -DHAVE_STDIO
-
 TEST_SRC = tsttiming.c tstlog.c
 TEST_OBJ=$(TEST_SRC:.c=.o)
 
@@ -64,7 +60,7 @@ TOOL_OBJ=$(TOOL_SRC:.c=.o)
 # as it can have dependencies on HDF5
 ifeq ($(SILO_HOME),)
 else
-DRIVER_SRC += macsio_silo.c ioperf_pdbl.c
+DRIVER_SRC += macsio_silo.c
 CFLAGS += -DHAVE_SILO
 DRIVER_INCS += -I$(SILO_INC)
 DRIVER_LIBS += -L$(SILO_LIB) $(SILO_LDFLAGS)
@@ -97,7 +93,7 @@ endif
 # Don't confuse PDB with PDB Lite (in Silo)
 ifeq ($(PDB_HOME),)
 else
-DRIVER_SRC += ioperf_pdb.c
+DRIVER_SRC += macsio_pdb.c
 CFLAGS += -DHAVE_PDB
 DRIVER_INCS += -I$(PDB_INC)
 DRIVER_LIBS += -L$(PDB_LIB) $(PDB_LDFLAGS)
@@ -148,9 +144,6 @@ tstlog.o: tstlog.c $(COMMON_HDR)
 tstlog: tstlog.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
-# the PDB Lite driver code is #included from PDB driver code
-ioperf_pdbl.o: ioperf_pdb.c
-
 macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
@@ -171,4 +164,4 @@ allclean: dataclean
 #srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
 check: macsio
 	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
-	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
+	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext h5 

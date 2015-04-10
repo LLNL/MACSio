@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <ifacemap.h>
 #include <macsio_utils.h>
 

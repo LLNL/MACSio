@@ -86,7 +86,7 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
-static MACSIO_optlist_t *FNAME(process_args)(int argi, int argc, char *argv[])
+static int FNAME(process_args)(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,

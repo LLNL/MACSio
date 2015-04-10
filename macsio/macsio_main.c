@@ -858,7 +858,6 @@ static void handle_list_request_and_exit()
     exit(0);
 }
 
-#warning NEED CL ARG FOR LOGGING TO FILES VS STDOUT/STDERR
 static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 {
     MACSIO_CLARGS_ArgvFlags_t const argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOJSON};
@@ -907,6 +906,13 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "2*number of topological dimensions. [50]",
         "--num_dumps %d",
             "Total number of dumps to write or read [10]",
+        "--debug_level %d",
+            "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
+            "more detailed output [0].",
+        "--log_line_cnt %d",
+            "Set number of lines per rank in the log file [64]."
+        "--log_line_length %d",
+            "Set log file line length [128]."
         "--alignment %d",
             "Not currently documented",
         "--filebase %s",
@@ -940,6 +946,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     return mainJargs;
 }
 
+#if 0
 static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv[], MACSIO_optlist_t const *opts)
 {
     int i;
@@ -961,6 +968,7 @@ static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv
 
     return retval;
 }
+#endif
 
 int
 main(int argc, char *argv[])
@@ -1002,8 +1010,8 @@ main(int argc, char *argv[])
 
     errno = 0;
 #warning MAKE DEBUG LEVEL CL ARG
-    MACSIO_LOG_DebugLevel = 1;
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 256, 64);
+    MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Setup parallel information */
