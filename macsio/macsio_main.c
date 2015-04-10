@@ -29,9 +29,9 @@
 extern char **enviornp;
 
 #ifdef HAVE_MPI
-MPI_Comm MACSIO_MAIN_Comm;
+MPI_Comm MACSIO_MAIN_Comm = MPI_COMM_WORLD;
 #else
-int MACSIO_MAIN_Comm;
+int MACSIO_MAIN_Comm = ;
 #endif
 
 int MACSIO_MAIN_Size = 1;
@@ -867,22 +867,57 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     int plugin_args_start = -1;
     int cl_result;
 
-#warning FIX PARTIAL CODE REVISION HERE
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
-        MACSIO_ARGV_DEF(interface, %s),
-        MACSIO_ARGV_DEF(parallel_file_mode, %s %d),
-        MACSIO_ARGV_DEF(part_size, %d),
-        MACSIO_ARGV_DEF(part_dim, %d),
-        MACSIO_ARGV_DEF(part_type, %s),
-        MACSIO_ARGV_DEF(avg_num_parts, %f),
-        MACSIO_ARGV_DEF(part_distribution, %s),
-        MACSIO_ARGV_DEF(vars_per_part, %d),
-        MACSIO_ARGV_DEF(num_dumps, %d),
-        MACSIO_ARGV_DEF(alignment, %d),
-        MACSIO_ARGV_DEF(filebase, %s),
-        MACSIO_ARGV_DEF(fileext, %s),
-        "--driver-args %n",
-            "All arguments after this sentinel are passed to the I/O driver plugin (ignore the %n)",
+        "--interface %s",
+            "Specify the name of the interface to be tested. Use keyword 'list'\\"
+            "to print a list of all known interface names and then exit.",
+        "--parallel_file_mode %s %d",
+            "Specify the parallel file mode. There are several choices.\\"
+            "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then\\"
+            "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\\"
+            "one file per processor or 'MIFOPT' for MIF mode and let the test\\"
+            "determine the optimum file count. Use 'SIF' for SIngle shared File\\"
+            "(Rich Man's) mode.",
+        "--avg_num_parts %f",
+            "The average number of mesh parts per MPI rank. Non-integral values\\"
+            "are acceptable. For example, a value that is half-way between two\\"
+            "integers, K and K+1, means that half the ranks have K mesh parts\\"
+            "and half have K+1 mesh parts. As another example, a value of 2.75\\"
+            "here would mean that 75% of the ranks get 3 parts and 25% of the\\"
+            "ranks get 2 parts. Note that the total number of parts is the this\\"
+            "number multiplied by the MPI communicator size. If the result of that\\"
+            "product is non-integral, it will be rounded and a warning message will\\"
+            "be generated. [1]",
+        "--part_size %d",
+            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character\\"
+            "indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes (2^20) or\\"
+            "'G'igabytes (2^30). This is then the nominal I/O request size used\\"
+            "by each MPI rank when marshalling data. [1M]",
+        "--part_dim %d",
+            "Spatial dimension of parts; 1, 2, or 3",
+        "--part_type %s",
+            "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\\"
+            "and 'arbitrary'",
+        "--part_distribution %s",
+            "Specify how parts are distributed to MPI tasks. (currently ignored)",
+        "--vars_per_part %d",
+            "Number of mesh variable objects in each part. The smallest this can\\"
+            "be depends on the mesh type. For rectilinear mesh it is 1. For\\"
+            "curvilinear mesh it is the number of spatial dimensions and for\\"
+            "unstructured mesh it is the number of spatial dimensions plus\\"
+            "2*number of topological dimensions. [50]",
+        "--num_dumps %d",
+            "Total number of dumps to write or read [10]",
+        "--alignment %d",
+            "Not currently documented",
+        "--filebase %s",
+            "Basename of generated file(s). ['macsio_']",
+        "--fileext %s",
+            "Extension of generated file(s). ['.dat']",
+        "--plugin-args %n",
+            "All arguments after this sentinel are passed to the I/O driver\\"
+            "plugin. The '%n' is a special designator for the builtin 'argi'\\"
+            "value.",
     MACSIO_CLARGS_END_OF_ARGS);
 
 #warning FIXME
@@ -904,27 +939,6 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         *plugin_argi = plugin_args_start>-1?plugin_args_start+1:argc;
 
     return mainJargs;
-}
-
-/* Debugging support method */
-#define OUTDBLOPT(A) fprintf(f?f:stdout, "%-40s = %f\n", #A, MACSIO_GetDblOption(opts,A));
-#define OUTINTOPT(A) fprintf(f?f:stdout, "%-40s = %d\n", #A, MACSIO_GetIntOption(opts,A));
-#define OUTSTROPT(A) fprintf(f?f:stdout, "%-40s = \"%s\"\n", #A, MACSIO_GetStrOption(opts,A));
-static void DumpOptions(MACSIO_optlist_t const *opts, FILE *f)
-{
-    OUTSTROPT(IOINTERFACE_NAME);
-    OUTSTROPT(PARALLEL_FILE_MODE);
-    OUTINTOPT(PARALLEL_FILE_COUNT);
-    OUTINTOPT(PART_SIZE);
-    OUTDBLOPT(AVG_NUM_PARTS);
-    OUTSTROPT(PART_DISTRIBUTION);
-    OUTINTOPT(VARS_PER_PART);
-    OUTINTOPT(NUM_DUMPS);
-    OUTINTOPT(ALIGNMENT);
-    OUTSTROPT(FILENAME_SPRINTF);
-    OUTINTOPT(PRINT_TIMING_DETAILS);
-    OUTINTOPT(MPI_SIZE);
-    OUTINTOPT(MPI_RANK);
 }
 
 static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv[], MACSIO_optlist_t const *opts)

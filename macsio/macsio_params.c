@@ -5,21 +5,21 @@ MACSIO_ArgvHelpStruct_t const MACSIO_ArgvHelp[] = {
     {_ArgvParamKeys_min, ""},
     {interface, 
         "Specify the name of the interface to be tested. Use keyword 'list' "
-        "to print a list of all known interfaces and then exit"},
+        "to print a list of all known interface names and then exit."},
 #warning SHOULD REALLY USE AN ENUM HERE. BUT HOW
     {parallel_file_mode,
         "Specify the parallel file mode. There are several choices. "
         "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then "
-        "also specify the number of files. Or, use 'MIFMAX' for MIF mode and "
-        "one file per processor or 'MIFAUTO' for MIF mode and let the test "
+        "also specify the number of files. Or, use 'MIFFPP' for MIF mode and "
+        "one file per processor or 'MIFOPT' for MIF mode and let the test "
         "determine the optimum file count. Use 'SIF' for SIngle shared File "
         "(Rich Man's) mode."},
     {part_size,
         "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character indicates 'B'ytes (2^0), "
         "'K'ilobytes (2^10), 'M'egabytes (2^20) or 'G'igabytes (2^30). This is then the nominal I/O "
-        "request size emitted from each MPI rank. [1M]"},
+        "request size used by each MPI rank when marshalling data. [1M]"},
     {part_dim,
-        "Spatial dimenion of parts; 1, 2, or 3"},
+        "Spatial dimension of parts; 1, 2, or 3"},
     {part_type,
         "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured', 'arbitrary'"},
     {avg_num_parts,
