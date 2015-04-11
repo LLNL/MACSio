@@ -1066,7 +1066,7 @@ main(int argc, char *argv[])
     json_object_object_add(parallel_obj, "mpi_rank", json_object_new_int(MACSIO_MAIN_Rank));
     json_object_object_add(main_obj, "parallel", parallel_obj);
 
-#warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEY'RE RESTRICTED
+#warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEYRE RESTRICTED
 #warning CREATE AN IO CONTEXT OBJECT
     /* Acquire an I/O context handle from the plugin */
 
@@ -1077,7 +1077,7 @@ main(int argc, char *argv[])
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);
 
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, don't dump large data, html output, dump large data at end
+#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
 #if 1
     if (MACSIO_MAIN_Size <= 64)
@@ -1089,7 +1089,7 @@ main(int argc, char *argv[])
     }
 #endif
 
-#warning WE'RE NOT GENERATING OR WRITING ANY METADATA STUFF
+#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
     dumpTime = 0.0;
     for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)

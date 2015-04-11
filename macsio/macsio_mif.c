@@ -195,7 +195,18 @@ void * MACSIO_MIF_WaitForBaton(
             Bat->mpiTag, Bat->mpiComm, &mpi_stat);
         if (mpi_err == MPI_SUCCESS && baton != MACSIO_MIF_BATON_ERR)
         {
-            return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+#ifdef HAVE_SCR
+            char scr_filename[SCR_MAX_FILENAME];
+            if (Bat->ioFlags.use_scr)
+            {
+                if (SCR_Route_file(fname, scr_filename) == SCR_SUCCESS)
+                    return Bat->openCb(scr_filename, nsname, Bat->ioFlags, Bat->clientData);
+                else
+                    return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+            }
+            else
+#endif
+                return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
         }
         else
         {
@@ -212,7 +223,7 @@ void * MACSIO_MIF_WaitForBaton(
             char scr_filename[SCR_MAX_FILENAME];
             if (Bat->ioFlags.use_scr)
             {
-                SCR_Route_file((char*)fname, scr_filename);
+                SCR_Route_file(fname, scr_filename);
                 return Bat->createCb(scr_filename, nsname, Bat->clientData);
             }
             else
@@ -220,7 +231,20 @@ void * MACSIO_MIF_WaitForBaton(
                 return Bat->createCb(fname, nsname, Bat->clientData);
         }
         else
-            return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+        {
+#ifdef HAVE_SCR
+            char scr_filename[SCR_MAX_FILENAME];
+            if (Bat->ioFlags.use_scr)
+            {
+                if (SCR_Route_file(fname, scr_filename) == SCR_SUCCESS)
+                    return Bat->openCb(scr_filename, nsname, Bat->ioFlags, Bat->clientData);
+                else
+                    return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+            }
+            else
+#endif
+                return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+        }
     }
 }
 
