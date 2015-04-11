@@ -938,9 +938,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
             "more detailed output [0].",
         "--log_line_cnt %d",
-            "Set number of lines per rank in the log file [64]."
+            "Set number of lines per rank in the log file [64].",
         "--log_line_length %d",
-            "Set log file line length [128]."
+            "Set log file line length [128].",
         "--alignment %d",
             "Not currently documented",
         "--filebase %s",
