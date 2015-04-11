@@ -818,7 +818,7 @@ static void handle_help_request_and_exit(int argi, int argc, char **argv)
         const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceById(ids[i]);
         if (iface->processArgsFunc)
         {
-            fprintf(outFILE, "\nOptions specific to the \"%s\" I/O driver\n", iface->name);
+            fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
             (*(iface->processArgsFunc))(argi, argc, argv);
         }
     }
@@ -847,7 +847,7 @@ static void handle_list_request_and_exit()
         strcat(names_buf, "\", ");
         if (!((i+1) % 10)) strcat(names_buf, "\n");
     }
-    fprintf(outFILE, "List of available I/O-library drivers...\n");
+    fprintf(outFILE, "List of available I/O-library plugins...\n");
     fprintf(outFILE, "%s\n", names_buf);
 #ifdef HAVE_MPI
     {   int result;
@@ -875,27 +875,31 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\n"
             "one file per processor or 'MIFOPT' for MIF mode and let the test\n"
             "determine the optimum file count. Use 'SIF' for SIngle shared File\n"
-            "(Rich Man's) mode.",
+            "(Rich Man's) mode. If you also give a file count for SIF mode, then\n"
+            "MACSio will perform a sort of hybrid combination of MIF and SIF modes.\n"
+            "It will produce the specified number of files by grouping ranks in the\n"
+            "the same way MIF does, but I/O within each group will be to a single,\n"
+            "shared file using SIF mode.",
         "--avg_num_parts %f",
             "The average number of mesh parts per MPI rank. Non-integral values\n"
             "are acceptable. For example, a value that is half-way between two\n"
             "integers, K and K+1, means that half the ranks have K mesh parts\n"
             "and half have K+1 mesh parts. As another example, a value of 2.75\n"
             "here would mean that 75% of the ranks get 3 parts and 25% of the\n"
-            "ranks get 2 parts. Note that the total number of parts is the this\n"
+            "ranks get 2 parts. Note that the total number of parts is this\n"
             "number multiplied by the MPI communicator size. If the result of that\n"
             "product is non-integral, it will be rounded and a warning message will\n"
             "be generated. [1]",
         "--part_size %d",
-            "Per-MPI-rank mesh part size in bytes. A following B|K|M|G character\n"
-            "indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes (2^20) or\n"
-            "'G'igabytes (2^30). This is then the nominal I/O request size used\n"
-            "by each MPI rank when marshalling data. [1M]",
+            "Mesh part size in bytes. This becomes the nominal I/O request size\n"
+            "used by each MPI rank when marshalling data. A following B|K|M|G\n"
+            "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
+            "(2^20) or 'G'igabytes (2^30).",
         "--part_dim %d",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
-            "and 'arbitrary'",
+            "and 'arbitrary' (only rectinilear is currently implemented)",
         "--part_distribution %s",
             "Specify how parts are distributed to MPI tasks. (currently ignored)",
         "--vars_per_part %d",
@@ -903,9 +907,33 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "be depends on the mesh type. For rectilinear mesh it is 1. For\n"
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
-            "2*number of topological dimensions. [50]",
+            "2^number of topological dimensions. [50]",
         "--num_dumps %d",
-            "Total number of dumps to write or read [10]",
+            "Total number of dumps to marshal [10]",
+        "--max_dir_size %d",
+            "The maximum number of filesystem objects (e.g. files or subdirectories)\n"
+            "that MACSio will create in any one subdirectory. This is typically\n"
+            "relevant only in MIF mode because MIF mode can wind up generating many\n"
+            "files on each dump. The default setting is unlimited meaning that MACSio\n"
+            "will continue to create output files in the same directory until it has\n"
+            "completed all dumps. Use a value of zero to force MACSio to put each\n"
+            "dump in a separate directory but where the number of top-level directories\n"
+            "is still unlimited. The result will be a 2-level directory hierarchy\n"
+            "with dump directories at the top and individual dump files in each\n"
+            "directory. A value > 0 will cause MACSio to create a tree-like directory\n"
+            "structure where the files are the leaves and encompassing dir tree is\n"
+            "created such as to maintain the max_dir_size constraint specified here.\n"
+            "For example, if the value is set to 32 and the MIF file count is 1024,\n"
+            "then each dump will involve a 3-level dir-tree; the top dir containing\n"
+            "32 sub-dirs and each sub-dir containing 32 of the 1024 files for the\n"
+            "dump. If more than 32 dumps are performed, then the dir-tree will really\n"
+            "be 4 or more levels with the first 32 dumps' dir-trees going into the\n"
+            "first dir, etc.",
+#ifdef HAVE_SCR
+        "--exercise_scr",
+            "Exercise the Scalable Checkpoint and Restart library to marshal files.\n"
+            "Note that this works only in MIFFPP mode.",
+#endif
         "--debug_level %d",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
             "more detailed output [0].",
@@ -920,10 +948,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--fileext %s",
             "Extension of generated file(s). ['.dat']",
         "--plugin-args %n",
-            "All arguments after this sentinel are passed to the I/O driver\n"
+            "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
     MACSIO_CLARGS_END_OF_ARGS);
+
+#warning DETERMINE IF THIS IS A WRITE TEST OR A READ TEST
 
 #warning FIXME
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
@@ -987,13 +1017,23 @@ main(int argc, char *argv[])
     char outfName[64];
     FILE *outf;
 
-    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
-
 #warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
 #endif
+
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+
+    /* Process the command line and put the results in the problem */
+    clargs_obj = ProcessCommandLine(argc, argv, &argi);
+    json_object_object_add(main_obj, "clargs", clargs_obj);
+
+#ifdef HAVE_SCR
+    if (JsonGetInt(clargs_obj, "exercise_scr"))
+        SCR_Init();
+#endif
+
 #ifdef HAVE_MPI
     MPI_Comm_dup(MPI_COMM_WORLD, &MACSIO_MAIN_Comm);
     MPI_Errhandler_set(MACSIO_MAIN_Comm, MPI_ERRORS_RETURN);
@@ -1004,12 +1044,8 @@ main(int argc, char *argv[])
 
 #warning SET DEFAULT VALUES FOR CLARGS
 
-    /* Process the command line and put the results in the problem */
-    clargs_obj = ProcessCommandLine(argc, argv, &argi);
-    json_object_object_add(main_obj, "clargs", clargs_obj);
 
     errno = 0;
-#warning MAKE DEBUG LEVEL CL ARG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
@@ -1047,11 +1083,16 @@ main(int argc, char *argv[])
     dumpTime = 0.0;
     for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
     {
+        int scr_need_checkpoint_flag = 1;
         MACSIO_TIMING_TimerId_t heavy_dump_tid;
 
-#warning ADD DUMP DIR CREATION OPTION HERE
+#ifdef HAVE_SCR
+        if (JsonGetInt(clargs_obj, "exercise_scr"))
+            SCR_Need_checkpoint(&scr_need_checkpoint_flag);
+#endif
 
         /* Use 'Fill' for read operation */
+#warning MOVE PLUGINS TO SEPARATE DIR
         const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
             json_object_path_get_string(main_obj, "clargs/interface"));
 
@@ -1060,9 +1101,22 @@ main(int argc, char *argv[])
         /* Start dump timer */
         heavy_dump_tid = MT_StartTimer("heavy dump", main_grp, dumpNum);
 
-        /* do the dump */
-#warning OVERRIGHTING SAME TIMESTEP FILE
-        (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+        if (scr_need_checkpoint_flag)
+        {
+            int scr_valid = 0;
+
+#ifdef HAVE_SCR
+            SCR_Start_checkpoint();
+#endif
+
+            /* do the dump */
+            (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+
+#ifdef HAVE_SCR
+            SCR_Complete_checkpoint(scr_valid);
+#endif
+
+        }
 
         /* stop timer */
         MT_StopTimer(heavy_dump_tid);
@@ -1097,6 +1151,10 @@ main(int argc, char *argv[])
     MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
 
+#ifdef HAVE_SCR
+    if (JsonGetInt(clargs_obj, "exercise_scr"))
+        SCR_Finalize();
+#endif
 #ifdef HAVE_MPI
     MPI_Finalize();
 #endif

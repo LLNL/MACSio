@@ -120,22 +120,33 @@ There are a large number of advantages to MIF-IO over SSF-IO.
 extern "C" {
 #endif
 
-typedef enum {
-    MACSIO_MIF_READ=0x1,
-    MACSIO_MIF_WRITE=0x3
-} MACSIO_MIF_iomode_t;
+#define MACSIO_MIF_READ  0
+#define MACSIO_MIF_WRITE 1
+#define MACSIO_MIF_SCR_OFF 0
+#define MACSIO_MIF_SCR_ON 1
+
+typedef struct _MACSIO_MIF_ioFlags_t
+{
+    unsigned int do_wr : 1;
+    unsigned int use_scr : 1;
+} MACSIO_MIF_ioFlags_t;
 
 typedef struct _MACSIO_MIF_baton_t MACSIO_MIF_baton_t;
 typedef void *(*MACSIO_MIF_CreateCB)(const char *fname, const char *nsname, void *udata);
-typedef void *(*MACSIO_MIF_OpenCB)  (const char *fname, const char *nsname, MACSIO_MIF_iomode_t iomode, void *udata);
+typedef void *(*MACSIO_MIF_OpenCB)  (const char *fname, const char *nsname,
+                                     MACSIO_MIF_ioFlags_t ioFlags, void *udata);
 typedef void  (*MACSIO_MIF_CloseCB) (void *file, void *udata);
 
 #ifdef HAVE_MPI
-extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_iomode_t ioMode, MPI_Comm mpiComm, int mpiTag,
-    MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb, void *userData);
+extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_ioFlags_t ioFlags,
+    MPI_Comm mpiComm, int mpiTag,
+    MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb,
+    void *userData);
 #else
-extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_iomode_t ioMode, int mpiComm, int mpiTag,
-    MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb, void *userData);
+extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_ioFlags_t ioFlags,
+    int mpiComm, int mpiTag,
+    MACSIO_MIF_CreateCB createCb, MACSIO_MIF_OpenCB openCb, MACSIO_MIF_CloseCB closeCb,
+    void *userData);
 #endif
 extern void   MACSIO_MIF_Finish(MACSIO_MIF_baton_t *bat);
 extern void * MACSIO_MIF_WaitForBaton(MACSIO_MIF_baton_t *Bat, const char *fname, const char *nsname);

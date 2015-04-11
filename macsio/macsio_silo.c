@@ -269,10 +269,7 @@ static int FNAME(process_args)(int argi, int argc, char *argv[])
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
     DBSetCompression(compression_str);
-#if 0
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
-#endif
-    DBShowErrors(DB_ALL_AND_DRVR, 0);
 
     return 0;
 }
@@ -289,14 +286,14 @@ static void *CreateSiloFile(const char *fname, const char *nsname, void *userDat
     return (void *) siloFile;
 }
 
-static void *OpenSiloFile(const char *fname, const char *nsname, MACSIO_MIF_iomode_t ioMode,
+static void *OpenSiloFile(const char *fname, const char *nsname, MACSIO_MIF_ioFlags_t ioFlags,
     void *userData)
 {
     int driverId = *((int*) userData);
-    DBfile *siloFile = DBOpen(fname, driverId, ioMode==MACSIO_MIF_WRITE ? DB_APPEND : DB_READ);
+    DBfile *siloFile = DBOpen(fname, driverId, ioFlags.do_wr ? DB_APPEND : DB_READ);
     if (siloFile && nsname)
     {
-        if (ioMode == MACSIO_MIF_WRITE)
+        if (ioFlags.do_wr)
             DBMkDir(siloFile, nsname);
         DBSetDir(siloFile, nsname);
     }
@@ -452,10 +449,9 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     int rank, size;
     char fileName[256];
     MACSIO_MIF_baton_t *bat;
+    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
+        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
-#warning MAKE LOGGING A CL OPTION
-
-#warning NEED TO PASS OR HAVE A FUNCTION THAT PRODUCES MPI COMM
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
@@ -502,7 +498,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     }
 
     /* Initialize MACSIO_MIF, pass a pointer to the driver type as the user data. */
-    bat = MACSIO_MIF_Init(numGroups, MACSIO_MIF_WRITE, MACSIO_MAIN_Comm, 1,
+    bat = MACSIO_MIF_Init(numGroups, ioFlags, MACSIO_MAIN_Comm, 1,
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */

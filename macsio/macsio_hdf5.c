@@ -281,13 +281,13 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
 }
 
 static void *OpenHDF5File(const char *fname, const char *nsname,
-                   MACSIO_MIF_iomode_t ioMode, void *userData)
+                   MACSIO_MIF_ioFlags_t ioFlags, void *userData)
 {
     hid_t *retval;
-    hid_t h5File = H5Fopen(fname, ioMode == MACSIO_MIF_WRITE ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
+    hid_t h5File = H5Fopen(fname, ioFlags.do_wr ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
     if (h5File >= 0)
     {
-        if (ioMode == MACSIO_MIF_WRITE && nsname && userData)
+        if (ioFlags.do_wr && nsname && userData)
         {
             user_data_t *ud = (user_data_t *) userData;
             ud->groupId = H5Gcreate1(h5File, nsname, 0);
@@ -349,11 +349,13 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     int i, len;
     int *theData;
     user_data_t userData;
+    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
+        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
 #warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 #warning SET FILE AND DATASET PROPERTIES
 #warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
-    MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, MACSIO_MIF_WRITE, MACSIO_MAIN_Comm, 3,
+    MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");

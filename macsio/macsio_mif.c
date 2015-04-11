@@ -14,7 +14,7 @@
 
 typedef struct _MACSIO_MIF_baton_t
 {
-    MACSIO_MIF_iomode_t ioMode; /**< Indicates if reading or writing */
+    MACSIO_MIF_ioFlags_t ioFlags; /**< Various flags controlling behavior. */
 #ifdef HAVE_MPI
     MPI_Comm mpiComm;           /**< The MPI communicator being used */
 #endif
@@ -44,7 +44,7 @@ Creates and returns a MACSIO_MIF \em baton object establishing the mapping
 between MPI ranks and file groups for a MIF I/O operation.
 
 All processors in the \c mpiComm communicator must call this function
-collectively with identical values for \c numFiles, \c ioMode, and \c mpiTag.
+collectively with identical values for \c numFiles, \c ioFlags, and \c mpiTag.
 
 The resultant \em baton object is used in subsequent calls to WaitFor and
 HandOff the baton to the next processor in each group.
@@ -70,7 +70,7 @@ MACSIO_MIF_baton_t *MACSIO_MIF_Init(
                                          application is executing on and the filesystem. Pass MACSIO_MIF_MAX for
                                          file-per-processor. Pass MACSIO_MIF_AUTO (currently not supported) to
                                          request that MACSIO_MIF determine and use an optimum file count. */
-    MACSIO_MIF_iomode_t ioMode,     /**< [in] Pass either MACSIO_MIF_READ or MACSIO_MIF_WRITE */
+    MACSIO_MIF_ioFlags_t ioFlags,   /**< [in] See MACSIO_MIF_ioFlags_t for meaning of flags. */
 #ifdef HAVE_MPI
     MPI_Comm mpiComm,               /**< [in] The MPI communicator containing all the MPI ranks that will
                                          marshall data in the MIF I/O operation. */
@@ -122,7 +122,7 @@ MACSIO_MIF_baton_t *MACSIO_MIF_Init(
         return 0;
 
     ret = (MACSIO_MIF_baton_t *) malloc(sizeof(MACSIO_MIF_baton_t));
-    ret->ioMode = ioMode;
+    ret->ioFlags = ioFlags;
     ret->commSize = commSize;
     ret->rankInComm = rankInComm;
     ret->numGroups = numGroups;
@@ -185,7 +185,7 @@ void * MACSIO_MIF_WaitForBaton(
             Bat->mpiTag, Bat->mpiComm, &mpi_stat);
         if (mpi_err == MPI_SUCCESS && baton != MACSIO_MIF_BATON_ERR)
         {
-            return Bat->openCb(fname, nsname, Bat->ioMode, Bat->clientData);
+            return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
         }
         else
         {
@@ -196,10 +196,21 @@ void * MACSIO_MIF_WaitForBaton(
     }
     else
     {
-        if (Bat->ioMode == MACSIO_MIF_WRITE)
-            return Bat->createCb(fname, nsname, Bat->clientData);
+        if (Bat->ioFlags.do_wr)
+        {
+#ifdef HAVE_SCR
+            char scr_filename[SCR_MAX_FILENAME];
+            if (Bat->ioFlags.use_scr)
+            {
+                SCR_Route_file(fname, scr_filename);
+                return Bat->createCb(scr_filename, nsname, Bat->clientData);
+            }
+            else
+#endif
+                return Bat->createCb(fname, nsname, Bat->clientData);
+        }
         else
-            return Bat->openCb(fname, nsname, Bat->ioMode, Bat->clientData);
+            return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
     }
 }
 
