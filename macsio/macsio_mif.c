@@ -1,5 +1,15 @@
 #include <stdlib.h>
 
+#ifdef HAVE_SCR
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <scr.h>
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #include <macsio_mif.h>
 
 #define MACSIO_MIF_BATON_OK  0
@@ -202,7 +212,7 @@ void * MACSIO_MIF_WaitForBaton(
             char scr_filename[SCR_MAX_FILENAME];
             if (Bat->ioFlags.use_scr)
             {
-                SCR_Route_file(fname, scr_filename);
+                SCR_Route_file((char*)fname, scr_filename);
                 return Bat->createCb(scr_filename, nsname, Bat->clientData);
             }
             else

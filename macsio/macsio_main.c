@@ -10,6 +10,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef HAVE_SCR
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <scr.h>
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #include <ifacemap.h>
 #include <macsio_clargs.h>
 #include <macsio_log.h>
@@ -1030,6 +1040,7 @@ main(int argc, char *argv[])
     json_object_object_add(main_obj, "clargs", clargs_obj);
 
 #ifdef HAVE_SCR
+#warning SANITY CHECK WITH MIFFPP
     if (JsonGetInt(clargs_obj, "exercise_scr"))
         SCR_Init();
 #endif

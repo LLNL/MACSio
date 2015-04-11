@@ -100,6 +100,16 @@ DRIVER_LIBS += -L$(PDB_LIB) $(PDB_LDFLAGS)
 DRIVER_RPATHS += -Wl,-rpath,$(PDB_LIB)
 endif
 
+ifeq ($(SCR_HOME),)
+else
+CFLAGS += -DHAVE_SCR
+SCR_INCS = $(SCR_HOME)/include
+SCR_LIBS = $(SCR_HOME)/lib
+DRIVER_INCS += -I$(SCR_INCS)
+LDFLAGS += -L$(SCR_LIBS) -lscr
+DRIVER_RPATHS += -Wl,-rpath,$(SCR_LIBS)
+endif
+
 LDFLAGS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
 
 DRIVER_OBJ=$(DRIVER_SRC:.c=.o)
