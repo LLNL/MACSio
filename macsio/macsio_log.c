@@ -14,15 +14,28 @@ int                     MACSIO_LOG_DebugLevel = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;
 
+typedef struct _log_flags_t
+{
+    unsigned int was_logged : 1; /**< Indicates if a message was ever logged to the log */
+} log_flags_t;
+
 typedef struct _MACSIO_LOG_LogHandle_t
 {
+#ifdef HAVE_MPI
+    MPI_Comm comm;            /**< MPI Communicator of tasks that will issue messages to this log */
+#else
+    int comm;                 /**< Dummy arg for non-MPI compilation */
+#endif
+    char *pathname;           /**< Name of the log file */
     int logfile;              /**< Log file file descriptor */
     int rank;                 /**< Rank of the processor that created this log handle */
     int size;                 /**< Size of the communicator that created this log handle */
     int log_line_length;      /**< Maximum length of a message line in the log file */
     int lines_per_proc;       /**< Number of message lines allocated in the file for each processor */
+#warning FIX USE OF MUTABLE HERE
     mutable int current_line; /**< Index into this processor's group of lines in the log file at
                                    which the next message will be written */
+    mutable log_flags_t flags; /**< Informational flags regarding the log */
 } MACSIO_LOG_LogHandle_t;
 
 /*!
@@ -114,6 +127,8 @@ MACSIO_LOG_LogInit(
 #endif
 
     retval = (MACSIO_LOG_LogHandle_t *) malloc(sizeof(MACSIO_LOG_LogHandle_t));
+    retval->pathname = path?strdup(path):0;
+    retval->comm = comm;
     /*retval->logfile = open(path, O_WRONLY|O_NONBLOCK);*/
     retval->logfile = path?open(path, O_WRONLY):fileno(stderr);
     retval->size = size;
@@ -121,6 +136,7 @@ MACSIO_LOG_LogInit(
     retval->log_line_length = path?line_len:1024;
     retval->lines_per_proc = path?lines_per_proc:1000000;
     retval->current_line = 1;
+    retval->flags.was_logged = 0;
     return retval;
 }
 
@@ -184,6 +200,7 @@ MACSIO_LOG_LogMsg(
     log->current_line++;
     if (log->current_line == log->lines_per_proc)
         log->current_line = 1;
+    log->flags.was_logged = 1;
 }
 
 /*!
@@ -233,16 +250,29 @@ MACSIO_LOG_LogMsgWithDetails(
 
 /*!
 \brief Finalize and close an open log
-Should be called by all processors that created the log.
+Should be called collectively by all processors that created the log.
 */
 void
 MACSIO_LOG_LogFinalize(
     MACSIO_LOG_LogHandle_t *log /**< [in] The log to be closed */
 )
 {
+    int was_logged = log->flags.was_logged;
+    int reduced_was_logged = was_logged;
+
 #warning ADD ATEXIT FUNCTIONALITY TO CLOSE LOGS
     if (log->logfile != fileno(stderr))
         close(log->logfile);
+
+#ifdef HAVE_MPI
+    MPI_Reduce(&was_logged, &reduced_was_logged, 1, MPI_INT, MPI_MAX, 0, log->comm);
+#endif
+
+    /* If there was no message logged, we remove the log */
+    if (log->rank == 0 && !reduced_was_logged && log->pathname)
+        unlink(log->pathname);
+
+    if (log->pathname) free(log->pathname);
     free(log);
 }
 
