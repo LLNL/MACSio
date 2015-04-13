@@ -225,11 +225,12 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                 json_object *mesh_dims_array = json_object_path_get_array(mesh_obj, "LogDims");
                 for (i = 0; i < ndims; i++)
                 {
-                    starts[ndims-1-i] = json_object_get_int(json_object_array_get_idx(global_log_origin_array,i));
-                    counts[ndims-1-i] = json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
+                    starts[ndims-1-i] =
+                        json_object_get_int(json_object_array_get_idx(global_log_origin_array,i));
+                    counts[ndims-1-i] =
+                        json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
                         counts[ndims-1-i]--;
-printf("start[%d]=%d,count[%d]=%d\n", ndims-1-i, (int) starts[ndims-1-i], ndims-1-i, (int) counts[ndims-1-i]);
                 }
 
                 /* set selection of filespace */
