@@ -1038,7 +1038,7 @@ main(int argc, char *argv[])
     MPI_Init(&argc, &argv);
 #ifdef HAVE_SCR
 #warning SANITY CHECK WITH MIFFPP
-    if (exercise_scr);
+    if (exercise_scr)
         SCR_Init();
 #endif
     MPI_Comm_dup(MPI_COMM_WORLD, &MACSIO_MAIN_Comm);
@@ -1096,7 +1096,7 @@ main(int argc, char *argv[])
         MACSIO_TIMING_TimerId_t heavy_dump_tid;
 
 #ifdef HAVE_SCR
-        if (JsonGetInt(clargs_obj, "exercise_scr"))
+        if (exercise_scr)
             SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
@@ -1115,14 +1115,16 @@ main(int argc, char *argv[])
             int scr_valid = 0;
 
 #ifdef HAVE_SCR
-            SCR_Start_checkpoint();
+            if (exercise_scr)
+                SCR_Start_checkpoint();
 #endif
 
             /* do the dump */
             (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 
 #ifdef HAVE_SCR
-            SCR_Complete_checkpoint(scr_valid);
+            if (exercise_scr)
+                SCR_Complete_checkpoint(scr_valid);
 #endif
 
         }
@@ -1161,7 +1163,7 @@ main(int argc, char *argv[])
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
 
 #ifdef HAVE_SCR
-    if (JsonGetInt(clargs_obj, "exercise_scr"))
+    if (exercise_scr)
         SCR_Finalize();
 #endif
 #ifdef HAVE_MPI
