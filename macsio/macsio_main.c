@@ -694,6 +694,7 @@ static int choose_part_count(int K, int mod, int *R, int *Q)
 }
 
 #warning GET FUNTION NAMING CONSISTENT THROUGHOUT SOURCE FILES
+#warning MAYBE PASS IN SEED HERE OR ADD TO MAIN_OBJ
 #warning COULD IMPROVE DESIGN A BIT BY SEPARATING ALGORITHM FOR GEN WITH A CALLBACK
 /* Just a very simple spatial partitioning. We use the same exact algorithm
    to determine which rank owns a chunk. So, we overload this method and
@@ -702,7 +703,6 @@ static int choose_part_count(int K, int mod, int *R, int *Q)
 static json_object *
 MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
 {
-#warning FIX READ ACCESS TO KEYS MAKE IT TYPE SAFE
 #warning FIX LEAK OF OBJECTS FOR QUERY CASE
     json_object *mesh_obj = rank_owning_chunkId?0:json_object_new_object();
     json_object *global_obj = rank_owning_chunkId?0:json_object_new_object();
@@ -759,7 +759,6 @@ MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
         json_object_object_add(mesh_obj, "global", global_obj);
     }
 
-#warning SHOULD MAIN OBJECT KNOW WHERE ALL CHUNKS ARE OR ONLY CHUNKS ON THIS RANK
     rank = 0;
     chunk = 0;
     srandom(0xDeadBeef); /* initialize for choose_part_count */
@@ -1020,32 +1019,28 @@ main(int argc, char *argv[])
     MACSIO_TIMING_TimerId_t main_tid;
     MACSIO_TIMING_GroupMask_t main_grp;
     const MACSIO_IFaceHandle_t *ioiface;
-    double         t0,t1;
-    int            argi;
+    double t0,t1;
+    int i, argi, exercise_scr = 0;
     int size = 1, rank = 0;
     double dumpTime = 0;
     char outfName[64];
     FILE *outf;
 
-#warning SHOULD WE BE USING MPI-3 API
-#ifdef HAVE_MPI
-    MPI_Init(&argc, &argv);
-#endif
+    /* quick pre-scan for scr cl flag */
+    for (i = 0; i < argc && !exercise_scr; i++)
+        exercise_scr = !strcmp("exercise_scr", argv[i]);
 
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
-    /* Process the command line and put the results in the problem */
-    clargs_obj = ProcessCommandLine(argc, argv, &argi);
-    json_object_object_add(main_obj, "clargs", clargs_obj);
-
+#warning SHOULD WE BE USING MPI-3 API
+#ifdef HAVE_MPI
+    MPI_Init(&argc, &argv);
 #ifdef HAVE_SCR
 #warning SANITY CHECK WITH MIFFPP
-    if (JsonGetInt(clargs_obj, "exercise_scr"))
+    if (exercise_scr);
         SCR_Init();
 #endif
-
-#ifdef HAVE_MPI
     MPI_Comm_dup(MPI_COMM_WORLD, &MACSIO_MAIN_Comm);
     MPI_Errhandler_set(MACSIO_MAIN_Comm, MPI_ERRORS_RETURN);
     MPI_Comm_size(MACSIO_MAIN_Comm, &MACSIO_MAIN_Size);
@@ -1055,6 +1050,9 @@ main(int argc, char *argv[])
 
 #warning SET DEFAULT VALUES FOR CLARGS
 
+    /* Process the command line and put the results in the problem */
+    clargs_obj = ProcessCommandLine(argc, argv, &argi);
+    json_object_object_add(main_obj, "clargs", clargs_obj);
 
     errno = 0;
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");

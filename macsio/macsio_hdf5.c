@@ -134,9 +134,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     hsize_t global_log_dims_nodal[3];
     hsize_t global_log_dims_zonal[3];
 
-    MPI_Info mpiInfo;
-
-    MPI_Info_create(&mpiInfo);
+    MPI_Info mpiInfo = MPI_INFO_NULL;
 
 #warning INCLUDE ARGS FOR ISTORE AND K_SYM
 #warning INCLUDE ARG PROCESS FOR HINTS
@@ -160,9 +158,9 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         json_object_path_get_array(main_obj, "problem/global/LogDims");
     for (i = 0; i < ndims; i++)
     {
-        global_log_dims_nodal[i] = (hsize_t) json_object_get_int(
+        global_log_dims_nodal[ndims-1-i] = (hsize_t) json_object_get_int(
             json_object_array_get_idx(global_log_dims_array, i));
-        global_log_dims_zonal[i] = global_log_dims_nodal[i] - 1;
+        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] - 1;
     }
     fspace_nodal_id = H5Screate_simple(ndims, global_log_dims_nodal, 0);
     fspace_zonal_id = H5Screate_simple(ndims, global_log_dims_zonal, 0);
@@ -175,7 +173,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning XFER PL: independent, collective
     /* Used in all H5Dwrite calls */
 #if H5_HAVE_PARALLEL
-    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
+    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
 #endif
 
     /* Loop over vars and then over parts */
@@ -227,11 +225,11 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                 json_object *mesh_dims_array = json_object_path_get_array(mesh_obj, "LogDims");
                 for (i = 0; i < ndims; i++)
                 {
-                    starts[i] = json_object_get_int(json_object_array_get_idx(global_log_origin_array,i));
-                    counts[i] = json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
+                    starts[ndims-1-i] = json_object_get_int(json_object_array_get_idx(global_log_origin_array,i));
+                    counts[ndims-1-i] = json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
-                        counts[i]--;
-printf("start[%d]=%d,count[%d]=%d\n", i, (int) starts[i], i, (int) counts[i]);
+                        counts[ndims-1-i]--;
+printf("start[%d]=%d,count[%d]=%d\n", ndims-1-i, (int) starts[ndims-1-i], ndims-1-i, (int) counts[ndims-1-i]);
                 }
 
                 /* set selection of filespace */
