@@ -229,7 +229,6 @@ static char const *iface_name = INAME;
 static char const *iface_ext = INAME;
 
 static const char *filename;
-DBfile *dbfile;
 static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
@@ -440,6 +439,67 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     free(blockTypes);
 }
 
+static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, MACSIO_MIF_baton_t *bat)
+{
+    int i, ndims = JsonGetInt(main_obj, "clargs/part_dim");
+    int total_parts = JsonGetInt(main_obj, "problem/global/TotalParts");
+    int zdims[3] = {0, 0, 0}, dims[3] = {0, 0, 0};
+    double bounds[6] = {0, 0, 0, 0, 0, 0};
+    char const *coordnames[] = {"X","Y","Z"};
+    double *coords[3];
+    double *color = (double *) malloc(total_parts * sizeof(double));
+
+    if (ndims >= 1)
+    {
+        double *x, xdelta;
+        dims[0] = JsonGetInt(main_obj, "problem/global/PartsLogDims/0")+1;
+        bounds[0] = JsonGetInt(main_obj, "problem/global/Bounds/0");
+        bounds[3] = JsonGetInt(main_obj, "problem/global/Bounds/3");
+        x = (double*) malloc(dims[0] * sizeof(double));
+        xdelta = MACSIO_UTILS_XDelta(dims, bounds);
+        for (i = 0; i < dims[0]; i++)
+            x[i] = bounds[0] + i * xdelta;
+        coords[0] = x;
+    }
+
+    if (ndims >= 2)
+    {
+        double *y, ydelta;
+        dims[1] = JsonGetInt(main_obj, "problem/global/PartsLogDims/1")+1;
+        bounds[1] = JsonGetInt(main_obj, "problem/global/Bounds/1");
+        bounds[4] = JsonGetInt(main_obj, "problem/global/Bounds/4");
+        y = (double*) malloc(dims[1] * sizeof(double));
+        ydelta = MACSIO_UTILS_YDelta(dims, bounds);
+        for (i = 0; i < dims[1]; i++)
+            y[i] = bounds[1] + i * ydelta;
+        coords[1] = y;
+    }
+
+    if (ndims >= 3)
+    {
+        double *z, zdelta;
+        dims[2] = JsonGetInt(main_obj, "problem/global/PartsLogDims/2")+1;
+        bounds[2] = JsonGetInt(main_obj, "problem/global/Bounds/2");
+        bounds[5] = JsonGetInt(main_obj, "problem/global/Bounds/5");
+        z = (double*) malloc(dims[2] * sizeof(double));
+        zdelta = MACSIO_UTILS_ZDelta(dims, bounds);
+        for (i = 0; i < dims[2]; i++)
+            z[i] = bounds[2] + i * zdelta;
+        coords[2] = z;
+    }
+
+    DBPutQuadmesh(siloFile, "part_mesh", (char**) coordnames, coords,
+        dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
+    
+    for (i = 0; i < total_parts; i++)
+        color[i] = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+    for (i = 0; i < ndims; i++)
+        zdims[i] = dims[i]-1;
+
+    DBPutQuadvar1(siloFile, "decomp", "part_mesh", color,
+        zdims, ndims, NULL, 0, DB_DOUBLE, DB_ZONECENT, 0);
+}
+
 #warning HOW IS A NEW DUMP CLASS HANDLED
 #warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
@@ -536,7 +596,15 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */
     if (rank == 0)
+    {
         WriteMultiXXXObjects(main_obj, siloFile, dumpn, bat);
+
+        /* output a top-level quadmesh and vars to indicate processor decomp */
+        if (MACSIO_LOG_DebugLevel >= 1)
+        {
+            WriteDecompMesh(main_obj, siloFile, dumpn, bat);
+        }
+    }
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
