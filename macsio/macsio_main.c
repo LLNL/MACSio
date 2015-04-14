@@ -917,6 +917,24 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
+        "--meta_type %s",
+            "Specify the type of metadata objects to include in each main dump.\n"
+            "Options are 'tabular', 'hierarchical', 'amorphous'. For tabular type\n"
+            "data, MACSio will generate a random set of tables of somewhat random\n"
+            "structure and content. For amorphous, MACSio will generate a\n"
+            "random hierarchy random type and size objects.",
+        "--meta_size %d %d",
+            "Specify the size of the metadata objects on each processor and\n"
+            "separately, the root (or master) processor (MPI rank 0). The size\n"
+            "is specified in terms of the total number of bytes in the metadata\n"
+            "objects MACSio creates. For example, a type of tabular and a size of\n"
+            "10K bytes could result in 3 random tables; one table with 250 unnamed\n"
+            "records where each record is an array of 3 doubles for a total of\n"
+            "6000 bytes, another table of 200 records where each record is a\n"
+            "named integer value where each name is length 8 chars for a total of\n"
+            "2400 bytes and a 3rd table of 40 unnamed records where each record\n"
+            "is a 40 byte struct comprised of ints and doubles for a total of 1600\n"
+            "bytes.",
         "--num_dumps %d",
             "Total number of dumps to marshal [10]",
         "--max_dir_size %d",
@@ -1100,8 +1118,8 @@ main(int argc, char *argv[])
             SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
-        /* Use 'Fill' for read operation */
-#warning MOVE PLUGINS TO SEPARATE DIR
+        /* Use 'Fill' or 'Load' as name for read operation */
+#warning MOVE PLUGINS TO SEPARATE SRC DIR
         const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
             json_object_path_get_string(main_obj, "clargs/interface"));
 

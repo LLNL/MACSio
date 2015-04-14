@@ -173,7 +173,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning XFER PL: independent, collective
     /* Used in all H5Dwrite calls */
 #if H5_HAVE_PARALLEL
-    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
+    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
 #endif
 
     /* Loop over vars and then over parts */
@@ -192,11 +192,12 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
-        hid_t fspace_id = strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id;
+        hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
 #warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
         hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, H5P_DEFAULT); 
+        H5Sclose(fspace_id);
 
         /* Loop to make write calls for this var for each part on this rank */
 #warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
@@ -205,11 +206,10 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         {
             json_object *part_obj = json_object_array_get_idx(part_array, p);
             json_object *var_obj = 0;
-            hid_t mspace_id = null_space_id;
+            hid_t mspace_id = H5Scopy(null_space_id);
             void const *buf = 0;
 
-            /* reset file space selection to nothing */
-            H5Sselect_none(fspace_id);
+            fspace_id = H5Scopy(null_space_id);
 
             /* this rank actually has something to contribute to the H5Dwrite call */
             if (part_obj)
@@ -234,14 +234,17 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                 }
 
                 /* set selection of filespace */
+                fspace_id = H5Dget_space(ds_id);
                 H5Sselect_hyperslab(fspace_id, H5S_SELECT_SET, starts, 0, counts, 0);
 
                 /* set dataspace of data in memory */
-                mspace_id = H5S_ALL;
+                mspace_id = H5Screate_simple(ndims, counts, 0);
                 buf = json_object_extarr_data(extarr_obj);
             }
 
             H5Dwrite(ds_id, dtype_id, mspace_id, fspace_id, dxpl_id, buf);
+            H5Sclose(fspace_id);
+            H5Sclose(mspace_id);
 
         }
 
