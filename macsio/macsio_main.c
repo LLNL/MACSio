@@ -502,6 +502,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     valip = (int *) json_object_extarr_data(data_obj);
 
     n = 0;
+#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
     srandom(0xBabeFace);
     for (k = 0; k < dims2[2]; k++)
     {
@@ -922,13 +923,13 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Options are 'tabular', 'hierarchical', 'amorphous'. For tabular type\n"
             "data, MACSio will generate a random set of tables of somewhat random\n"
             "structure and content. For amorphous, MACSio will generate a\n"
-            "random hierarchy random type and size objects.",
+            "random hierarchy of random type and sized objects.",
         "--meta_size %d %d",
             "Specify the size of the metadata objects on each processor and\n"
             "separately, the root (or master) processor (MPI rank 0). The size\n"
             "is specified in terms of the total number of bytes in the metadata\n"
             "objects MACSio creates. For example, a type of tabular and a size of\n"
-            "10K bytes could result in 3 random tables; one table with 250 unnamed\n"
+            "10K bytes might result in 3 random tables; one table with 250 unnamed\n"
             "records where each record is an array of 3 doubles for a total of\n"
             "6000 bytes, another table of 200 records where each record is a\n"
             "named integer value where each name is length 8 chars for a total of\n"
@@ -963,7 +964,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #endif
         "--debug_level %d",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more detailed output [0].",
+            "more frequent and detailed output [0]. Generally, a value of zero,\n"
+            "the default, turns all debugging output off. A value of 1 should\n"
+            "not adversely effect performance. A value of 2 may effect\n"
+            "performance and a value of 3 will most certainly effect performance.\n"
+            "For debugging level of 3, MACSio will generate ascii json files from\n"
+            "each processor for the main dump object prior to starting dumps.",
         "--log_line_cnt %d",
             "Set number of lines per rank in the log file [64].",
         "--log_line_length %d",
@@ -1093,17 +1099,16 @@ main(int argc, char *argv[])
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);
 
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
-#if 1
-    if (MACSIO_MAIN_Size <= 64)
+    if (MACSIO_LOG_DebugLevel >= 3)
     {
+#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
+#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
         snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
         outf = fopen(outfName, "w");
         fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
         fclose(outf);
     }
-#endif
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 

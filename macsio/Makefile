@@ -159,7 +159,7 @@ macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
-macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
+macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ) notes
 	$(LINK) $< -o $@ $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(LDFLAGS)
 
 clean:
@@ -176,3 +176,8 @@ allclean: dataclean
 check: macsio
 	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo --debug_level 1
 	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext h5 --debug_level 1
+
+notes:
+	@echo
+	@echo "Put each plugin's make vars, etc. in own make include file in own dir"
+	@echo

@@ -156,10 +156,13 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
     json_object *global_log_dims_array =
         json_object_path_get_array(main_obj, "problem/global/LogDims");
+    json_object *global_parts_log_dims_array =
+        json_object_path_get_array(main_obj, "problem/global/PartsLogDims");
     for (i = 0; i < ndims; i++)
     {
-        global_log_dims_nodal[ndims-1-i] = (hsize_t) json_object_get_int(
-            json_object_array_get_idx(global_log_dims_array, i));
+#warning CORRECT SIZE FOR ZONAL CASE IS 1 LESS PER-PROCESSOR IN THAT DIM
+        int parts_log_dims_val = JsonGetInt(global_parts_log_dims_array, "", i);
+        global_log_dims_nodal[ndims-1-i] = (hsize_t) JsonGetInt(global_log_dims_array, "", i);
         global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] - 1;
     }
     fspace_nodal_id = H5Screate_simple(ndims, global_log_dims_nodal, 0);
@@ -187,7 +190,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         /* Inspect the first part's var object for name, datatype, etc. */
         json_object *var_obj = json_object_array_get_idx(first_part_vars_array, v);
         char const *varName = json_object_path_get_string(var_obj, "name");
-        char const *centering = json_object_path_get_string(var_obj, "centering");
+        char *centering = strdup(json_object_path_get_string(var_obj, "centering"));
         json_object *dataobj = json_object_path_get_extarr(var_obj, "data");
 #warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
@@ -231,6 +234,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                         json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
                         counts[ndims-1-i]--;
+#warning CORRECT STARTS FOR ZONAL CASE IS 1 LESS PER-PROCESSOR IN EACH DIM
                 }
 
                 /* set selection of filespace */
@@ -249,6 +253,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         }
 
         H5Dclose(ds_id);
+        free(centering);
     }
 
     H5Sclose(fspace_nodal_id);
