@@ -158,12 +158,14 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         json_object_path_get_array(main_obj, "problem/global/LogDims");
     json_object *global_parts_log_dims_array =
         json_object_path_get_array(main_obj, "problem/global/PartsLogDims");
+    /* Note that global zonal array is smaller in each dimension by one *ON*EACH*BLOCK*
+       in the associated dimension. */
     for (i = 0; i < ndims; i++)
     {
-#warning CORRECT SIZE FOR ZONAL CASE IS 1 LESS PER-PROCESSOR IN THAT DIM
         int parts_log_dims_val = JsonGetInt(global_parts_log_dims_array, "", i);
         global_log_dims_nodal[ndims-1-i] = (hsize_t) JsonGetInt(global_log_dims_array, "", i);
-        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] - 1;
+        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] -
+            JsonGetInt(global_parts_log_dims_array, "", i);
     }
     fspace_nodal_id = H5Screate_simple(ndims, global_log_dims_nodal, 0);
     fspace_zonal_id = H5Screate_simple(ndims, global_log_dims_zonal, 0);
@@ -225,6 +227,8 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                 json_object *extarr_obj = json_object_path_get_extarr(var_obj, "data");
                 json_object *global_log_origin_array =
                     json_object_path_get_array(part_obj, "GlobalLogOrigin");
+                json_object *global_log_indices_array =
+                    json_object_path_get_array(part_obj, "GlobalLogIndices");
                 json_object *mesh_dims_array = json_object_path_get_array(mesh_obj, "LogDims");
                 for (i = 0; i < ndims; i++)
                 {
@@ -233,8 +237,11 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                     counts[ndims-1-i] =
                         json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
+                    {
                         counts[ndims-1-i]--;
-#warning CORRECT STARTS FOR ZONAL CASE IS 1 LESS PER-PROCESSOR IN EACH DIM
+                        starts[ndims-1-i] -=
+                            json_object_get_int(json_object_array_get_idx(global_log_indices_array,i));
+                    }
                 }
 
                 /* set selection of filespace */

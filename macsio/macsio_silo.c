@@ -502,6 +502,7 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
 #warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
+#warning ADD TIMING LOGIC
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
