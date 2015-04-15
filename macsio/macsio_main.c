@@ -20,8 +20,8 @@ extern "C" {
 #endif
 #endif
 
-#include <ifacemap.h>
 #include <macsio_clargs.h>
+#include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_timing.h>
@@ -822,10 +822,10 @@ static void handle_help_request_and_exit(int argi, int argc, char **argv)
     int i, n, *ids=0;;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
 
-    MACSIO_GetInterfaceIds(&n, &ids);
+    MACSIO_IFACE_GetIds(&n, &ids);
     for (i = 0; i < n; i++)
     {
-        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceById(ids[i]);
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
         if (iface->processArgsFunc)
         {
             fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
@@ -848,10 +848,10 @@ static void handle_list_request_and_exit()
     char names_buf[1024];
 
     names_buf[0] = '\0';
-    MACSIO_GetInterfaceIds(&n, &ids);
+    MACSIO_IFACE_GetIds(&n, &ids);
     for (i = 0; i < n; i++)
     {
-        char const *nm = MACSIO_GetInterfaceName(ids[i]);
+        char const *nm = MACSIO_IFACE_GetName(ids[i]);
         strcat(names_buf, "\"");
         strcat(names_buf, nm);
         strcat(names_buf, "\", ");
@@ -904,12 +904,17 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
             "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
-            "(2^20) or 'G'igabytes (2^30).",
+            "(2^20) or 'G'igabytes (2^30). Mesh and variable data is then sized\n"
+            "by MACSio to hit this target byte count. However, due to contraints\n"
+            "involved in creating valid mesh topology and variable data with\n"
+            "realistic variation in features (e.g. zone- and node-centering),\n"
+            "this target byte count is hit exactly for only the most frequently\n"
+            "dumped objects and approximately for other objects.",
         "--part_dim %d",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
-            "and 'arbitrary' (only rectinilear is currently implemented)",
+            "and 'arbitrary' (currently, only rectilinear is implemented)",
         "--part_distribution %s",
             "Specify how parts are distributed to MPI tasks. (currently ignored)",
         "--vars_per_part %d",
@@ -920,10 +925,10 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "2^number of topological dimensions. [50]",
         "--meta_type %s",
             "Specify the type of metadata objects to include in each main dump.\n"
-            "Options are 'tabular', 'hierarchical', 'amorphous'. For tabular type\n"
-            "data, MACSio will generate a random set of tables of somewhat random\n"
-            "structure and content. For amorphous, MACSio will generate a\n"
-            "random hierarchy of random type and sized objects.",
+            "Options are 'tabular', 'amorphous'. For tabular type data, MACSio\n"
+            "will generate a random set of tables of somewhat random structure\n"
+            "and content. For amorphous, MACSio will generate a random hierarchy\n"
+            "of random type and sized objects.",
         "--meta_size %d %d",
             "Specify the size of the metadata objects on each processor and\n"
             "separately, the root (or master) processor (MPI rank 0). The size\n"
@@ -964,12 +969,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #endif
         "--debug_level %d",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more frequent and detailed output [0]. Generally, a value of zero,\n"
-            "the default, turns all debugging output off. A value of 1 should\n"
-            "not adversely effect performance. A value of 2 may effect\n"
-            "performance and a value of 3 will most certainly effect performance.\n"
-            "For debugging level of 3, MACSio will generate ascii json files from\n"
-            "each processor for the main dump object prior to starting dumps.",
+            "more frequent and detailed output [0]. A value of zero, the default,\n"
+            "turns all debugging output off. A value of 1 should not adversely\n"
+            "effect performance. A value of 2 may effect performance and a value\n"
+            "of 3 will almost certainly effect performance. For debug level 3,\n"
+            "MACSio will generate ascii json files from each processor for the main\n"
+            "dump object prior to starting dumps.",
         "--log_line_cnt %d",
             "Set number of lines per rank in the log file [64].",
         "--log_line_length %d",
@@ -980,6 +985,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Basename of generated file(s). ['macsio_']",
         "--fileext %s",
             "Extension of generated file(s). ['.dat']",
+#if 0
+        MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
+#endif
         "--plugin-args %n",
             "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
@@ -1010,12 +1018,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 }
 
 #if 0
-static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv[], MACSIO_optlist_t const *opts)
+static MACSIO_IFACE_Handle_t const *GetIOInterface(int argi, int argc, char *argv[], MACSIO_optlist_t const *opts)
 {
     int i;
     char testfilename[256];
     char ifacename[256];
-    const MACSIO_IFaceHandle_t *retval=0;
+    const MACSIO_IFACE_Handle_t *retval=0;
 
     /* First, get rid of the old data file */
     strcpy(ifacename, MACSIO_GetStrOption(opts, IOINTERFACE_NAME));
@@ -1025,7 +1033,7 @@ static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv
     unlink(testfilename);
 
     /* search for and instantiate the desired interface */
-    retval = MACSIO_GetInterfaceByName(ifacename);
+    retval = MACSIO_IFACE_GetByName(ifacename);
     if (!retval)
         MACSIO_LOG_MSG(Die, ("unable to instantiate IO interface \"%s\"",ifacename));
 
@@ -1042,7 +1050,7 @@ main(int argc, char *argv[])
     json_object *clargs_obj = 0;
     MACSIO_TIMING_TimerId_t main_tid;
     MACSIO_TIMING_GroupMask_t main_grp;
-    const MACSIO_IFaceHandle_t *ioiface;
+    const MACSIO_IFACE_Handle_t *ioiface;
     double t0,t1;
     int i, argi, exercise_scr = 0;
     int size = 1, rank = 0;
@@ -1125,7 +1133,7 @@ main(int argc, char *argv[])
 
         /* Use 'Fill' or 'Load' as name for read operation */
 #warning MOVE PLUGINS TO SEPARATE SRC DIR
-        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
             json_object_path_get_string(main_obj, "clargs/interface"));
 
         /* log dump start */
