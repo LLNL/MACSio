@@ -143,28 +143,19 @@ json-c: ../json-c/install
 	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install; \
         make install
 	
-probe.o: probe.c
-probe: probe.o
-	$(LINK) $< -o $@ $(LDFLAGS)
-
-tsttiming.o: tsttiming.c $(COMMON_HDR)
-tsttiming: tsttiming.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
-
-tstlog.o: tstlog.c $(COMMON_HDR)
-tstlog: tstlog.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
-
 macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
-macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ) notes
-	$(LINK) $< -o $@ $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(LDFLAGS)
+FOO_OBJ=$(shell make -C ../plugins objlist)
+FOO_OBJ2=$(foreach foo, $(FOO_OBJ), ../plugins/$(foo))
+macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(FOO_OBJ2)
+	$(LINK) $< -o $@ $(FOO_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(LDFLAGS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
 	rm -f macsio tstopts tsttiming tstlog probe
+	$(MAKE) -C ../plugins $@
 
 dataclean: clean
 	rm -f *.json *.silo *.log
@@ -179,5 +170,24 @@ check: macsio
 
 notes:
 	@echo
-	@echo "Put each plugin's make vars, etc. in own make include file in own dir"
+	@echo "Add support out of source builds"
 	@echo
+
+plugins:
+	$(MAKE) -C ../plugins $@
+
+#
+# Test utility targets
+#
+probe.o: probe.c
+probe: probe.o
+	$(LINK) $< -o $@ $(LDFLAGS)
+
+tsttiming.o: tsttiming.c $(COMMON_HDR)
+tsttiming: tsttiming.o $(COMMON_OBJ)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
+
+tstlog.o: tstlog.c $(COMMON_HDR)
+tstlog: tstlog.o $(COMMON_OBJ)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
+

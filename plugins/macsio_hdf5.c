@@ -491,14 +491,13 @@ static int register_this_interface()
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 #warning ADD LINDSTROM COMPRESSION STUFF
 
-    /* Take this slot in the map */
+    /* Populate information about this plugin */
     strcpy(iface.name, iface_name);
     strcpy(iface.ext, iface_ext);
-
-    /* Must define at least these two methods */
     iface.dumpFunc = FNAME(main_dump);
     iface.processArgsFunc = FNAME(process_args);
 
+    /* Register this plugin */
     if (!MACSIO_IFACE_Register(&iface))
         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface_name));
 
