@@ -9,6 +9,11 @@
 
 #include <macsio_log.h>
 
+/*!
+\addtogroup MACSIO_LOG
+@{
+*/
+
 int                     mpi_errno = MPI_SUCCESS;
 int                     MACSIO_LOG_DebugLevel = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
@@ -37,11 +42,6 @@ typedef struct _MACSIO_LOG_LogHandle_t
                                    which the next message will be written */
     mutable log_flags_t flags; /**< Informational flags regarding the log */
 } MACSIO_LOG_LogHandle_t;
-
-/*!
-\addtogroup MACSIO_LOG
-@{
-*/
 
 /*!
 \brief Internal convenience method to build a message from a printf-style format string and args.
@@ -129,6 +129,7 @@ MACSIO_LOG_LogInit(
     retval = (MACSIO_LOG_LogHandle_t *) malloc(sizeof(MACSIO_LOG_LogHandle_t));
     retval->pathname = path?strdup(path):0;
     retval->comm = comm;
+#warning TURN OFF BUFFERING ON THE LOG FILE
     /*retval->logfile = open(path, O_WRONLY|O_NONBLOCK);*/
     retval->logfile = path?open(path, O_WRONLY):fileno(stderr);
     retval->size = size;

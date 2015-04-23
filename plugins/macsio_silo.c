@@ -514,6 +514,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
+#warning CONFIRM THIS IS STILL NEEDED
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */

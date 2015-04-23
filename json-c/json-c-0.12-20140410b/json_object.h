@@ -615,6 +615,8 @@ extern const char* json_object_get_string(struct json_object *obj);
  */
 extern int json_object_get_string_len(struct json_object *obj);
 
+extern void json_object_free_printbuf(struct json_object *obj);
+
 /* extarr methods */
 extern enum json_extarr_type json_object_extarr_type(struct json_object* jso);
 extern int                   json_object_extarr_nvals(struct json_object* jso);

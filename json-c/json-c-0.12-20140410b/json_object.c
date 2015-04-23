@@ -1784,3 +1784,9 @@ struct json_object *json_object_apath_find_object(struct json_object *root, char
 
     return 0;
 }
+
+void json_object_free_printbuf(struct json_object* jso)
+{
+  printbuf_free(jso->_pb);
+  jso->_pb = 0;
+}

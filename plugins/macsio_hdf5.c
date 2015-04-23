@@ -355,7 +355,6 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
 {
     int size, rank;
-    int numaroups = 3;
     hid_t *h5File_ptr;
     hid_t h5File;
     hid_t h5Group;
