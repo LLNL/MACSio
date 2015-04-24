@@ -940,12 +940,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "first dir, etc.",
 #ifdef HAVE_SCR
         "--exercise_scr",
-            "Exercise the Scalable Checkpoint and Restart library to marshal files.\n"
-            "Note that this works only in MIFFPP mode.",
+            "Exercise the Scalable Checkpoint and Restart (SCR)\n"
+            "(https://computation.llnl.gov/project/scr/library) to marshal\n"
+            "files. Note that this works only in MIFFPP mode. A request to exercise\n"
+            "SCR in any other mode will be ignored and en error message generated.",
 #endif
         "--debug_level %d",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more detailed output [0].",
+            "more frequent and detailed output [0].",
         "--log_line_cnt %d",
             "Set number of lines per rank in the log file [64].",
         "--log_line_length %d",
@@ -984,30 +986,6 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 
     return mainJargs;
 }
-
-#if 0
-static MACSIO_IFaceHandle_t const *GetIOInterface(int argi, int argc, char *argv[], MACSIO_optlist_t const *opts)
-{
-    int i;
-    char testfilename[256];
-    char ifacename[256];
-    const MACSIO_IFaceHandle_t *retval=0;
-
-    /* First, get rid of the old data file */
-    strcpy(ifacename, MACSIO_GetStrOption(opts, IOINTERFACE_NAME));
-
-#warning FIX FILENAME GENERATION
-    sprintf(testfilename, "macsio_test_%s.dat", ifacename);
-    unlink(testfilename);
-
-    /* search for and instantiate the desired interface */
-    retval = MACSIO_GetInterfaceByName(ifacename);
-    if (!retval)
-        MACSIO_LOG_MSG(Die, ("unable to instantiate IO interface \"%s\"",ifacename));
-
-    return retval;
-}
-#endif
 
 int
 main(int argc, char *argv[])
