@@ -17,31 +17,12 @@ DRIVER_INCS += -I$(JSON_C_INC)
 DRIVER_LIBS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
 DRIVER_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
 
-SILO_INC=$(SILO_HOME)/include
-SILO_LIB=$(SILO_HOME)/lib
-SILO_LDFLAGS=-lsiloh5 -lz
-
-#  This is for PDB Lite, not to be confused with PDB
-PDBL_INC=$(SILO_HOME)/include
-PDBL_LIB=$(SILO_HOME)/lib
-PDBL_LDFLAGS=-lsiloh5 -lz
-
-HDF5_INC=$(HDF5_HOME)/include
-HDF5_LIB=$(HDF5_HOME)/lib
-HDF5_LDFLAGS=-lhdf5
-
-# Typically, only for linking w/HDF5
-
-#CFLAGS=-DHAVE_MPI
-#CC=mpixlc
-#LINK=mpixlcxx
-
 CFLAGS += -g -DPARALLEL -DHAVE_MPI
 CXX ?= mpicxx
 CC ?= mpicc
 LINK ?= mpicxx
 
-COMMON_SRC = macsio_clargs.c macsio_mif.c ifacemap.c macsio_timing.c macsio_utils.c macsio_log.c
+COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_iface.c macsio_timing.c macsio_utils.c macsio_log.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 
@@ -54,51 +35,6 @@ TEST_OBJ=$(TEST_SRC:.c=.o)
 
 TOOL_SRC = probe.c
 TOOL_OBJ=$(TOOL_SRC:.c=.o)
-
-# PDB Lite is part of Silo
-# If Silo is present, append it ahead of HDF5
-# as it can have dependencies on HDF5
-ifeq ($(SILO_HOME),)
-else
-DRIVER_SRC += macsio_silo.c
-CFLAGS += -DHAVE_SILO
-DRIVER_INCS += -I$(SILO_INC)
-DRIVER_LIBS += -L$(SILO_LIB) $(SILO_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(SILO_LIB)
-endif
-
-ifeq ($(HDF5_HOME),)
-else
-DRIVER_SRC += macsio_hdf5.c
-CFLAGS += -DHAVE_HDF5
-DRIVER_INCS += -I$(HDF5_INC)
-DRIVER_LIBS += -L$(HDF5_LIB) $(HDF5_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(HDF5_LIB)
-ifeq ($(SZIP_HOME),)
-else
-SZIP_LIB=$(SZIP_HOME)/lib
-SZIP_LDFLAGS=-lsz
-DRIVER_LIBS += -L$(HDF5_LIB) $(HDF5_LDFLAGS) -L$(SZIP_LIB) $(SZIP_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(HDF5_LIB) -Wl,-rpath,$(SZIP_LIB)
-endif
-ifeq ($(ZLIB_HOME),)
-else
-ZLIB_LIB=$(ZLIB_HOME)/lib
-ZLIB_LDFLAGS=-lz
-DRIVER_LIBS += -L$(HDF5_LIB) $(HDF5_LDFLAGS) -L$(ZLIB_LIB) $(ZLIB_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(HDF5_LIB) -Wl,-rpath,$(ZLIB_LIB)
-endif
-endif
-
-# Don't confuse PDB with PDB Lite (in Silo)
-ifeq ($(PDB_HOME),)
-else
-DRIVER_SRC += macsio_pdb.c
-CFLAGS += -DHAVE_PDB
-DRIVER_INCS += -I$(PDB_INC)
-DRIVER_LIBS += -L$(PDB_LIB) $(PDB_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(PDB_LIB)
-endif
 
 ifeq ($(SCR_HOME),)
 else
@@ -143,6 +79,45 @@ json-c: ../json-c/install
 	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install; \
         make install
 	
+macsio_timing.o: macsio_timing.h
+
+macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
+
+FOO_OBJ=$(shell make -C ../plugins objlist)
+FOO_OBJ2=$(foreach foo, $(FOO_OBJ), ../plugins/$(foo))
+FOO_LDFLAGS=$(shell make -C ../plugins ldflags)
+macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(FOO_OBJ2)
+	$(LINK) $< -o $@ $(FOO_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(FOO_LDFLAGS)
+
+clean:
+	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
+	rm -f macsio tstopts tsttiming tstlog probe
+	$(MAKE) -C ../plugins $@
+
+dataclean: clean
+	rm -f *.json *.silo *.log
+
+allclean: dataclean
+	rm -rf ../json-c/{install,build}
+
+#srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
+check: macsio
+	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo --debug_level 1
+	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext h5 --debug_level 1
+	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode SIF 2 --avg_num_parts 2 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext h5 --debug_level 1
+	mpirun -np 4 macsio --interface miftmpl --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext json --debug_level 1
+
+notes:
+	@echo
+	@echo "Add support out of source builds"
+	@echo
+
+plugins:
+	$(MAKE) -C ../plugins $@
+
+#
+# Test utility targets
+#
 probe.o: probe.c
 probe: probe.o
 	$(LINK) $< -o $@ $(LDFLAGS)
@@ -155,24 +130,3 @@ tstlog.o: tstlog.c $(COMMON_HDR)
 tstlog: tstlog.o $(COMMON_OBJ)
 	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
 
-macsio_timing.o: macsio_timing.h
-
-macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
-
-macsio: $(BASIC_OBJ) $(COMMON_OBJ) $(DRIVER_OBJ)
-	$(LINK) $< -o $@ $(DRIVER_OBJ) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(LDFLAGS)
-
-clean:
-	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
-	rm -f macsio tstopts tsttiming tstlog probe
-
-dataclean: clean
-	rm -f *.json *.silo *.log
-
-allclean: dataclean
-	rm -rf ../json-c/{install,build}
-
-#srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
-check: macsio
-	mpirun -np 4 macsio --interface silo --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo --debug_level 1
-	mpirun -np 4 macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext h5 --debug_level 1

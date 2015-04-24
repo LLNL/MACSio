@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <ifacemap.h>
 #include <macsio_clargs.h>
+#include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
@@ -21,7 +21,6 @@
 #include <hdf5.h>
 
 /* convenient name mapping macors */
-#define FHNDL FHNDL2(hdf5)
 #define FNAME2(FUNC,A) FUNC ## _ ## A
 #define FNAME(FUNC) FNAME2(FUNC,hdf5)
 #define INAME2(A) #A
@@ -89,6 +88,7 @@ static hid_t make_fapl()
 static int FNAME(process_args)(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
+
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--show_errors",
             "Show low-level HDF5 errors",
@@ -156,11 +156,16 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
     json_object *global_log_dims_array =
         json_object_path_get_array(main_obj, "problem/global/LogDims");
+    json_object *global_parts_log_dims_array =
+        json_object_path_get_array(main_obj, "problem/global/PartsLogDims");
+    /* Note that global zonal array is smaller in each dimension by one *ON*EACH*BLOCK*
+       in the associated dimension. */
     for (i = 0; i < ndims; i++)
     {
-        global_log_dims_nodal[ndims-1-i] = (hsize_t) json_object_get_int(
-            json_object_array_get_idx(global_log_dims_array, i));
-        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] - 1;
+        int parts_log_dims_val = JsonGetInt(global_parts_log_dims_array, "", i);
+        global_log_dims_nodal[ndims-1-i] = (hsize_t) JsonGetInt(global_log_dims_array, "", i);
+        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] -
+            JsonGetInt(global_parts_log_dims_array, "", i);
     }
     fspace_nodal_id = H5Screate_simple(ndims, global_log_dims_nodal, 0);
     fspace_zonal_id = H5Screate_simple(ndims, global_log_dims_zonal, 0);
@@ -173,7 +178,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #warning XFER PL: independent, collective
     /* Used in all H5Dwrite calls */
 #if H5_HAVE_PARALLEL
-    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
+    H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
 #endif
 
     /* Loop over vars and then over parts */
@@ -187,16 +192,17 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         /* Inspect the first part's var object for name, datatype, etc. */
         json_object *var_obj = json_object_array_get_idx(first_part_vars_array, v);
         char const *varName = json_object_path_get_string(var_obj, "name");
-        char const *centering = json_object_path_get_string(var_obj, "centering");
+        char *centering = strdup(json_object_path_get_string(var_obj, "centering"));
         json_object *dataobj = json_object_path_get_extarr(var_obj, "data");
 #warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
-        hid_t fspace_id = strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id;
+        hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
 #warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
         hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, H5P_DEFAULT); 
+        H5Sclose(fspace_id);
 
         /* Loop to make write calls for this var for each part on this rank */
 #warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
@@ -205,11 +211,10 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         {
             json_object *part_obj = json_object_array_get_idx(part_array, p);
             json_object *var_obj = 0;
-            hid_t mspace_id = null_space_id;
+            hid_t mspace_id = H5Scopy(null_space_id);
             void const *buf = 0;
 
-            /* reset file space selection to nothing */
-            H5Sselect_none(fspace_id);
+            fspace_id = H5Scopy(null_space_id);
 
             /* this rank actually has something to contribute to the H5Dwrite call */
             if (part_obj)
@@ -222,6 +227,8 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                 json_object *extarr_obj = json_object_path_get_extarr(var_obj, "data");
                 json_object *global_log_origin_array =
                     json_object_path_get_array(part_obj, "GlobalLogOrigin");
+                json_object *global_log_indices_array =
+                    json_object_path_get_array(part_obj, "GlobalLogIndices");
                 json_object *mesh_dims_array = json_object_path_get_array(mesh_obj, "LogDims");
                 for (i = 0; i < ndims; i++)
                 {
@@ -230,22 +237,30 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
                     counts[ndims-1-i] =
                         json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
                     if (!strcmp(centering, "zone"))
+                    {
                         counts[ndims-1-i]--;
+                        starts[ndims-1-i] -=
+                            json_object_get_int(json_object_array_get_idx(global_log_indices_array,i));
+                    }
                 }
 
                 /* set selection of filespace */
+                fspace_id = H5Dget_space(ds_id);
                 H5Sselect_hyperslab(fspace_id, H5S_SELECT_SET, starts, 0, counts, 0);
 
                 /* set dataspace of data in memory */
-                mspace_id = H5S_ALL;
+                mspace_id = H5Screate_simple(ndims, counts, 0);
                 buf = json_object_extarr_data(extarr_obj);
             }
 
             H5Dwrite(ds_id, dtype_id, mspace_id, fspace_id, dxpl_id, buf);
+            H5Sclose(fspace_id);
+            H5Sclose(mspace_id);
 
         }
 
         H5Dclose(ds_id);
+        free(centering);
     }
 
     H5Sclose(fspace_nodal_id);
@@ -340,7 +355,6 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
 {
     int size, rank;
-    int numaroups = 3;
     hid_t *h5File_ptr;
     hid_t h5File;
     hid_t h5Group;
@@ -468,23 +482,23 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 static int register_this_interface()
 {
-    unsigned int id = MACSIO_UTILS_BJHash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
-    if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
-        MACSIO_LOG_MSG(Die, ("interface name \"%s\" too long",iface_name));
-    if (iface_map[id].slotUsed!= 0)
-        MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
+    MACSIO_IFACE_Handle_t iface;
+
+    if (strlen(iface_name) >= MACSIO_IFACE_MAX_NAME)
+        MACSIO_LOG_MSG(Die, ("Interface name \"%s\" too long", iface_name));
 
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 #warning ADD LINDSTROM COMPRESSION STUFF
 
-    /* Take this slot in the map */
-    iface_map[id].slotUsed = 1;
-    strcpy(iface_map[id].name, iface_name);
-    strcpy(iface_map[id].ext, iface_ext);
+    /* Populate information about this plugin */
+    strcpy(iface.name, iface_name);
+    strcpy(iface.ext, iface_ext);
+    iface.dumpFunc = FNAME(main_dump);
+    iface.processArgsFunc = FNAME(process_args);
 
-    /* Must define at least these two methods */
-    iface_map[id].dumpFunc = FNAME(main_dump);
-    iface_map[id].processArgsFunc = FNAME(process_args);
+    /* Register this plugin */
+    if (!MACSIO_IFACE_Register(&iface))
+        MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface_name));
 
     return 0;
 }

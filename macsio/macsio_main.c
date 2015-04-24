@@ -20,8 +20,8 @@ extern "C" {
 #endif
 #endif
 
-#include <ifacemap.h>
 #include <macsio_clargs.h>
+#include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_timing.h>
@@ -502,6 +502,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     valip = (int *) json_object_extarr_data(data_obj);
 
     n = 0;
+#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
     srandom(0xBabeFace);
     for (k = 0; k < dims2[2]; k++)
     {
@@ -821,10 +822,10 @@ static void handle_help_request_and_exit(int argi, int argc, char **argv)
     int i, n, *ids=0;;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
 
-    MACSIO_GetInterfaceIds(&n, &ids);
+    MACSIO_IFACE_GetIds(&n, &ids);
     for (i = 0; i < n; i++)
     {
-        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceById(ids[i]);
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
         if (iface->processArgsFunc)
         {
             fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
@@ -847,10 +848,10 @@ static void handle_list_request_and_exit()
     char names_buf[1024];
 
     names_buf[0] = '\0';
-    MACSIO_GetInterfaceIds(&n, &ids);
+    MACSIO_IFACE_GetIds(&n, &ids);
     for (i = 0; i < n; i++)
     {
-        char const *nm = MACSIO_GetInterfaceName(ids[i]);
+        char const *nm = MACSIO_IFACE_GetName(ids[i]);
         strcat(names_buf, "\"");
         strcat(names_buf, nm);
         strcat(names_buf, "\", ");
@@ -903,12 +904,17 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
             "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
-            "(2^20) or 'G'igabytes (2^30).",
+            "(2^20) or 'G'igabytes (2^30). Mesh and variable data is then sized\n"
+            "by MACSio to hit this target byte count. However, due to contraints\n"
+            "involved in creating valid mesh topology and variable data with\n"
+            "realistic variation in features (e.g. zone- and node-centering),\n"
+            "this target byte count is hit exactly for only the most frequently\n"
+            "dumped objects and approximately for other objects.",
         "--part_dim %d",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
-            "and 'arbitrary' (only rectinilear is currently implemented)",
+            "and 'arbitrary' (currently, only rectilinear is implemented)",
         "--part_distribution %s",
             "Specify how parts are distributed to MPI tasks. (currently ignored)",
         "--vars_per_part %d",
@@ -917,6 +923,24 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
+        "--meta_type %s",
+            "Specify the type of metadata objects to include in each main dump.\n"
+            "Options are 'tabular', 'amorphous'. For tabular type data, MACSio\n"
+            "will generate a random set of tables of somewhat random structure\n"
+            "and content. For amorphous, MACSio will generate a random hierarchy\n"
+            "of random type and sized objects.",
+        "--meta_size %d %d",
+            "Specify the size of the metadata objects on each processor and\n"
+            "separately, the root (or master) processor (MPI rank 0). The size\n"
+            "is specified in terms of the total number of bytes in the metadata\n"
+            "objects MACSio creates. For example, a type of tabular and a size of\n"
+            "10K bytes might result in 3 random tables; one table with 250 unnamed\n"
+            "records where each record is an array of 3 doubles for a total of\n"
+            "6000 bytes, another table of 200 records where each record is a\n"
+            "named integer value where each name is length 8 chars for a total of\n"
+            "2400 bytes and a 3rd table of 40 unnamed records where each record\n"
+            "is a 40 byte struct comprised of ints and doubles for a total of 1600\n"
+            "bytes.",
         "--num_dumps %d",
             "Total number of dumps to marshal [10]",
         "--max_dir_size %d",
@@ -947,7 +971,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #endif
         "--debug_level %d",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more frequent and detailed output [0].",
+            "more frequent and detailed output [0]. A value of zero, the default,\n"
+            "turns all debugging output off. A value of 1 should not adversely\n"
+            "effect performance. A value of 2 may effect performance and a value\n"
+            "of 3 will almost certainly effect performance. For debug level 3,\n"
+            "MACSio will generate ascii json files from each processor for the main\n"
+            "dump object prior to starting dumps.",
         "--log_line_cnt %d",
             "Set number of lines per rank in the log file [64].",
         "--log_line_length %d",
@@ -996,7 +1025,7 @@ main(int argc, char *argv[])
     json_object *clargs_obj = 0;
     MACSIO_TIMING_TimerId_t main_tid;
     MACSIO_TIMING_GroupMask_t main_grp;
-    const MACSIO_IFaceHandle_t *ioiface;
+    const MACSIO_IFACE_Handle_t *ioiface;
     double t0,t1;
     int i, argi, exercise_scr = 0;
     int size = 1, rank = 0;
@@ -1053,17 +1082,16 @@ main(int argc, char *argv[])
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);
 
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
     /* Just here for debugging for the moment */
-#if 1
-    if (MACSIO_MAIN_Size <= 64)
+    if (MACSIO_LOG_DebugLevel >= 3)
     {
+#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
+#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
         snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
         outf = fopen(outfName, "w");
         fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
         fclose(outf);
     }
-#endif
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
@@ -1078,9 +1106,9 @@ main(int argc, char *argv[])
             SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
-        /* Use 'Fill' for read operation */
-#warning MOVE PLUGINS TO SEPARATE DIR
-        const MACSIO_IFaceHandle_t *iface = MACSIO_GetInterfaceByName(
+        /* Use 'Fill' or 'Load' as name for read operation */
+#warning MOVE PLUGINS TO SEPARATE SRC DIR
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
             json_object_path_get_string(main_obj, "clargs/interface"));
 
         /* log dump start */

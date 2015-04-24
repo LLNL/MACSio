@@ -135,8 +135,10 @@ typedef struct _MACSIO_MIF_baton_t MACSIO_MIF_baton_t;
 typedef void *(*MACSIO_MIF_CreateCB)(const char *fname, const char *nsname, void *udata);
 typedef void *(*MACSIO_MIF_OpenCB)  (const char *fname, const char *nsname,
                                      MACSIO_MIF_ioFlags_t ioFlags, void *udata);
+#warning MAKE CLOSE CALLBACK RETURN SUCCESS OR FAILURE
 typedef void  (*MACSIO_MIF_CloseCB) (void *file, void *udata);
 
+#warning ENSURE DIFFERENT PLUGINS USE DIFFERENT MPI TAGS
 #ifdef HAVE_MPI
 extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_ioFlags_t ioFlags,
     MPI_Comm mpiComm, int mpiTag,

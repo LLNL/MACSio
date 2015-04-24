@@ -13,7 +13,8 @@
 #define MACSIO_CLARGS_ERROR 1
 #define MACSIO_CLARGS_WARN 0
 #define MACSIO_CLARGS_OK 0
-#define MACSIO_CLARGS_END_OF_ARGS "end_of_args"
+#define MACSIO_CLARGS_SEPARATOR(SEPSTR) "macsio_args_sep_" #SEPSTR
+#define MACSIO_CLARGS_END_OF_ARGS "macsio_end_of_args"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +23,7 @@ extern "C" {
 typedef struct _MACSIO_CLARGS_ArgvFlags_t
 {
     unsigned int error_mode : 1;
-    unsigned int route_mode : 2; /* allows for 4 options; only 2 used currently */
+    unsigned int route_mode : 2;
 } MACSIO_CLARGS_ArgvFlags_t;
 
 #warning RE-THINK THESE NAMES

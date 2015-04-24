@@ -9,8 +9,8 @@
   #include <windows.h>
 #endif
 
-#include <ifacemap.h>
 #include <macsio_clargs.h>
+#include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
@@ -267,7 +267,8 @@ static int FNAME(process_args)(int argi, int argc, char *argv[])
     driver = StringToDriver(driver_str);
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
-    DBSetCompression(compression_str);
+    if (compression_str[0] != '\0')
+        DBSetCompression(compression_str);
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
 
     return 0;
@@ -502,6 +503,7 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
 #warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
+#warning ADD TIMING LOGIC
 static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
@@ -513,6 +515,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
+#warning CONFIRM THIS IS STILL NEEDED
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
@@ -617,20 +620,21 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
 
 static int register_this_interface()
 {
-    unsigned int id = MACSIO_UTILS_BJHash((unsigned char*)iface_name, strlen(iface_name), 0) % MACSIO_MAX_IFACES;
-    if (strlen(iface_name) >= MACSIO_MAX_IFACE_NAME)
-        MACSIO_LOG_MSG(Die, ("interface name \"%s\" too long",iface_name));
-    if (iface_map[id].slotUsed!= 0)
-        MACSIO_LOG_MSG(Die, ("hash collision for interface name \"%s\"",iface_name));
+    MACSIO_IFACE_Handle_t iface;
+
+    if (strlen(iface_name) >= MACSIO_IFACE_MAX_NAME)
+        MACSIO_LOG_MSG(Die, ("Interface name \"%s\" too long",iface_name));
 
     /* Take this slot in the map */
-    iface_map[id].slotUsed = 1;
-    strcpy(iface_map[id].name, iface_name);
-    strcpy(iface_map[id].ext, iface_ext);
+    strcpy(iface.name, iface_name);
+    strcpy(iface.ext, iface_ext);
 
     /* Must define at least these two methods */
-    iface_map[id].dumpFunc = FNAME(main_dump);
-    iface_map[id].processArgsFunc = FNAME(process_args);
+    iface.dumpFunc = FNAME(main_dump);
+    iface.processArgsFunc = FNAME(process_args);
+
+    if (!MACSIO_IFACE_Register(&iface))
+        MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface_name));
 
     return 0;
 }
