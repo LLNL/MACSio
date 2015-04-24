@@ -35,6 +35,9 @@ notes:
 objlist:
 	@echo $(PLUGIN_OBJECTS)
 
+ldflags:
+	@echo $(PLUGIN_LDFLAGS)
+
 # Includes plugins in a specific order, determined by BUILD_ORDER variable in each
 # plugin, thereby enabling interdependencies between TPLs used in plugins to be
 # more easily and correctly handled.

@@ -267,7 +267,8 @@ static int FNAME(process_args)(int argi, int argc, char *argv[])
     driver = StringToDriver(driver_str);
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
-    DBSetCompression(compression_str);
+    if (compression_str[0] != '\0')
+        DBSetCompression(compression_str);
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
 
     return 0;

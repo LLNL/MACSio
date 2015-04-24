@@ -7,10 +7,9 @@ HDF5_BUILD_ORDER = 1.0
 HDF5_HOME = /Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
 
 # Libraries HDF5 may depend on
-SZIP_HOME = /Users/miller86/visit/visit/szip/2.1/i386-apple-darwin12_gcc-4.2/lib
-ZLIB_HOME =
+SZIP_HOME = /Users/miller86/visit/visit/szip/2.1/i386-apple-darwin12_gcc-4.2
 
-HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -L$(SZIP_HOME)/lib -L$(ZLIB_HOME) -lhdf5 -lsz -lz -lm
+HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -L$(SZIP_HOME)/lib -lhdf5 -lsz -lz -lm
 HDF5_CFLAGS = -I$(HDF5_HOME)/include
 
 HDF5_SOURCES = macsio_hdf5.c
@@ -21,4 +20,3 @@ PLUGIN_LIST += hdf5
 
 macsio_hdf5.o: ../plugins/macsio_hdf5.c
 	$(CXX) -c $(HDF5_CFLAGS) $(MACSIO_CFLAGS) $(CLFAGS) ../plugins/macsio_hdf5.c
-

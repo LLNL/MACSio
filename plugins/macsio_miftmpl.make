@@ -7,7 +7,7 @@ MIFTMPL_BUILD_ORDER = 2.0
 
 # Convenience variable to simplify paths to header and library/archive files
 # for the I/O library being used by this plugin
-MIFTMPL_HOME = /Users/miller86/visit/visit/miftmpl
+MIFTMPL_HOME =
 
 # Convenience variables for any dependent libs (not always needed) for the
 # I/O library being used by this plugin
@@ -15,10 +15,12 @@ FOO_LIB = /usr/local/foo
 BAR_LIB = /etc/bar
 
 # Compiler flags for this plugin to find the I/O library's header files
-MIFTMPL_CFLAGS = -I$(MIFTMPL_HOME)/include
+#MIFTMPL_CFLAGS = -I$(MIFTMPL_HOME)/include
+MIFTMPL_CFLAGS =
 
 # Linker flags for this plugin to find the I/O library's lib/archive files
-MIFTMPL_LDFLAGS = -L$(MIFTMPL_HOME)/lib -L$(FOO_LIB) -L$(BAR_LIB) -lmiftmpl -lfoo -lbar
+#MIFTMPL_LDFLAGS = -L$(MIFTMPL_HOME)/lib -L$(FOO_LIB) -L$(BAR_LIB) -lmiftmpl -lfoo -lbar
+MIFTMPL_LDFLAGS =
 
 # List of source files used by this plugin (usually just one)
 MIFTMPL_SOURCES = macsio_miftmpl.c
