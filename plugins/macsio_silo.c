@@ -22,6 +22,17 @@
 #include <mpi.h>
 #endif
 
+/*!
+\addtogroup plugins
+@{
+*/
+
+/*!
+\addtogroup Silo
+@{
+*/
+
+
 /*
  *  BEGIN StringToDriver utility code from Silo's tests
  */
@@ -218,15 +229,9 @@ static int StringToDriver(const char *str)
  *  END StringToDriver utility code from Silo's tests
  */
 
-/* convenient name mapping macors */
-#define FNAME2(FUNC,A) FUNC ## _ ## A
-#define FNAME(FUNC) FNAME2(FUNC,silo)
-#define INAME2(A) #A
-#define INAME INAME2(silo)
-
 /* the name you want to assign to the interface */
-static char const *iface_name = INAME;
-static char const *iface_ext = INAME;
+static char const *iface_name = "silo";
+static char const *iface_ext = "silo";
 
 static const char *filename;
 static int has_mesh = 0;
@@ -234,7 +239,7 @@ static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 #warning MOVE LOG HANDLE TO IO CONTEXT
 
-static int FNAME(process_args)(int argi, int argc, char *argv[])
+static int process_args(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
     char driver_str[128];
@@ -502,9 +507,8 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
 }
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
-#warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
 #warning ADD TIMING LOGIC
-static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
+static void main_dump(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
     int numGroups = -1;
@@ -519,7 +523,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
-    FNAME(process_args)(argi, argc, argv);
+    process_args(argi, argc, argv);
 
     rank = JsonGetInt(main_obj, "parallel/mpi_rank");
     size = JsonGetInt(main_obj, "parallel/mpi_size");
@@ -630,8 +634,8 @@ static int register_this_interface()
     strcpy(iface.ext, iface_ext);
 
     /* Must define at least these two methods */
-    iface.dumpFunc = FNAME(main_dump);
-    iface.processArgsFunc = FNAME(process_args);
+    iface.dumpFunc = main_dump;
+    iface.processArgsFunc = process_args;
 
     if (!MACSIO_IFACE_Register(&iface))
         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface_name));
@@ -647,3 +651,7 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
+
+/*!@}*/
+
+/*!@}*/

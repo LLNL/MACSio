@@ -20,14 +20,18 @@
 #include <H5pubconf.h>
 #include <hdf5.h>
 
-/* convenient name mapping macors */
-#define FNAME2(FUNC,A) FUNC ## _ ## A
-#define FNAME(FUNC) FNAME2(FUNC,hdf5)
-#define INAME2(A) #A
-#define INAME INAME2(hdf5)
+/*!
+\addtogroup plugins
+@{
+*/
+
+/*!
+\addtogroup HDF5
+@{
+*/
 
 /* the name you want to assign to the interface */
-static char const *iface_name = INAME;
+static char const *iface_name = "hdf5";
 static char const *iface_ext = "h5";
 
 static int use_log = 0;
@@ -85,7 +89,7 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
-static int FNAME(process_args)(int argi, int argc, char *argv[])
+static int process_args(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
@@ -419,7 +423,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
 }
 
-static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj,
+static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
     int dumpn, double dumpt)
 {
     int rank, size, numFiles;
@@ -430,7 +434,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
-    FNAME(process_args)(argi, argc, argv);
+    process_args(argi, argc, argv);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
@@ -493,8 +497,8 @@ static int register_this_interface()
     /* Populate information about this plugin */
     strcpy(iface.name, iface_name);
     strcpy(iface.ext, iface_ext);
-    iface.dumpFunc = FNAME(main_dump);
-    iface.processArgsFunc = FNAME(process_args);
+    iface.dumpFunc = main_dump;
+    iface.processArgsFunc = process_args;
 
     /* Register this plugin */
     if (!MACSIO_IFACE_Register(&iface))
@@ -511,3 +515,7 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
+
+/*!@}*/
+
+/*!@}*/

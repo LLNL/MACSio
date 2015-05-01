@@ -27,6 +27,9 @@
 extern "C" {
 #endif
 
+/** \addtogroup jsonclib JSON-C Library
+  @{ */
+
 #define JSON_OBJECT_DEF_HASH_ENTRIES 16
 
 /**
@@ -80,6 +83,9 @@ typedef struct json_object json_object;
 typedef struct json_object_iter json_object_iter;
 typedef struct json_tokener json_tokener;
 
+/** \addtogroup custom Object Customization
+  @{ */
+
 /**
  * Type of custom user delete functions.  See json_object_set_serializer.
  */
@@ -92,6 +98,7 @@ typedef int (json_object_to_json_string_fn)(struct json_object *jso,
 						struct printbuf *pb,
 						int level,
 						int flags);
+/**@} Object Customization */
 
 /* supported object types */
 
@@ -118,7 +125,8 @@ typedef enum json_extarr_type {
   json_extarr_type_flt64
 } json_extarr_type;
 
-/* reference counting functions */
+/** \addtogroup refcount Reference Counting
+  @{ */
 
 /**
  * Increment the reference count of json_object, thereby grabbing shared 
@@ -137,6 +145,10 @@ extern struct json_object* json_object_get(struct json_object *obj);
  * @returns 1 if the object was freed.
  */
 int json_object_put(struct json_object *obj);
+/**@} Reference Counting */
+
+/** \addtogroup objquery Object Introspection and Query
+  @{ */
 
 /**
  * Check if the json_object is of a given type
@@ -167,7 +179,10 @@ extern int json_object_is_type(struct json_object *obj, enum json_type type);
      json_type_string,
  */
 extern enum json_type json_object_get_type(struct json_object *obj);
+/**@} Object Introspection and Query */
 
+/** \addtogroup serialize Serialization
+  @{ */
 
 /** Stringify object to json format.
  * Equivalent to json_object_to_json_string_ext(obj, JSON_C_TO_STRING_SPACED)
@@ -183,6 +198,7 @@ extern const char* json_object_to_json_string(struct json_object *obj);
  */
 extern const char* json_object_to_json_string_ext(struct json_object *obj, int
 flags);
+/**@} Serialization */
 
 /**
  * Set a custom serialization function to be used when this particular object
@@ -235,8 +251,13 @@ json_object_delete_fn json_object_free_userdata;
  */
 json_object_to_json_string_fn json_object_userdata_to_json_string;
 
+/**@} Object Customization */
 
-/* object type methods */
+/** \addtogroup aggregate Aggregate Types
+  @{ */
+
+/** \addtogroup object Object Methods
+  @{ */
 
 /** Create a new empty object with a reference count of 1.  The caller of
  * this object initially has sole ownership.  Remember, when using
@@ -382,8 +403,10 @@ extern void json_object_object_del(struct json_object* obj, const char *key);
  */
 #define json_object_object_foreachC(obj,iter) \
  for(iter.entry = json_object_get_object(obj)->head; (iter.entry ? (iter.key = (char*)iter.entry->k, iter.val = (struct json_object*)iter.entry->v, iter.entry) : 0); iter.entry = iter.entry->next)
+/**@} Object Methods */
 
-/* Array type methods */
+/** \addtogroup array Array Methods
+  @{ */
 
 /** Create a new empty json_object of type json_type_array
  * @returns a json_object of type json_type_array
@@ -449,8 +472,15 @@ extern int json_object_array_put_idx(struct json_object *obj, int idx,
  */
 extern struct json_object* json_object_array_get_idx(struct json_object *obj,
 						     int idx);
+/**@} Array Methods */
 
-/* json_bool type methods */
+/**@} Aggregate Types */
+
+/** \addtogroup prim Primitive Types
+  @{ */
+
+/** \addtogroup bool Boolean Methods
+  @{ */
 
 /** Create a new empty json_object of type json_type_boolean
  * @param b a json_bool TRUE or FALSE (0 or 1)
@@ -470,9 +500,10 @@ extern struct json_object* json_object_new_boolean(json_bool b);
  * @returns a json_bool
  */
 extern json_bool json_object_get_boolean(struct json_object *obj);
+/**@} Boolean Methods */
 
-
-/* int type methods */
+/** \addtogroup int Int Methods
+  @{ */
 
 /** Create a new empty json_object of type json_type_int
  * Note that values are stored as 64-bit values internally.
@@ -520,9 +551,10 @@ extern int32_t json_object_get_int(struct json_object *obj);
  * @returns an int64
  */
 extern int64_t json_object_get_int64(struct json_object *obj);
+/**@} Int Methods */
 
-
-/* double type methods */
+/** \addtogroup double Double Methods
+  @{ */
 
 /** Create a new empty json_object of type json_type_double
  * @param d the double
@@ -577,9 +609,11 @@ extern struct json_object* json_object_new_double_s(double d, const char *ds);
  * @returns a double floating point number
  */
 extern double json_object_get_double(struct json_object *obj);
+/**@} Double Methods */
 
 
-/* string type methods */
+/** \addtogroup string String Methods
+  @{ */
 
 /** Create a new empty json_object of type json_type_string
  *
@@ -614,69 +648,121 @@ extern const char* json_object_get_string(struct json_object *obj);
  * @returns int
  */
 extern int json_object_get_string_len(struct json_object *obj);
+/**@} String Methods */
 
+/**@} Primitive Types */
+
+extern struct json_object* json_object_new_enum(void);
+extern void                json_object_enum_add(struct json_object* jso, char const *name,
+                               int64_t val, json_bool selected);
+extern int                 json_object_enum_length(struct json_object* jso);
+extern char const *        json_object_enum_get_idx_name(struct json_object* jso, int idx);
+extern int64_t             json_object_enum_get_idx_val(struct json_object* jso, int idx);
+extern char const *        json_object_enum_get_name(struct json_object* jso, int64_t val);
+extern int64_t             json_object_enum_get_val(struct json_object *jso, char const *name);
+extern char const *        json_object_enum_get_choice_name(struct json_object* jso);
+extern int64_t             json_object_enum_get_choice_val(struct json_object* jso);
+
+
+#warning ADD A METHOD TO TRAVERSE A HIERARCHY AND ELIM ALL PRINTBUF STRING MEMORY
 extern void json_object_free_printbuf(struct json_object *obj);
 
-/* extarr methods */
+extern struct json_object*   json_object_new_extarr(void const *data, enum json_extarr_type type,
+                                 int ndims, int const *dims);
+extern struct json_object*   json_object_new_extarr_alloc(enum json_extarr_type etype,
+                                 int ndims, int const *dims);
 extern enum json_extarr_type json_object_extarr_type(struct json_object* jso);
 extern int                   json_object_extarr_nvals(struct json_object* jso);
 extern int                   json_object_extarr_ndims(struct json_object* jso);
 extern int                   json_object_extarr_dim(struct json_object* jso, int dimidx);
 extern void const *          json_object_extarr_data(struct json_object* jso);
-extern struct json_object*   json_object_new_extarr(void const *data,enum json_extarr_type type,int ndims,int const *dims);
-extern struct json_object*   json_object_new_extarr_alloc(enum json_extarr_type etype, int ndims, int const *dims);
 
-/* enum methods */
-extern struct json_object* json_object_new_enum(void);
-extern void         json_object_enum_add(struct json_object* jso, char const *choice_name, int64_t choice_val,
-                        json_bool selected);
-extern int          json_object_enum_length(struct json_object* jso);
-extern char const * json_object_enum_get_idx_name(struct json_object* jso, int idx);
-extern int64_t      json_object_enum_get_idx_val(struct json_object* jso, int idx);
-extern char const * json_object_enum_get_name(struct json_object* jso, int64_t val);
-extern int64_t      json_object_enum_get_val(struct json_object *jso, char const *name);
-extern char const * json_object_enum_get_choice_name(struct json_object* jso);
-extern int64_t      json_object_enum_get_choice_val(struct json_object* jso);
-
-/* path get methods */
-extern json_bool    json_object_path_get_boolean(struct json_object *src, char const *key_path);
-extern char const * json_object_path_get_enum_choice_name(struct json_object *src, char const *key_path);
-extern int64_t      json_object_path_get_enum_choice_val(struct json_object *src, char const *key_path);
-extern int32_t      json_object_path_get_int(struct json_object *src, char const *key_path);
-extern int64_t      json_object_path_get_int64(struct json_object *src, char const *key_path);
-extern char const * json_object_path_get_string(struct json_object *src, char const *key_path);
-extern double       json_object_path_get_double(struct json_object *src, char const *key_path);
+extern json_bool            json_object_path_get_boolean(struct json_object *src, char const *key_path);
+extern char const *         json_object_path_get_enum_choice_name(struct json_object *src, char const *key_path);
+extern int64_t              json_object_path_get_enum_choice_val(struct json_object *src, char const *key_path);
+extern int32_t              json_object_path_get_int(struct json_object *src, char const *key_path);
+extern int64_t              json_object_path_get_int64(struct json_object *src, char const *key_path);
+extern char const *         json_object_path_get_string(struct json_object *src, char const *key_path);
+extern double               json_object_path_get_double(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_path_get_array(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_path_get_object(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_path_get_extarr(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_path_get_any(struct json_object *src, char const *key_path);
-extern json_bool    json_object_object_path_get_ex(struct json_object *src, char const *key_path, struct json_object **val);
 
-/* apath methods are an improvement over path methods (for gets anyways).
-   They support paths with intermediate array objects as in
-       "/foo/bar/16/gorfo/32/11/dims"
-           where "bar" is an array object and '16' is the index we want and
-           where "gorfo" is an array object whose members are also array objects, etc.
-   and do sane casting to return type whenever needed. */
-extern json_bool    json_object_apath_get_boolean(struct json_object *src, char const *key_path);
-extern int          json_object_apath_get_int(struct json_object *src, char const *key_path);
-extern int64_t      json_object_apath_get_int64(struct json_object *src, char const *key_path);
-extern double       json_object_apath_get_double(struct json_object *src, char const *key_path);
-extern char const * json_object_apath_get_string(struct json_object *src, char const *key_path);
+extern json_bool            json_object_apath_get_boolean(struct json_object *src, char const *key_path);
+extern int                  json_object_apath_get_int(struct json_object *src, char const *key_path);
+extern int64_t              json_object_apath_get_int64(struct json_object *src, char const *key_path);
+extern double               json_object_apath_get_double(struct json_object *src, char const *key_path);
+extern char const *         json_object_apath_get_string(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_apath_get_object(struct json_object *src, char const *key_path);
 extern struct json_object * json_object_apath_find_object(struct json_object *src, char const *key_path);
+extern char const *         json_paste_apath(char const *va_args_str, char const *first, ...);
 
-/* using variadic macros here */
-extern char const *json_paste_apath(char const *va_args_str, char const *first, ...);
+/** \addtogroup jsonclib JSON-C Library
+  @{ */
+
+/** \addtogroup objquery Object Introspection and Query
+  @{ */
+
+/**
+ * \addtogroup apathmacros Convenient Path Macros
+ * \brief JSON object hierarchy path query convenience macros 
+ *
+ * These convenience macros free the caller from having to sprintf the key_paths used in
+ * alternative path methods. This is all the more important for code blocks utilizing local
+ * variables to hold indices into intermediate arrays.
+ *
+ * If a local variable, say \c i, holds an array index for the array "/foo/bar" in the JSON
+ * object, the caller can use the macro JsonGetInt(obj, "/foo/bar", i) to obtain the value of
+ * the ith member of that array. These macros work with intermediate arrays too. So, for example,
+ * in the call JsonGetInt(obj, "/foo/bar", i, "gorfo", 32, k, "dims"), suppose local variables
+ * i==16 and k==11, then the macro will automatically construct the key path
+ * "/foo/bar/16/gorfo/32/11/dims" and then query the object with this path.
+ *
+ * These macros are by far the easiest way to query and traverse a large JSON-C object.
+ @{
+ */
+
+/**
+  * \brief Get the bool value at specified path
+  *
+  * \return For return value and type corecion see json_object_path_get_boolean().
+  */
 #define JsonGetBool(OBJ, ...)  json_object_apath_get_boolean(OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**
+  * \brief Get the int value at specified path
+  *
+  * \return For return value and type corecion see json_object_path_get_int().
+  */
 #define JsonGetInt(OBJ, ...)   json_object_apath_get_int(    OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**
+  * \brief Get the int64_t value at specified path
+  *
+  * \return For return value and type corecion see json_object_path_get_int64().
+  */
 #define JsonGetInt64(OBJ, ...) json_object_apath_get_int64(  OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**
+  * \brief Get the double value at specified path
+  *
+  * \return For return value and type corecion see json_object_path_get_double().
+  */
 #define JsonGetDbl(OBJ, ...)   json_object_apath_get_double( OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**
+  * \brief Get the string value at specified path
+  *
+  * \return For return value and type corecion see json_object_path_get_string().
+  */
 #define JsonGetStr(OBJ, ...)   json_object_apath_get_string( OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**
+  * \brief Get the object at specified path
+  *
+  * \return For return and type corecion see json_object_path_get_any().
+  */
 #define JsonGetObj(OBJ, ...)   json_object_apath_get_object( OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
-#define JsonFindObj(OBJ, ...)  json_object_apath_find_object( OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+#define JsonFindObj(OBJ, ...)  json_object_apath_find_object(OBJ, json_paste_apath(#__VA_ARGS__, __VA_ARGS__))
+/**@} Convenient Path Macros */
+/**@} Object Introspection and Query */
 
-/* primitive value overwrite (set) methods */
 extern json_bool json_object_set_boolean(struct json_object *bool_obj, json_bool val);
 extern json_bool json_object_set_enum_choice_name(struct json_object *enum_obj, char const *name);
 extern json_bool json_object_set_enum_choice_val(struct json_object *enum_obj, int64_t val);
@@ -685,14 +771,17 @@ extern json_bool json_object_set_int64(struct json_object *int64_obj, int64_t va
 extern json_bool json_object_set_double(struct json_object *double_obj, double val);
 extern json_bool json_object_set_string(struct json_object *string_obj, char const *val);
 
-/* path value overwrite (set) methods */
 extern json_bool json_object_path_set_boolean(struct json_object *obj, char const *key_path, json_bool val);
-extern json_bool json_object_path_set_enum_choice_name(struct json_object *enum_obj, char const *key_path, char const *val);
-extern json_bool json_object_path_set_enum_choice_val(struct json_object *enum_obj, char const *key_path, int64_t val);
+extern json_bool json_object_path_set_enum_choice_name(
+                     struct json_object *enum_obj, char const *key_path, char const *val);
+extern json_bool json_object_path_set_enum_choice_val(
+                     struct json_object *enum_obj, char const *key_path, int64_t val);
 extern json_bool json_object_path_set_int(struct json_object *obj, char const *key_path, int32_t val);
 extern json_bool json_object_path_set_int64(struct json_object *obj, char const *key_path, int64_t val);
 extern json_bool json_object_path_set_double(struct json_object *obj, char const *key_path, double val);
 extern json_bool json_object_path_set_string(struct json_object *obj, char const *key_path, char const *val);
+
+/**@} JSON-C Library */
 
 #ifdef __cplusplus
 }

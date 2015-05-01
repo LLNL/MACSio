@@ -1,0 +1,25 @@
+/**
+ * \addtogroup jsonclib JSON-C Library
+ *
+ * All of the data marshalled by MACSio and its plugins is stored in an uber
+ * JSON object. In a write test, MACSio creates and updates this uber JSON
+ * object and passes it to plugins. Plugins traverse, interrogate and write
+ * out what MACSio passes to them. On the other hand, during read tests, it
+ * is the plugins that are responsible for creating the same JSON object from
+ * file data that gets passed back to MACSio to validate.
+ *
+ * As a consequence, it is important for plugin developers to understand the
+ * structure of the JSON data object used in MACSio to represent mesh and
+ * variable data.
+ *
+ * The easiest way to understand it is to \em browse an example of MACSio's
+ * uber JSON object in a web browser. However, it is very useful for your
+ * browser to have the extension necessary to \em render and manipulate
+ * raw JSON strings nicely. Here are some options...
+ *   - For Safari: https://github.com/rfletcher/safari-json-formatter
+ *   - For Chrome: https://github.com/tulios/json-viewer
+ *   - For Firefox: https://addons.mozilla.org/en-Us/firefox/addon/jsonview
+ *
+ * Here is an <A HREF="../../../macsio/macsio_json_object.json">example</A> of
+ * a JSON object on a given MPI task.
+ */

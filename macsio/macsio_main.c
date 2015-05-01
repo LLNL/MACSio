@@ -33,6 +33,21 @@ extern "C" {
 #include <mpi.h>
 #endif
 
+/*!
+ * \mainpage
+ *
+ * MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
+ *
+ * It is designed to support a number of goals with respect to parallel I/O performance benchmarking
+ * including the ability to test and compare various I/O libraries and I/O paradigms, to predict
+ * scalable performance of real applications and to help identify where improvements in I/O performance
+ * can be made.
+ *
+ * For a detailed description of MACSio's design goals and outline of its design, please see
+ * 
+ * 
+ */
+
 #define MAX(A,B) (((A)>(B))?(A):(B))
 
 extern char **enviornp;
