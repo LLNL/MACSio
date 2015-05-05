@@ -43,9 +43,10 @@ extern "C" {
  * scalable performance of real applications and to help identify where improvements in I/O performance
  * can be made.
  *
- * For a detailed description of MACSio's design goals and outline of its design, please see
+ * For an overview of MACSio's design goals and outline of its design, please see
+ * <A HREF="../../macsio_design_intro_final_html/macsio_design_intro_final.htm">this design document.</A>
  * 
- * 
+ *
  */
 
 #define MAX(A,B) (((A)>(B))?(A):(B))
