@@ -10,6 +10,7 @@
 #endif
 
 #include <macsio_clargs.h>
+#include <macsio_data.h>
 #include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
@@ -379,7 +380,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     /* Construct the lists of individual object names */
     for (i = 0; i < numChunks; i++)
     {
-        int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+        int rank_owning_chunk = MACSIO_DATA_GetRankOwningPart(main_obj, i);
         int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
         blockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
@@ -409,7 +410,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     {
         for (i = 0; i < numChunks; i++)
         {
-            int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+            int rank_owning_chunk = MACSIO_DATA_GetRankOwningPart(main_obj, i);
             int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
             if (groupRank == 0)
             {
@@ -498,7 +499,7 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
         dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
     
     for (i = 0; i < total_parts; i++)
-        color[i] = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+        color[i] = MACSIO_DATA_GetRankOwningPart(main_obj, i);
     for (i = 0; i < ndims; i++)
         zdims[i] = dims[i]-1;
 
@@ -622,6 +623,22 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     MACSIO_MIF_Finish(bat);
 }
 
+static
+void main_load(int argi, int argc, char **argv, char const *path, json_object **data_read_obj)
+{
+    /* Open the root file */
+
+    /* Get number of pieces in mesh */
+
+    /* Call MACSIO func to assign mesh pieces to MPI ranks */
+
+    /* Get piece ids to load on this processor */
+
+    /* Iterate finding correct file/dir combo and reading mesh pieces and variables */
+
+    /* Need helper methods to construct JSON objects from read Silo contents */
+}
+
 static int register_this_interface()
 {
     MACSIO_IFACE_Handle_t iface;
@@ -635,6 +652,7 @@ static int register_this_interface()
 
     /* Must define at least these two methods */
     iface.dumpFunc = main_dump;
+    iface.loadFunc = main_load;
     iface.processArgsFunc = process_args;
 
     if (!MACSIO_IFACE_Register(&iface))

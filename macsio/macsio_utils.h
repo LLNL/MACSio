@@ -7,21 +7,23 @@
 extern "C" {
 #endif
 
+#define MU_MAX(A,B) (((A)>(B))?(A):(B))
+
 /* Short-hand for commonly used functions */
 #define MU_SeqIdx3(i,j,k,Ni,Nj) MACSIO_UTILS_LogicalIJKIndexToSequentialIndex(i,j,k,Ni,Nj)
 #define MU_SeqIdx2(i,j,Ni)      MACSIO_UTILS_LogicalIJIndexToSequentialIndex (i,j,  Ni   )
 #define MU_SeqIdx1(i)           MACSIO_UTILS_LogicalIIndexToSequentialIndex  (i          )
-#define MU_LogIdx3(s,Ni,Nj,a,b,c)                                        \
+#define MU_LogIdx3(s,Ni,Nj,a,b,c)                                     \
 { int q0,q1,q2;                                                       \
   MACSIO_UTILS_SequentialIndexToLogicalIJKIndex(s,Ni,Nj,&q0,&q1,&q2); \
   a=q0;b=q1;c=q2;                                                     \
 }
-#define MU_LogIdx2(s,Ni,a,b)                                             \
+#define MU_LogIdx2(s,Ni,a,b)                                          \
 { int q0,q1;                                                          \
    MACSIO_UTILS_SequentialIndexToLogicalIJIndex(s,Ni,   &q0,&q1    ); \
   a=q0;b=q1;                                                          \
 }
-#define MU_LogIdx1(s,a)                                                  \
+#define MU_LogIdx1(s,a)                                               \
 { int q0;                                                             \
     MACSIO_UTILS_SequentialIndexToLogicalIIndex(s,      &q0        ); \
   a=q0;                                                               \

@@ -38,7 +38,7 @@ char const *MACSIO_IFACE_GetName(int i)
     return iface_table[i].name;
 }
 
-void MACSIO_IFACE_GetIds(int *cnt, int **ids)
+void MACSIO_IFACE_GetIdsMatchingFileExtension(int *cnt, int **ids, char const *ext)
 {
     int i, n, pass;
     for (pass = 0; pass < (ids?2:1); pass++)
@@ -46,7 +46,7 @@ void MACSIO_IFACE_GetIds(int *cnt, int **ids)
         n = 0;
         for (i = 0; i < MACSIO_IFACE_MAX_COUNT; i++)
         {
-            if (iface_table[i].slotUsed)
+            if (iface_table[i].slotUsed && (!ext || !strcmp(iface_table[i].ext, ext)))
             {
                 if (pass == 1)
                     (*ids)[n] = i;
@@ -57,6 +57,11 @@ void MACSIO_IFACE_GetIds(int *cnt, int **ids)
             *ids = (int *) malloc(n * sizeof(int));
     }
     *cnt = n;
+}
+
+void MACSIO_IFACE_GetIds(int *cnt, int **ids)
+{
+    return MACSIO_IFACE_GetIdsMatchingFileExtension(cnt, ids, 0);
 }
 
 MACSIO_IFACE_Handle_t const *MACSIO_IFACE_GetById(int i)

@@ -140,6 +140,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
     MPI_Info mpiInfo = MPI_INFO_NULL;
 
+#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
 #warning INCLUDE ARGS FOR ISTORE AND K_SYM
 #warning INCLUDE ARG PROCESS FOR HINTS
 #warning FAPL PROPS: ALIGNMENT 
@@ -287,6 +288,7 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
     hid_t h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (h5File >= 0)
     {
+#warning USE NEWER GROUP CREATION SETTINGS OF HDF5
         if (nsname && userData)
         {
             user_data_t *ud = (user_data_t *) userData;

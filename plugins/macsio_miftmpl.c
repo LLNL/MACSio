@@ -197,7 +197,6 @@ means that the root file is effectively written using serial (e.g. non-parallel)
 
 It is a useful exercise to ask how we might improve the implementation here to avoid
 writing the root file using serial I/O.
-
 */
 static void main_dump(
     int argi,               /**< [in] Command-line argument index at which first plugin-specific arg appears */
