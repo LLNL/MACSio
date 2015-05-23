@@ -168,6 +168,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     int cl_result;
 
 #warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
+#warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
         "--interface %s",
@@ -288,9 +289,16 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--num_loads %d",
             "Number of loads in succession to test.",
         "--no_validate_read",
-            "Don't validate data on read",
+            "Don't validate data on read.",
+        "--read_mesh %s",
+            "Specficify mesh name to read.",
         "--read_vars %s",
-            "Specify variable names to read. \"all\" means all variables.",
+            "Specify variable names to read. \"all\" means all variables. If listing more\n"
+            "than one, be sure to either enclose space separated list in quotes or\n"
+            "use a comma-separated list with no spaces",
+        "--randomize_seeds",
+            "Make randomness in MACSio vary from run to run by using a time-modulated value\n"
+            "for all random number seeding.",
 #if 0
         MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
 #endif
@@ -419,7 +427,7 @@ main_read(int argi, int argc, char **argv, json_object *main_obj)
 
         /* do the load */
         (*(iface->loadFunc))(argi, argc, argv,
-            JsonGetStr(main_obj, "clargs/read_path"), &data_read_obj);
+            JsonGetStr(main_obj, "clargs/read_path"), main_obj, &data_read_obj);
 
         /* stop timer */
         MT_StopTimer(heavy_load_tid);

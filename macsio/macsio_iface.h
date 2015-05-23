@@ -15,10 +15,13 @@ extern "C" {
  */
 
 typedef void (*DumpFunc)(int argi, int argc, char **argv, json_object *main_obj, int dumpNum, double dumpTime);
-typedef void (*LoadFunc)(int argi, int argc, char **argv, char const *path, json_object **main_obj);
+typedef void (*LoadFunc)(int argi, int argc, char **argv, char const *path, json_object *main_obj, 
+                             json_object **data_read_obj);
 typedef int (*ProcessArgsFunc)  (int argi, int argc, char **argv);
 typedef int (*QueryFeaturesFunc)(void);
 typedef int (*IdentifyFileFunc) (char const *pathname);
+
+#warning ALLOCATE MPI TAG IDS HERE TOO
 
 #warning MAKE THE MAKEFILE LINK ANY .o FILES WITH A GIVEN NAME SCHEME
 typedef struct MACSIO_IFACE_Handle_t

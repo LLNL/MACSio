@@ -45,10 +45,15 @@ part individually so that we can keep track of where they all are in the fileset
 Some of the aspects of this plugin code exist here only to serve as an example in
 writing a MIF plugin and are non-essential to the proper operation of this plugin.
 
-In writing any MACSio plugin (MIF or SIF) be sure to declare all your plugin's
+MACSio uses a static load approach to its plugins. The MACSio main executable must
+be linked with all the plugins it expects to use.
+
+In writing any MACSio plugin (MIF or SIF) be sure to declare *all* of your plugin's
 symbols (functions, local variables, etc.) as static. Each plugin is being linked into
 MACSio's main and any symbols that are not static file scope will wind up appearing
-in and therefore being vulnerable too global namespace collisions.
+in and therefore being vulnerable too global namespace collisions. The plugin's
+main interface methods to MACSio are handled via registration of a set of function
+pointers.
 @{
 */
 
@@ -170,6 +175,7 @@ static json_object *write_mesh_part(
 {
     json_object *part_info = json_object_new_object();
 
+#warning SOMEHOW SHOULD INCLUDE OFFSETS TO EACH VARIABLE
     /* Write the json mesh part object as an ascii string */
     fprintf(myFile, "%s\n", json_object_to_json_string_ext(part_obj, JSON_C_TO_STRING_PRETTY));
     json_object_free_printbuf(part_obj);
@@ -295,6 +301,7 @@ static void main_dump(
     /* Wait for MACSIO_MIF to give this processor exclusive access */
     myFile = (FILE *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
+#warning FIX THE STRING THAT WE PRODUCE HERE SO ITS A SINGLE JSON ARRAY OBJECT
     /* This processor's work on the file is just to write its part_infos */
     fprintf(myFile, "%s\n", json_object_to_json_string_ext(part_infos, JSON_C_TO_STRING_PRETTY));
 
