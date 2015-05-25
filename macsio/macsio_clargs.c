@@ -14,14 +14,21 @@
 #include <macsio_clargs.h>
 #include <macsio_log.h>
 
+/* Flags for parameters */
+#define PARAM_ASSIGNED 0x01
+
 typedef struct _knownArgInfo {
-   char *helpStr;		/* the help string for this command line argument */
-   char *fmtStr;		/* format string for this command line argument */
-   int argNameLength;		/* number of characters in this command line argument name */
-   int paramCount;		/* number of parameters associated with this argument */
-   char *paramTypes;		/* the string of parameter conversion specification characters */
-   void **paramPtrs;		/* an array of pointers to caller-supplied scalar variables to be assigned */
-   struct _knownArgInfo *next;	/* pointer to the next comand line argument */
+   char *helpStr;		/**< the help string for this command line argument */
+   char *fmtStr;		/**< format string for this command line argument */
+   char *defStr;                /**< Strong holding default values for arg params */
+   char *argName;               /**< To get populated with the argument's name without leading dashes */
+   int argNameLength;		/**< number of characters in this command line argument name */
+   int paramCount;		/**< number of parameters associated with this argument */
+   char *paramTypes;		/**< the string of parameter conversion specification characters */
+   void **paramPtrs;		/**< an array of pointers to caller-supplied scalar variables to be assigned */
+   char *paramFlags;            /**< Flags for each param to indicate things such as if the param was
+                                     actually assigned a value */
+   struct _knownArgInfo *next;	/**< pointer to the next comand line argument */
 } MACSIO_KnownArgInfo_t;
 
 static int GetSizeFromModifierChar(char c)
@@ -173,7 +180,7 @@ MACSIO_CLARGS_ProcessCmdline(
    while (1)
    {
       int n, paramCount, argNameLength;
-      char *fmtStr, *helpStr, *p, *paramTypes;
+      char *fmtStr, *defStr, *helpStr, *p, *paramTypes, *paramFlags;
       void **paramPtrs;
       MACSIO_KnownArgInfo_t *newArg, *oldArg;
 
@@ -183,6 +190,9 @@ MACSIO_CLARGS_ProcessCmdline(
       /* check to see if we're done */
       if (!strcmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS))
 	 break;
+
+      /* get this arg's default string */
+      defStr = va_arg(ap, char *);
 
       /* get this arg's help string */
       helpStr = va_arg(ap, char *);
@@ -198,11 +208,12 @@ MACSIO_CLARGS_ProcessCmdline(
 	 if (first)
 	 {
 	    first = 0;
-	    fprintf(outFILE, "usage and help for %s\n", argv[0]);
+	    fprintf(outFILE, "Usage and Help for \"%s\"\n", argv[0]);
+	    fprintf(outFILE, "Defaults, if any, are in square brackets after an argument's definition\n");
 	 }
 
 	 /* this arguments format string */
-	 fprintf(outFILE, "   %-s\n", fmtStr);
+	 fprintf(outFILE, "   %-s [%s]\n", fmtStr, defStr?defStr:"");
 
          if (has_embedded_newlines)
          {
@@ -261,6 +272,9 @@ MACSIO_CLARGS_ProcessCmdline(
          /* allocate a string for the pointers to caller's arguments to set */ 
          paramPtrs = (void **) calloc(paramCount, sizeof(void*));
 
+         /* allocate flags for params */
+         paramFlags = (char*) calloc(paramCount+1, sizeof(char));
+
          /* ok, make a second pass through the string and setup argument pointers and conversion characters */
 	 k = 0;
          for (i = 0; i < n; i++)
@@ -288,19 +302,33 @@ MACSIO_CLARGS_ProcessCmdline(
 	 /* in this case, we assume we just have a boolean (int) value */
 	 argNameLength = n;
 	 paramTypes = NULL;
-	 paramPtrs = (void **) malloc (sizeof(void*));
+	 paramPtrs = (void **) malloc(sizeof(void*));
+         paramFlags = (char*) malloc(sizeof(char));
          if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 	     paramPtrs[0] = va_arg(ap, int *);
       }
 
       /* ok, we're done with this parameter, so plug it into the paramInfo array */
-      newArg = (MACSIO_KnownArgInfo_t *) malloc(sizeof(MACSIO_KnownArgInfo_t));
+      newArg = (MACSIO_KnownArgInfo_t *) calloc(1, sizeof(MACSIO_KnownArgInfo_t));
       newArg->helpStr = helpStr;
       newArg->fmtStr = fmtStr;
+      newArg->defStr = defStr;
+      if (fmtStr[0] == '-')
+      {
+          if (fmtStr[1] == '-')
+              newArg->argName = strndup(&fmtStr[2], argNameLength-2);
+          else
+              newArg->argName = strndup(&fmtStr[1], argNameLength-1);
+      }
+      else
+      {
+          newArg->argName = strndup(&fmtStr[0], argNameLength-0);
+      }
       newArg->argNameLength = argNameLength;
       newArg->paramCount = paramCount;
       newArg->paramTypes = paramTypes;
       newArg->paramPtrs = paramPtrs;
+      newArg->paramFlags = paramFlags;
       newArg->next = NULL; 
       if (firstArg)
       {
@@ -440,9 +468,15 @@ MACSIO_CLARGS_ProcessCmdline(
                      else
                      {
                          if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                         {
                              *pInt = (int) tmpDbl;
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
+                         }
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                         {
                              add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_int((int)tmpDbl));
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
+                         }
                      }
 		     break;
 	          }
@@ -455,19 +489,27 @@ MACSIO_CLARGS_ProcessCmdline(
                          {
 		             *pChar = (char*) malloc(strlen(argv[++i]+1));
 		             strcpy(*pChar, argv[i]);
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
                          }
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
                          {
                              add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_string(argv[i+1]));
                              i++;
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
                          }
 		     }
 		     else
                      {
                          if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                         {
 		             strcpy(*pChar, argv[++i]);
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
+                         }
                          else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                         {
                              add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_string(argv[++i]));
+                             p->paramFlags[j] |= PARAM_ASSIGNED;
+                         }
                      }
 		     break;
 	          }
@@ -475,14 +517,21 @@ MACSIO_CLARGS_ProcessCmdline(
 	          {
 		     double *pDouble = (double *) (p->paramPtrs[j]);
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                     {
 		         *pDouble = atof(argv[++i]);
+                         p->paramFlags[j] |= PARAM_ASSIGNED;
+                     }
                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                     {
                          add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_double(atof(argv[++i])));
+                         p->paramFlags[j] |= PARAM_ASSIGNED;
+                     }
 		     break;
 	          }
 	          case 'n': /* special case to return arg index */
 	          {
 		     int *pInt = (int *) (p->paramPtrs[j]);
+                     p->paramFlags[j] |= PARAM_ASSIGNED;
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
 		         *pInt = i++;
                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
@@ -496,9 +545,15 @@ MACSIO_CLARGS_ProcessCmdline(
 	 {
             int *pInt = (int *) (p->paramPtrs[0]);
             if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+            {
                 *pInt = 1; 
+                p->paramFlags[0] |= PARAM_ASSIGNED;
+            }
             else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+            {
                 add_param_to_json_retobj(ret_json_obj, &argName[2], json_object_new_boolean((json_bool)1));
+                p->paramFlags[0] |= PARAM_ASSIGNED;
+            }
 	 }
       }
       else
@@ -524,15 +579,109 @@ MACSIO_CLARGS_ProcessCmdline(
    if (rank != 0 && argv)
       free(argv);
 
+   /* find any args for which defaults are specified but a value
+      wasn't assigned from arc/argv and assign the default value(s). */
+   { MACSIO_KnownArgInfo_t *pka = knownArgs;
+       while (pka)
+       {
+          if (pka->defStr)
+          {
+              if (pka->paramCount)
+              {
+                  int j;
+                  char *defStr, *defStrOrig;
+                  defStr = defStrOrig = strdup(pka->defStr);
+                  for (j = 0; j < pka->paramCount; j++)
+                  {
+                      char *defParam = strsep(&defStr, " ");
+
+                      if (pka->paramFlags[j] & PARAM_ASSIGNED) continue;
+
+                      MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                          ("Default value of \"%s\" assigned for param %d of arg \"%s\"",defParam,j,pka->argName));
+
+	              switch (pka->paramTypes[j])
+	              {
+	                 case 'd':
+	                 {
+                            int n = strlen(defParam)-1;
+		            int *pInt = (int *) (pka->paramPtrs[j]);
+                            int tmpInt;
+                            double tmpDbl;
+                            n = GetSizeFromModifierChar(defParam[n]);
+		            tmpInt = strtol(defParam, (char **)NULL, 10);
+                            tmpDbl = tmpInt * n;
+                            if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                                *pInt = (int) tmpDbl;
+                            else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                                add_param_to_json_retobj(ret_json_obj, pka->argName, json_object_new_int((int)tmpDbl));
+		            break;
+	                 }
+	                 case 's':
+	                 {
+		            char **pChar = (char **) (pka->paramPtrs[j]);
+		            if (pChar && *pChar == NULL)
+		            {
+                                if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                                {
+		                    *pChar = (char*) malloc(strlen(defParam+1));
+		                    strcpy(*pChar, defParam);
+                                }
+                                else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                                {
+                                    add_param_to_json_retobj(ret_json_obj, pka->argName, json_object_new_string(defParam));
+                                }
+		            }
+		            else
+                            {
+                                if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+		                    strcpy(*pChar, defParam);
+                                else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                                    add_param_to_json_retobj(ret_json_obj, pka->argName, json_object_new_string(defParam));
+                            }
+		            break;
+                         }
+	                 case 'f':
+	                 {
+		            double *pDouble = (double *) (pka->paramPtrs[j]);
+                            if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+		                *pDouble = atof(defParam);
+                            else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                                add_param_to_json_retobj(ret_json_obj, pka->argName, json_object_new_double(atof(defParam)));
+		            break;
+	                 }
+                      }
+                  }
+                  free(defStrOrig);
+              }
+              else /* boolean arg case */
+              {
+                  if (!(pka->paramFlags[0] & PARAM_ASSIGNED))
+                  {
+                      int *pInt = (int *) (pka->paramPtrs[0]);
+                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
+                          *pInt = 0; 
+                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
+                          add_param_to_json_retobj(ret_json_obj, pka->argName, json_object_new_boolean((json_bool)0));
+                  }
+              }
+          }
+          pka = pka->next;
+       }
+   }
+
    /* free the known args stuff */
    while (knownArgs)
    {
       MACSIO_KnownArgInfo_t *next = knownArgs->next;
-
       if (knownArgs->paramTypes)
          free(knownArgs->paramTypes);
       if (knownArgs->paramPtrs)
          free(knownArgs->paramPtrs);
+      if (knownArgs->paramFlags);
+         free(knownArgs->paramFlags);
+      if (knownArgs->argName)
+         free(knownArgs->argName);
       free(knownArgs);
       knownArgs = next;
    }

@@ -88,17 +88,17 @@ static int process_args(
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
-        "--json_as_html",
+        "--json_as_html", "",
             "Write files as HTML instead of raw ascii [false]",
             &json_as_html,
-        "--my_opt_one",
+        "--my_opt_one", "",
             "Help message for my_opt_one which has no arguments. If present, local\n"
             "var my_opt_one will be assigned a value of 1 and a value of zero otherwise.",
             &my_opt_one,
-        "--my_opt_two %d",
+        "--my_opt_two %d", MACSIO_CLARGS_NODEFAULT,
             "Help message for my_opt_two which has a single integer argument",
             &my_opt_two,
-        "--my_opt_three %s %f",
+        "--my_opt_three %s %f", MACSIO_CLARGS_NODEFAULT,
             "Help message for my_opt_three which has a string argument and a float argument",
             &my_opt_three_string, &my_opt_three_float,
            MACSIO_CLARGS_END_OF_ARGS);

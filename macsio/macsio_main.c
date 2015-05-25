@@ -171,10 +171,10 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
-        "--interface %s",
+        "--interface %s", "miftmpl",
             "Specify the name of the interface to be tested. Use keyword 'list'\n"
             "to print a list of all known interface names and then exit.",
-        "--parallel_file_mode %s %d",
+        "--parallel_file_mode %s %d", "MIF 4",
             "Specify the parallel file mode. There are several choices.\n"
             "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then\n"
             "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\n"
@@ -185,7 +185,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "It will produce the specified number of files by grouping ranks in the\n"
             "the same way MIF does, but I/O within each group will be to a single,\n"
             "shared file using SIF mode.",
-        "--avg_num_parts %f",
+        "--avg_num_parts %f", "1",
             "The average number of mesh parts per MPI rank. Non-integral values\n"
             "are acceptable. For example, a value that is half-way between two\n"
             "integers, K and K+1, means that half the ranks have K mesh parts\n"
@@ -194,8 +194,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "ranks get 2 parts. Note that the total number of parts is this\n"
             "number multiplied by the MPI communicator size. If the result of that\n"
             "product is non-integral, it will be rounded and a warning message will\n"
-            "be generated. [1]",
-        "--part_size %d",
+            "be generated.",
+        "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
             "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
@@ -205,29 +205,29 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "realistic variation in features (e.g. zone- and node-centering),\n"
             "this target byte count is hit exactly for only the most frequently\n"
             "dumped objects and approximately for other objects.",
-        "--part_dim %d",
+        "--part_dim %d", "2",
             "Spatial dimension of parts; 1, 2, or 3",
-        "--part_type %s",
+        "--part_type %s", "rectilinear",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
             "and 'arbitrary' (currently, only rectilinear is implemented)",
-        "--part_map %s",
+        "--part_map %s", MACSIO_CLARGS_NODEFAULT,
             "Specify the name of an ascii file containing part assignments to MPI ranks.\n"
             "The ith line in the file, numbered from 0, holds the MPI rank to which the\n"
             "ith part is to be assigned. (currently ignored)",
-        "--vars_per_part %d",
+        "--vars_per_part %d", "20",
             "Number of mesh variable objects in each part. The smallest this can\n"
             "be depends on the mesh type. For rectilinear mesh it is 1. For\n"
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
-        "--meta_type %s",
+        "--meta_type %s", "tabular",
             "Specify the type of metadata objects to include in each main dump.\n"
             "Options are 'tabular', 'amorphous'. For tabular type data, MACSio\n"
             "will generate a random set of tables of somewhat random structure\n"
             "and content. For amorphous, MACSio will generate a random hierarchy\n"
             "of random type and sized objects.",
 #warning MAY WANT SOME PORTIONS OF METADATA TO SCALE WITH MESH PIECE COUNT
-        "--meta_size %d %d",
+        "--meta_size %d %d", "10000 50000",
             "Specify the size of the metadata objects on each processor and\n"
             "separately, the root (or master) processor (MPI rank 0). The size\n"
             "is specified in terms of the total number of bytes in the metadata\n"
@@ -239,9 +239,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "2400 bytes and a 3rd table of 40 unnamed records where each record\n"
             "is a 40 byte struct comprised of ints and doubles for a total of 1600\n"
             "bytes.",
-        "--num_dumps %d",
-            "Total number of dumps to marshal [10]",
-        "--max_dir_size %d",
+        "--num_dumps %d", "10",
+            "Total number of dumps to marshal",
+        "--max_dir_size %d", MACSIO_CLARGS_NODEFAULT,
             "The maximum number of filesystem objects (e.g. files or subdirectories)\n"
             "that MACSio will create in any one subdirectory. This is typically\n"
             "relevant only in MIF mode because MIF mode can wind up generating many\n"
@@ -261,48 +261,48 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "be 4 or more levels with the first 32 dumps' dir-trees going into the\n"
             "first dir, etc.",
 #ifdef HAVE_SCR
-        "--exercise_scr",
+        "--exercise_scr", "",
             "Exercise the Scalable Checkpoint and Restart library to marshal files.\n"
             "For more information, see https://computation.llnl.gov/project/scr\n"
             "Note that this works only in MIFFPP mode.",
 #endif
-        "--debug_level %d",
+        "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more frequent and detailed output [0]. A value of zero, the default,\n"
+            "more frequent and detailed output. A value of zero, the default,\n"
             "turns all debugging output off. A value of 1 should not adversely\n"
             "effect performance. A value of 2 may effect performance and a value\n"
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
-        "--log_line_cnt %d",
-            "Set number of lines per rank in the log file [64].",
-        "--log_line_length %d",
-            "Set log file line length [128].",
-        "--alignment %d",
+        "--log_line_cnt %d", "64",
+            "Set number of lines per rank in the log file.",
+        "--log_line_length %d", "128",
+            "Set log file line length.",
+        "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
-        "--filebase %s",
-            "Basename of generated file(s). ['macsio_']",
-        "--fileext %s",
-            "Extension of generated file(s). ['.dat']",
-        "--read_path %s",
+        "--filebase %s", "macsio_",
+            "Basename of generated file(s).",
+        "--fileext %s", "dat",
+            "Extension of generated file(s).",
+        "--read_path %s", MACSIO_CLARGS_NODEFAULT,
             "Specify a path name (file or dir) to start reading for a read test.",
-        "--num_loads %d",
+        "--num_loads %d", MACSIO_CLARGS_NODEFAULT,
             "Number of loads in succession to test.",
-        "--no_validate_read",
+        "--no_validate_read", "",
             "Don't validate data on read.",
-        "--read_mesh %s",
+        "--read_mesh %s", MACSIO_CLARGS_NODEFAULT,
             "Specficify mesh name to read.",
-        "--read_vars %s",
+        "--read_vars %s", MACSIO_CLARGS_NODEFAULT,
             "Specify variable names to read. \"all\" means all variables. If listing more\n"
             "than one, be sure to either enclose space separated list in quotes or\n"
             "use a comma-separated list with no spaces",
-        "--randomize_seeds",
-            "Make randomness in MACSio vary from run to run by using a time-modulated value\n"
-            "for all random number seeding.",
+        "--time_randomize_seeds", "",
+            "Make randomness in MACSio vary from dump to dump and run to run by\n"
+            "time-modulating all random number seeding.",
 #if 0
         MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
 #endif
-        "--plugin-args %n",
+        "--plugin-args %n", MACSIO_CLARGS_NODEFAULT,
             "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
@@ -484,6 +484,10 @@ main(int argc, char *argv[])
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;
 #endif
+    errno = 0;
+
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
 #warning SET DEFAULT VALUES FOR CLARGS
 
@@ -492,10 +496,7 @@ main(int argc, char *argv[])
     json_object_object_add(main_obj, "clargs", clargs_obj);
 
 #warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
-    errno = 0;
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Setup parallel information */
     json_object_object_add(parallel_obj, "mpi_size", json_object_new_int(MACSIO_MAIN_Size));
@@ -507,7 +508,7 @@ main(int argc, char *argv[])
     /* Acquire an I/O context handle from the plugin */
 
     /* Do a read or write test */
-    if (JsonGetStr(clargs_obj, "read_path"))
+    if (strcmp(JsonGetStr(clargs_obj, "read_path"),"null"))
         main_read(argi, argc, argv, main_obj);
     else
         main_write(argi, argc, argv, main_obj);

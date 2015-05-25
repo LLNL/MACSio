@@ -15,6 +15,7 @@
 #define MACSIO_CLARGS_OK 0
 #define MACSIO_CLARGS_SEPARATOR(SEPSTR) "macsio_args_sep_" #SEPSTR
 #define MACSIO_CLARGS_END_OF_ARGS "macsio_end_of_args"
+#define MACSIO_CLARGS_NODEFAULT (void*)0
 
 #ifdef __cplusplus
 extern "C" {
