@@ -1,6 +1,7 @@
 #ifndef _MACSIO_IFACE_H
 #define _MACSIO_IFACE_H
 
+#warning ELIMINATE USE OF JSON HEADER FILE HERE
 #include <json-c/json.h>
 
 #define MACSIO_IFACE_MAX_COUNT 128

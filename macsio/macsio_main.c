@@ -280,7 +280,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Set log file line length.",
         "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
-        "--filebase %s", "macsio_",
+        "--filebase %s", "macsio",
             "Basename of generated file(s).",
         "--fileext %s", "dat",
             "Extension of generated file(s).",

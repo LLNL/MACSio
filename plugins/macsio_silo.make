@@ -1,7 +1,7 @@
 SILO_BUILD_ORDER = 2.0
 SILO_HOME = /Users/miller86/visit/visit/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
 
-# Libraries Silo may depend on depends on
+# Libraries Silo may depend on
 HDF5_LIB=/Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2/lib
 SZIP_LIB=/Users/miller86/visit/visit/szip/2.1/i386-apple-darwin12_gcc-4.2/lib
 

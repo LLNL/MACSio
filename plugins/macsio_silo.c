@@ -243,15 +243,16 @@ static int show_all_errors = FALSE;
 
 static int process_args(int argi, int argc, char *argv[])
 {
-    const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
-    char driver_str[128];
-    char compression_str[512];
+    const MACSIO_CLARGS_ArgvFlags_t argFlags = {
+        MACSIO_CLARGS_WARN,
+        MACSIO_CLARGS_TOMEM,
+        MACSIO_CLARGS_ASSIGN_OFF};
+    char *driver_str = 0;
+    char *compression_str = 0;
     int cksums = 0;
     int hdf5friendly = 0;
     int show_all_errors = 0;
 
-    strcpy(driver_str, "DB_HDF5");
-    strcpy(compression_str, "");
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--driver %s", "DB_HDF5",
             "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants)",
@@ -270,12 +271,19 @@ static int process_args(int argi, int argc, char *argv[])
             &show_all_errors,
     MACSIO_CLARGS_END_OF_ARGS);
 
-#warning MOVE THIS STUFF TO register METHOD
-    driver = StringToDriver(driver_str);
+    if (driver_str)
+    {
+        driver = StringToDriver(driver_str);
+        free(driver_str);
+    }
+    if (compression_str)
+    {
+        if (*compression_str)
+            DBSetCompression(compression_str);
+        free(compression_str);
+    }
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
-    if (compression_str[0] != '\0')
-        DBSetCompression(compression_str);
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
 
     return 0;
