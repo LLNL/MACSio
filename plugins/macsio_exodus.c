@@ -275,13 +275,14 @@ static void write_mesh_coords_all_parts(int exoid, ex_global_init_params_t const
 /* Write the different mesh parts as different element blocks over a
    single set of coordinates */
 static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t const *params,
-    json_object *part, int coord_offset)
+    json_object *part, int coord_offset, int dumpn, double dumpt)
 {
     int i,j;
     int num_elems_in_dim[3] = {1,1,1};
     int elem_block_id = JsonGetInt(part, "Mesh/ChunkID")+1;
     int nodes_per_elem = params->num_dim==2?4:8;
     int num_elems_in_block = JsonGetInt(part, "Mesh/LogDims", 0)-1;
+    json_object *vars_array = JsonGetObj(part, "Vars");
     int *connect;
 
     num_elems_in_dim[0] = JsonGetInt(part, "Mesh/LogDims", 0)-1;
@@ -311,68 +312,96 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
                 JsonGetInt(part, "Mesh/Topology/Template", j) +  /* Offset for nodes in template elem */
                 1;                                               /* Offset for 1-origin indexing */
 
-#if 0
-coord_offset + i + i/elem_dims[0] +
-                JsonGetInt(part, "Mesh/Topology/Template", j) + 1;
-#endif
-
     ex_put_elem_conn(exoid, elem_block_id, connect);
-
-    free(connect);
+    if (connect) free(connect);
   
 #if 0
     exo_err = ex_put_id_map(exoid, EX_NODE_MAP, node_map);
     exo_err = ex_put_id_map(exoid, EX_ELEM_MAP, elem_map);
-  
-    exo_err = ex_put_all_var_param(exoid, 0, num_nodal_fields, num_element_fields,
-        elem_var_tab, 0, 0, 0, 0);
-
-      if (num_nodal_fields > 0) {
-
-	if (npd == 0) {
-	  nvar_name = malloc (num_nodal_fields * sizeof(char *));
-	  assert(nvar_name);
-	  for (j=0; j<num_nodal_fields; j++) {
-	    nvar_name[j] = malloc ((MAX_STRING_LEN+1) * sizeof (char));
-	    sprintf (nvar_name[j], "node_field_%d", j+1);
-	  }
-	}
-	err = ex_put_variable_names (exoid[npd], EX_NODAL, num_nodal_fields, nvar_name);
-	if (npd == files_per_domain-1) {
-	  for (j=0; j<num_nodal_fields; j++) {
-	    free(nvar_name[j]);
-	  }
-	  free(nvar_name);
-	}
-      }
-
-    exo_err = ex_put_variable_names(exoid, EX_ELEM_BLOCK, num_element_fields, evar_name);
-
-    ex_put_time(exoid[npd], t+1, &time);
-
-	  for (j=0; j<num_nodal_fields; j++) {
-	    t_tmp1 = my_timer();
-	    err = ex_put_var (exoid[npd], t+1, EX_NODAL, j+1, 0, num_nodes, x_coords);
-	    t_tmp2 = my_timer();
-	    raw_write_time += t_tmp2-t_tmp1;
-	    if (err) {
-	      fprintf(stderr, "after ex_put_nodal_var, error = %d\n", err);
-	      ex_close (exoid[npd]);
-	      exit(1);
-	    }
-	  }
-	  for (j=0; j<num_element_fields; j++) {
-	    t_tmp1 = my_timer();
-	    err = ex_put_var (exoid[npd], t+1, EX_ELEM_BLOCK, j+1, EBLK_ID, num_elems, x_coords);
-	    t_tmp2 = my_timer();
-	    raw_write_time += t_tmp2-t_tmp1;
-	    if (err) {
-	      fprintf(stderr, "after ex_put_element_var, error = %d\n", err);
-	      ex_close (exoid[npd]);
-	      exit(1);
-	    }
-	  }
 #endif
+
+    /* Output variables */
+    {
+#define MAX_STRING_LEN 128
+        int nv, ev;
+        int num_node_vars = 0;
+        int num_elem_vars = 0;
+        int *elem_var_tab = 0;
+        char **node_var_names = 0;
+        char **elem_var_names = 0;
+
+        for (i = 0; i < json_object_array_length(vars_array); i++)
+        {
+            json_object *varobj = json_object_array_get_idx(vars_array, i);
+            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
+                num_elem_vars++;
+            else
+                num_node_vars++;
+        }
+        if (num_node_vars)
+            node_var_names = (char **) malloc(num_node_vars * sizeof(char*));
+        if (num_elem_vars)
+        {
+            elem_var_names = (char **) malloc(num_elem_vars * sizeof(char*));
+            elem_var_tab = (int *) malloc(num_elem_vars * sizeof(int));
+            for (i = 0; i < num_elem_vars; i++)
+                elem_var_tab[i] = 1;
+        }
+
+        ex_put_all_var_param(exoid, 0, num_node_vars, num_elem_vars,
+            elem_var_tab, 0, 0, 0, 0);
+
+        for (i = 0; i < json_object_array_length(vars_array); i++)
+        {
+            json_object *varobj = json_object_array_get_idx(vars_array, i);
+            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
+            {
+                elem_var_names[ev] = (char *) malloc((MAX_STRING_LEN+1) * sizeof (char));
+                snprintf(elem_var_names[ev], MAX_STRING_LEN, JsonGetStr(varobj, "name"));
+                ev++;
+            }
+            else
+            {
+                node_var_names[nv] = (char *) malloc((MAX_STRING_LEN+1) * sizeof (char));
+                snprintf(node_var_names[nv], MAX_STRING_LEN, JsonGetStr(varobj, "name"));
+                nv++;
+            }
+        }
+
+        if (num_node_vars)
+        {
+	    ex_put_variable_names(exoid, EX_NODAL, num_node_vars, node_var_names);
+            for (i = 0; i < num_node_vars; i++)
+                free(node_var_names[i]);
+            free(node_var_names);
+        }
+        if (num_elem_vars)
+        {
+	    ex_put_variable_names(exoid, EX_ELEM_BLOCK, num_elem_vars, elem_var_names);
+            for (i = 0; i < num_elem_vars; i++)
+                free(elem_var_names[i]);
+            free(elem_var_names);
+            free(elem_var_tab);
+        }
+
+        ex_put_time(exoid, dumpn+1, &dumpt);
+
+        ev = 1;
+        for (i = 0; i < json_object_array_length(vars_array); i++)
+        {
+            json_object *varobj = json_object_array_get_idx(vars_array, i);
+            json_object *dataobj = JsonGetObj(varobj, "data");
+            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
+	        ex_put_var(exoid, dumpn+1, EX_ELEM_BLOCK, ev++, elem_block_id, num_elems_in_block,
+                    json_object_extarr_data(dataobj));
+#warning HAVE TO CONVERT NON-DOUBLE DATA TO DOUBLE HERE
+#warning CANNOT PUT NODAL VARS OUT AT THIS LEVEL
+#if 0
+            else
+	        ex_put_var(exoid, dumpn+1, EX_NODAL, nv++, 0, num_nodes, x_coords);
+#endif
+        }
+    }
 }
 
 static void WriteNemesis(json_object *main_obj, int exoid, int dumpn, MACSIO_MIF_baton_t *bat)
@@ -519,7 +548,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     for (int i = 0; i < numParts; i++)
     {
         json_object *this_part = JsonGetObj(main_obj, "problem/parts", i);
-        write_mesh_part_blocks_and_vars(*exoid_ptr, &ex_globals, this_part, elem_block_coord_offsets[i]);
+        write_mesh_part_blocks_and_vars(*exoid_ptr, &ex_globals, this_part, elem_block_coord_offsets[i], dumpn, dumpt);
     }
     if (elem_block_coord_offsets) free(elem_block_coord_offsets);
 
