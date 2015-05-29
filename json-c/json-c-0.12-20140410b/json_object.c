@@ -1139,6 +1139,58 @@ void const *json_object_extarr_data(struct json_object* jso)
     if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
     return jso->o.c_extarr.data;
 }
+
+#define COPYNCAST_EXTARR_DATA(SRCT, SRCP, DSTT, DSTP, NVALS) \
+{                                                            \
+    if (!strcmp(#SRCT, #DSTT))                               \
+        memcpy(DSTP, SRCP, NVALS * sizeof(SRCT));            \
+    else                                                     \
+    {                                                        \
+        int i;                                               \
+        SRCT *psrc = (SRCT*) json_object_extarr_data(jso);   \
+        DSTT *pdst = (DSTT*) DSTP;                           \
+        for (i = 0; i < NVALS; i++)                          \
+            pdst[i] = (DSTT) psrc[i];                        \
+    }                                                        \
+}
+
+#define JSON_OBJECT_EXTARR_DATA_AS(DSTT,DSTN)                                                               \
+int json_object_extarr_data_as_ ## DSTN(struct json_object* jso, DSTT **buf)                                \
+{                                                                                                           \
+    json_extarr_type etype;                                                                                 \
+    int nvals;                                                                                              \
+    void *srcp;                                                                                             \
+                                                                                                            \
+    if (buf == 0) return 0;                                                                                 \
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;                                      \
+                                                                                                            \
+    etype = json_object_extarr_type(jso);                                                                   \
+    if (etype == json_extarr_type_null) return 0;                                                           \
+    nvals = json_object_extarr_nvals(jso);                                                                  \
+                                                                                                            \
+    if (*buf == 0)                                                                                          \
+        *buf = (DSTT*) malloc(nvals * sizeof(DSTT));                                                        \
+    srcp = json_object_extarr_data(jso);                                                                    \
+                                                                                                            \
+    switch (etype)                                                                                          \
+    {                                                                                                       \
+        case json_extarr_type_byt08: COPYNCAST_EXTARR_DATA(unsigned char, srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_int32: COPYNCAST_EXTARR_DATA(int,           srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_int64: COPYNCAST_EXTARR_DATA(int64_t,       srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_flt32: COPYNCAST_EXTARR_DATA(float,         srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_flt64: COPYNCAST_EXTARR_DATA(double,        srcp, DSTT, *buf, nvals); break;  \
+        default: return 0;                                                                                  \
+    }                                                                                                       \
+                                                                                                            \
+    return 1;                                                                                               \
+}
+
+JSON_OBJECT_EXTARR_DATA_AS(unsigned char,unsigned_char)
+JSON_OBJECT_EXTARR_DATA_AS(int,int)
+JSON_OBJECT_EXTARR_DATA_AS(int64_t,int64_t)
+JSON_OBJECT_EXTARR_DATA_AS(float,float)
+JSON_OBJECT_EXTARR_DATA_AS(double,double)
+
 /**@} External Arrays */
 
 /**@} Aggregate Types */

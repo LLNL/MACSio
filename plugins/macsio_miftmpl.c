@@ -168,7 +168,7 @@ file, the memory for the ASCII string is released by json_object_free_printbuf()
 which the JSON object for this part was written in the file and the part's ID.
 */
 static json_object *write_mesh_part(
-    FILE *myFile,          /**< [in] The a file handle being used in a MIF dump */
+    FILE *myFile,          /**< [in] The file handle being used in a MIF dump */
     char const *fileName,  /**< [in] Name of the MIF file */
     json_object *part_obj  /**< [in] The json object representing this mesh part */
 )

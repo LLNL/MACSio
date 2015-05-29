@@ -676,6 +676,11 @@ extern int                   json_object_extarr_nvals(struct json_object* jso);
 extern int                   json_object_extarr_ndims(struct json_object* jso);
 extern int                   json_object_extarr_dim(struct json_object* jso, int dimidx);
 extern void const *          json_object_extarr_data(struct json_object* jso);
+extern int                   json_object_extarr_data_as_unsigned_char(struct json_object* jso, unsigned char **buf);
+extern int                   json_object_extarr_data_as_int(struct json_object* jso, int **buf);
+extern int                   json_object_extarr_data_as_int64_t(struct json_object* jso, int64_t **buf);
+extern int                   json_object_extarr_data_as_float(struct json_object* jso, float **buf);
+extern int                   json_object_extarr_data_as_double(struct json_object* jso, double **buf);
 
 extern json_bool            json_object_path_get_boolean(struct json_object *src, char const *key_path);
 extern char const *         json_object_path_get_enum_choice_name(struct json_object *src, char const *key_path);

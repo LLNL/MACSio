@@ -348,9 +348,11 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
                 elem_var_tab[i] = 1;
         }
 
+#warning CHANGE TO EX_PUT_VAR_PARAM
         ex_put_all_var_param(exoid, 0, num_node_vars, num_elem_vars,
             elem_var_tab, 0, 0, 0, 0);
 
+        nv = ev = 0;
         for (i = 0; i < json_object_array_length(vars_array); i++)
         {
             json_object *varobj = json_object_array_get_idx(vars_array, i);
@@ -368,6 +370,7 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
             }
         }
 
+
         if (num_node_vars)
         {
 	    ex_put_variable_names(exoid, EX_NODAL, num_node_vars, node_var_names);
@@ -384,22 +387,29 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
             free(elem_var_tab);
         }
 
+
         ex_put_time(exoid, dumpn+1, &dumpt);
+
 
         ev = 1;
         for (i = 0; i < json_object_array_length(vars_array); i++)
         {
             json_object *varobj = json_object_array_get_idx(vars_array, i);
             json_object *dataobj = JsonGetObj(varobj, "data");
-            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
-	        ex_put_var(exoid, dumpn+1, EX_ELEM_BLOCK, ev++, elem_block_id, num_elems_in_block,
-                    json_object_extarr_data(dataobj));
-#warning HAVE TO CONVERT NON-DOUBLE DATA TO DOUBLE HERE
-#warning CANNOT PUT NODAL VARS OUT AT THIS LEVEL
-#if 0
-            else
-	        ex_put_var(exoid, dumpn+1, EX_NODAL, nv++, 0, num_nodes, x_coords);
-#endif
+            json_extarr_type etype = json_object_extarr_type(dataobj);
+            void const *dbuf = json_object_extarr_data(dataobj);
+            void *vbuf = 0;
+
+            if (strcmp(JsonGetStr(varobj, "centering"), "zone")) continue;
+
+            if (params->cpu_word_size == sizeof(double) && etype != json_extarr_type_flt64)
+                json_object_extarr_data_as_double(dataobj, (double**) &vbuf);
+            else if (params->cpu_word_size == sizeof(float) && etype != json_extarr_type_flt32)
+                json_object_extarr_data_as_float(dataobj, (float**) &vbuf);
+
+	    ex_put_var(exoid, dumpn+1, EX_ELEM_BLOCK, ev++, elem_block_id, num_elems_in_block, vbuf?vbuf:dbuf);
+
+            if (vbuf) free(vbuf);
         }
     }
 }
