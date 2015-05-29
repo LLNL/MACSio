@@ -395,11 +395,10 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             if (exercise_scr)
                 SCR_Complete_checkpoint(scr_valid);
 #endif
-
         }
 
         /* stop timer */
-        MT_StopTimer(heavy_dump_tid);
+        dumpTime += MT_StopTimer(heavy_dump_tid);
 
         /* log dump completion */
     }

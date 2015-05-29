@@ -18,6 +18,8 @@
 #include <mpi.h>
 #endif
 
+#define MAX_STRING_LEN 128
+
 /*!
 \addtogroup plugins
 @{
@@ -46,6 +48,11 @@ typedef struct _ex_global_init_params {
     int num_elem_block;
     int num_node_sets;
     int num_side_sets;
+
+    /* not really global initialization state but is useful to include
+       in this struct to facilitate file open vs. create */
+    int dumpn;
+    double dumpt;
 } ex_global_init_params_t;
 
 static int process_args(int argi, int argc, char *argv[])
@@ -72,12 +79,44 @@ static int process_args(int argi, int argc, char *argv[])
     return 0;
 }
 
+/*!
+\brief MIF Create callback
+
+This is a *create* callback. However, Exodus expects additional timesteps to be
+written to the same file(s) as the time zero data went into (unless there are changes
+in mesh connectivity/topology. So, this callback really only does file *creation*
+during time-zero. Thereafter, it only does opens. We put an additional field into
+ex_global_init_params (passed in here as userData), dumpn, to detect when
+this callback is called for time zero or not.
+*/
 static void *CreateExodusFile(const char *fname, const char *nsname, void *userData)
 {
     ex_global_init_params_t *params = (ex_global_init_params_t *) userData;
+    int exoid;
 
-    int exoid = ex_create(fname, params->file_creation_flags,
-        &(params->cpu_word_size), &(params->io_word_size));
+    if (params->dumpn)
+    {
+        float version;
+        int *exoid_ptr;
+
+        exoid = ex_open(fname, EX_WRITE, &(params->cpu_word_size), &(params->io_word_size), &version);
+
+        if (exoid >= 0)
+        {
+            int exo_err = ex_put_time(exoid, params->dumpn+1, &(params->dumpt));
+            if (exo_err == 0)
+            {
+                exoid_ptr = (int *) malloc(sizeof(int));
+                *exoid_ptr = exoid;
+                return exoid_ptr;
+            }
+        }
+
+        return 0;
+    }
+
+    exoid = ex_create(fname, params->file_creation_flags,
+                &(params->cpu_word_size), &(params->io_word_size));
 
     if (exoid >= 0)
     {
@@ -88,6 +127,9 @@ static void *CreateExodusFile(const char *fname, const char *nsname, void *userD
         exo_err = ex_put_init(exoid, "MACSio performance test of Exodus library",
             params->num_dim, params->num_nodes, params->num_elems, params->num_elem_block,
             params->num_node_sets, params->num_side_sets);
+
+        if (exo_err == 0)
+            exo_err = ex_put_time(exoid, params->dumpn+1, &(params->dumpt));
 
         if (exo_err == 0)
             return exoid_ptr;
@@ -114,7 +156,8 @@ static void CloseExodusFile(void *file, void *userData)
     free(file);
 }
 
-static void get_exodus_global_init_params(json_object *main_obj, ex_global_init_params_t* params)
+static void get_exodus_global_init_params(json_object *main_obj, int dumpn, double dumpt,
+    ex_global_init_params_t* params)
 {
     int i;
     long long num_nodes = 0, num_elems = 0;
@@ -191,6 +234,10 @@ static void get_exodus_global_init_params(json_object *main_obj, ex_global_init_
 
     params->num_node_sets = 0;
     params->num_side_sets = 0;
+
+    /* this is needed to facilitate MIF create callback behavior */
+    params->dumpn = dumpn;
+    params->dumpt = dumpt;
 }
 
 static void write_rect_mesh_coords_all_parts(int exoid, ex_global_init_params_t const *params,
@@ -300,6 +347,7 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
     ex_put_elem_block(exoid, elem_block_id, params->num_dim==2?"QUAD":"HEX",
         num_elems_in_block, nodes_per_elem, 0);
 
+#warning ONLY NEED TO DO CONNECT STUFF ONCE
     connect = (int *) malloc(nodes_per_elem * num_elems_in_block * sizeof(int));
 
     for (i = 0; i < num_elems_in_block; i++)
@@ -322,74 +370,40 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
 
     /* Output variables */
     {
-#define MAX_STRING_LEN 128
-        int nv, ev;
-        int num_node_vars = 0;
+        int ev = 0;
         int num_elem_vars = 0;
-        int *elem_var_tab = 0;
-        char **node_var_names = 0;
         char **elem_var_names = 0;
 
         for (i = 0; i < json_object_array_length(vars_array); i++)
         {
             json_object *varobj = json_object_array_get_idx(vars_array, i);
-            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
-                num_elem_vars++;
-            else
-                num_node_vars++;
+            if (strcmp(JsonGetStr(varobj, "centering"), "zone")) continue;
+            num_elem_vars++;
         }
-        if (num_node_vars)
-            node_var_names = (char **) malloc(num_node_vars * sizeof(char*));
         if (num_elem_vars)
-        {
             elem_var_names = (char **) malloc(num_elem_vars * sizeof(char*));
-            elem_var_tab = (int *) malloc(num_elem_vars * sizeof(int));
-            for (i = 0; i < num_elem_vars; i++)
-                elem_var_tab[i] = 1;
-        }
 
-#warning CHANGE TO EX_PUT_VAR_PARAM
-        ex_put_all_var_param(exoid, 0, num_node_vars, num_elem_vars,
-            elem_var_tab, 0, 0, 0, 0);
+        ex_put_var_param(exoid, "e", num_elem_vars);
 
-        nv = ev = 0;
         for (i = 0; i < json_object_array_length(vars_array); i++)
         {
             json_object *varobj = json_object_array_get_idx(vars_array, i);
-            if (!strcmp(JsonGetStr(varobj, "centering"), "zone"))
-            {
-                elem_var_names[ev] = (char *) malloc((MAX_STRING_LEN+1) * sizeof (char));
-                snprintf(elem_var_names[ev], MAX_STRING_LEN, JsonGetStr(varobj, "name"));
-                ev++;
-            }
-            else
-            {
-                node_var_names[nv] = (char *) malloc((MAX_STRING_LEN+1) * sizeof (char));
-                snprintf(node_var_names[nv], MAX_STRING_LEN, JsonGetStr(varobj, "name"));
-                nv++;
-            }
+            if (strcmp(JsonGetStr(varobj, "centering"), "zone")) continue;
+            elem_var_names[ev] = (char *) malloc((MAX_STRING_LEN+1) * sizeof (char));
+            snprintf(elem_var_names[ev], MAX_STRING_LEN, "%s", JsonGetStr(varobj, "name"));
+            ev++;
         }
 
-
-        if (num_node_vars)
-        {
-	    ex_put_variable_names(exoid, EX_NODAL, num_node_vars, node_var_names);
-            for (i = 0; i < num_node_vars; i++)
-                free(node_var_names[i]);
-            free(node_var_names);
-        }
         if (num_elem_vars)
         {
 	    ex_put_variable_names(exoid, EX_ELEM_BLOCK, num_elem_vars, elem_var_names);
             for (i = 0; i < num_elem_vars; i++)
                 free(elem_var_names[i]);
             free(elem_var_names);
-            free(elem_var_tab);
         }
 
-
+#warning MOVE TO MORE GLOBAL PLACE IN DUMP SEQUENCE
         ex_put_time(exoid, dumpn+1, &dumpt);
-
 
         ev = 1;
         for (i = 0; i < json_object_array_length(vars_array); i++)
@@ -532,16 +546,15 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         numGroups = size;
     }
 
-    get_exodus_global_init_params(main_obj, &ex_globals);
+    get_exodus_global_init_params(main_obj, dumpn, dumpt, &ex_globals);
 
     bat = MACSIO_MIF_Init(numGroups, ioFlags, MACSIO_MAIN_Comm, 1,
         CreateExodusFile, OpenExodusFile, CloseExodusFile, &ex_globals);
 
     /* Construct name for the file */
-    sprintf(fileName, "%s_exodus_%05d_%03d.%s",
+    sprintf(fileName, "%s_exodus_%05d.%s",
         JsonGetStr(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
-        dumpn,
         JsonGetStr(main_obj, "clargs/fileext"));
 
     /* Wait for write access to the file. All processors call this.
