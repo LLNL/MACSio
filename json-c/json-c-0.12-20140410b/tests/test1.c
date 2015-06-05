@@ -167,7 +167,8 @@ int main(int argc, char **argv)
         {
             json_object *filobj = json_object_from_file("foo.json");
             json_object *tmpobj;
-	    printf("filobj=%s\n", json_object_to_json_string(filobj));
+	    printf("filobj=%s, nbytes=%d\n", json_object_to_json_string(filobj),
+                json_object_object_nbytes(filobj));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_path_get_int(filobj, "steve/cameron/b"),
                 json_object_path_get_int(filobj, "abc"));

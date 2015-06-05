@@ -1118,6 +1118,38 @@ int json_object_extarr_nvals(struct json_object* jso)
     return nvals;
 }
 
+int json_object_extarr_valsize(struct json_object* obj)
+{
+    if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
+
+    switch (json_object_extarr_type(obj))
+    {
+        case json_extarr_type_null:  return(0);
+        case json_extarr_type_bit01: return(1);
+        case json_extarr_type_byt08: return(1);
+        case json_extarr_type_int32: return(4);
+        case json_extarr_type_int64: return(8);
+        case json_extarr_type_flt32: return(4);
+        case json_extarr_type_flt64: return(8);
+    }
+
+    return 0;
+}
+
+int64_t json_object_extarr_nbytes(struct json_object* obj)
+{
+    int64_t nvals;
+    int valsize;
+
+    if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
+
+    /* We include the space necessary to store the type, #dims and
+       size of each dim */
+    return json_object_extarr_nvals(obj) *
+           json_object_extarr_valsize(obj) +
+          (json_object_extarr_ndims(obj)+2) * sizeof(int);
+}
+
 int json_object_extarr_ndims(struct json_object* jso)
 {
     if (!jso) return 0;
@@ -2221,5 +2253,37 @@ void json_object_free_printbuf(struct json_object* jso)
   jso->_pb = 0;
 }
 /**@} Serialization */
+
+int64_t json_object_object_nbytes(struct json_object* obj)
+{
+    if (!obj) return 0;
+    switch (json_object_get_type(obj))
+    {
+        case json_type_null:    return 0;
+        case json_type_boolean: return sizeof(json_bool);
+        case json_type_int:     return sizeof(int64_t);
+        case json_type_double:  return sizeof(double);
+        case json_type_string:  return json_object_get_string_len(obj);
+        case json_type_extarr:  return json_object_extarr_nbytes(obj);
+        case json_type_enum:    return json_object_enum_length(obj) * sizeof(int);
+        case json_type_array:
+        {
+            int i;
+            int64_t retval = 0;
+            for (i = 0; i < json_object_array_length(obj); i++)
+                retval += json_object_object_nbytes(json_object_array_get_idx(obj, i));
+            return retval;
+        }
+        case json_type_object:
+        {
+            int64_t retval = 0;
+            struct json_object_iter iter;
+            json_object_object_foreachC(obj, iter)
+                retval += json_object_object_nbytes(iter.val);
+            return retval;
+        }
+    }
+    return 0;
+}
 
 /**@} JSON-C Library */

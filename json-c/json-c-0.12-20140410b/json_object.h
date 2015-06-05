@@ -656,6 +656,7 @@ extern struct json_object* json_object_new_enum(void);
 extern void                json_object_enum_add(struct json_object* jso, char const *name,
                                int64_t val, json_bool selected);
 extern int                 json_object_enum_length(struct json_object* jso);
+extern int                 json_object_enum_nbytes(struct json_object* jso);
 extern char const *        json_object_enum_get_idx_name(struct json_object* jso, int idx);
 extern int64_t             json_object_enum_get_idx_val(struct json_object* jso, int idx);
 extern char const *        json_object_enum_get_name(struct json_object* jso, int64_t val);
@@ -673,6 +674,8 @@ extern struct json_object*   json_object_new_extarr_alloc(enum json_extarr_type 
                                  int ndims, int const *dims);
 extern enum json_extarr_type json_object_extarr_type(struct json_object* jso);
 extern int                   json_object_extarr_nvals(struct json_object* jso);
+extern int                   json_object_extarr_valsize(struct json_object* jso);
+extern int64_t               json_object_extarr_nbytes(struct json_object* jso);
 extern int                   json_object_extarr_ndims(struct json_object* jso);
 extern int                   json_object_extarr_dim(struct json_object* jso, int dimidx);
 extern void const *          json_object_extarr_data(struct json_object* jso);
@@ -785,6 +788,8 @@ extern json_bool json_object_path_set_int(struct json_object *obj, char const *k
 extern json_bool json_object_path_set_int64(struct json_object *obj, char const *key_path, int64_t val);
 extern json_bool json_object_path_set_double(struct json_object *obj, char const *key_path, double val);
 extern json_bool json_object_path_set_string(struct json_object *obj, char const *key_path, char const *val);
+
+extern int64_t json_object_object_nbytes(struct json_object *const obj);
 
 /**@} JSON-C Library */
 
