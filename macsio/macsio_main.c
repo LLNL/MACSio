@@ -171,6 +171,13 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
+        "--units_prefix_system %s", "binary",
+            "Specify which SI units prefix system to use both in reporting performance\n"
+            "data and in interpreting sizing modifiers to arguments. The options are\n"
+            "\"binary\" and \"decimal\". For \"binary\" unit prefixes, sizes are reported\n"
+            "in powers of 1024 and unit symbols Ki, Mi, Gi, Ti, Pi are used. For \"decimal\",\n"
+            "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
+            "See http://en.wikipedia.org/wiki/Binary_prefix. for more information",
         "--interface %s", "miftmpl",
             "Specify the name of the interface to be tested. Use keyword 'list'\n"
             "to print a list of all known interface names and then exit.",
@@ -220,6 +227,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
+        "--topology_change_probability %f", "0.0",
+            "The probability that the topology of the mesh (e.g. something fundamental\n"
+            "about the mesh's structure) will change between dumps. A value of 1.0\n"
+            "indicates it should be changed every dump. A value of 0.0, the default,\n"
+            "indicates it will never change. A value of 0.1 indicates it will change\n"
+            "about once every 10 dumps. Note: at present MACSio will not actually\n"
+            "compute/construct a different topology. It will only inform a plugin\n"
+            "that a given dump should be treated as a change in topology.",
         "--meta_type %s", "tabular",
             "Specify the type of metadata objects to include in each main dump.\n"
             "Options are 'tabular', 'amorphous'. For tabular type data, MACSio\n"
@@ -274,6 +289,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
+        "--log_file_name %s", "macsio-log.log",
+            "The name of the log file.",
         "--log_line_cnt %d", "64",
             "Set number of lines per rank in the log file.",
         "--log_line_length %d", "128",
@@ -332,7 +349,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 static int
 main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
-    int dumpNum;
+    int dumpNum = 0, dumpCount = 0;
+    unsigned long long problem_nbytes, dumpBytes = 0;
+    char nbytes_str[32], seconds_str[32], bandwidth_str[32];
     double dumpTime = 0;
     MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
@@ -341,6 +360,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
     /* Generate a static problem object to dump on each dump */
     json_object *problem_obj = MACSIO_DATA_GenerateTimeZeroDumpObject(main_obj,0);
+    problem_nbytes = (unsigned long long) json_object_object_nbytes(problem_obj);
+
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);
 
@@ -363,8 +384,11 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     dumpTime = 0.0;
     for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
     {
+        double dt;
         int scr_need_checkpoint_flag = 1;
         MACSIO_TIMING_TimerId_t heavy_dump_tid;
+
+#warning ADD OPTION TO UNLINK OLD FILE SETS
 
 #ifdef HAVE_SCR
         if (exercise_scr)
@@ -376,10 +400,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
         /* log dump start */
 
-        /* Start dump timer */
-        heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
-
-        if (scr_need_checkpoint_flag)
+        if (!exercise_scr || scr_need_checkpoint_flag)
         {
             int scr_valid = 0;
 
@@ -388,8 +409,15 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
                 SCR_Start_checkpoint();
 #endif
 
+            /* Start dump timer */
+            heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
+
+#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
+#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
             /* do the dump */
             (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+
+            dt = MT_StopTimer(heavy_dump_tid);
 
 #ifdef HAVE_SCR
             if (exercise_scr)
@@ -398,10 +426,21 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
         }
 
         /* stop timer */
-        dumpTime += MT_StopTimer(heavy_dump_tid);
+        dumpTime += dt;
+        dumpBytes += problem_nbytes;
+        dumpCount += 1;
 
-        /* log dump completion */
+        /* log dump timing */
+        MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
+            MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
+
+    MACSIO_LOG_MSG(Info, ("Overall BW: %s/%s = %s",
+        MU_PrByts(dumpBytes, 0, nbytes_str, sizeof(nbytes_str)),
+        MU_PrSecs(dumpTime, 0, seconds_str, sizeof(seconds_str)),
+        MU_PrBW(dumpBytes, dumpTime, 0, bandwidth_str, sizeof(bandwidth_str))));
 }
 
 #warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
@@ -483,16 +522,21 @@ main(int argc, char *argv[])
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;
 #endif
+
     errno = 0;
-
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
-
-#warning SET DEFAULT VALUES FOR CLARGS
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
     json_object_object_add(main_obj, "clargs", clargs_obj);
+
+    strncpy(MACSIO_UTILS_UnitsPrefixSystem, JsonGetStr(clargs_obj, "units_prefix_system"),
+        sizeof(MACSIO_UTILS_UnitsPrefixSystem));
+
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
+        JsonGetStr(clargs_obj, "log_file_name"),
+        JsonGetInt(clargs_obj, "log_line_length"),
+        JsonGetInt(clargs_obj, "log_line_cnt"));
 
 #warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
@@ -527,7 +571,7 @@ main(int argc, char *argv[])
         {
             /* For now, just log to stderr */
 #warning NEED A LOG FILE FOR SPECIFIC SET OF PROCESSORS, OR JUST ONE
-            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Dbg1, (timer_strs[i]));
+            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Info, (timer_strs[i]));
             free(timer_strs[i]);
         }
         free(timer_strs);
@@ -536,8 +580,8 @@ main(int argc, char *argv[])
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
 #warning ATEXIT THESE
-    MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
+    MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
 
 #ifdef HAVE_SCR
     if (exercise_scr)

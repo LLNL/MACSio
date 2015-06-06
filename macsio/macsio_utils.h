@@ -29,37 +29,48 @@ extern "C" {
   a=q0;                                                               \
 }
 
-unsigned int MACSIO_UTILS_BJHash(const unsigned char *k, unsigned int length, unsigned int initval);
-int MACSIO_UTILS_Best2DFactors(int val, int *x, int *y);
-int MACSIO_UTILS_Best3DFactors(int val, int *x, int *y, int *z);
-int MACSIO_UTILS_LogicalIJKIndexToSequentialIndex(int i,int j,int k,int Ni,int Nj);
-int MACSIO_UTILS_LogicalIJIndexToSequentialIndex (int i,int j,      int Ni       );
-int MACSIO_UTILS_LogicalIIndexToSequentialIndex  (int i                          );
-void MACSIO_UTILS_SequentialIndexToLogicalIJKIndex(int s,int Ni,int Nj,int *i,int *j,int *k);
-void MACSIO_UTILS_SequentialIndexToLogicalIJIndex(int s,int Ni,int *i,int *j);
-void MACSIO_UTILS_SequentialIndexToLogicalIIndex(int s,int *i);
+#define MU_PrByts(B,FMT,STR,N) MACSIO_UTILS_PrintBytes(B,FMT,STR,N)
+#define MU_PrSecs(S,FMT,STR,N) MACSIO_UTILS_PrintSeconds(S,FMT,STR,N)
+#define MU_PrBW(B,S,FMT,STR,N) MACSIO_UTILS_PrintBandwidth(B,S,FMT,STR,N)
 
-void MACSIO_UTILS_SetDims(int *dims, int nx, int ny, int nz);
-int MACSIO_UTILS_XDim(int const *dims);
-int MACSIO_UTILS_YDim(int const *dims);
-int MACSIO_UTILS_ZDim(int const *dims);
-void MACSIO_UTILS_SetBounds(double *bounds,
+extern char MACSIO_UTILS_UnitsPrefixSystem[32];
+
+extern unsigned int MACSIO_UTILS_BJHash(const unsigned char *k, unsigned int length, unsigned int initval);
+extern int MACSIO_UTILS_Best2DFactors(int val, int *x, int *y);
+extern int MACSIO_UTILS_Best3DFactors(int val, int *x, int *y, int *z);
+extern int MACSIO_UTILS_LogicalIJKIndexToSequentialIndex(int i,int j,int k,int Ni,int Nj);
+extern int MACSIO_UTILS_LogicalIJIndexToSequentialIndex (int i,int j,      int Ni       );
+extern int MACSIO_UTILS_LogicalIIndexToSequentialIndex  (int i                          );
+extern void MACSIO_UTILS_SequentialIndexToLogicalIJKIndex(int s,int Ni,int Nj,int *i,int *j,int *k);
+extern void MACSIO_UTILS_SequentialIndexToLogicalIJIndex(int s,int Ni,int *i,int *j);
+extern void MACSIO_UTILS_SequentialIndexToLogicalIIndex(int s,int *i);
+
+extern void MACSIO_UTILS_SetDims(int *dims, int nx, int ny, int nz);
+extern int MACSIO_UTILS_XDim(int const *dims);
+extern int MACSIO_UTILS_YDim(int const *dims);
+extern int MACSIO_UTILS_ZDim(int const *dims);
+extern void MACSIO_UTILS_SetBounds(double *bounds,
     double xmin, double ymin, double zmin,
     double xmax, double ymax, double zmax);
-double MACSIO_UTILS_XRange(double const *bounds);
-double MACSIO_UTILS_YRange(double const *bounds);
-double MACSIO_UTILS_ZRange(double const *bounds);
-double MACSIO_UTILS_XMin(double const *bounds);
-double MACSIO_UTILS_YMin(double const *bounds);
-double MACSIO_UTILS_ZMin(double const *bounds);
-double MACSIO_UTILS_XMax(double const *bounds);
-double MACSIO_UTILS_YMax(double const *bounds);
-double MACSIO_UTILS_ZMax(double const *bounds);
-double MACSIO_UTILS_XDelta(int const *dims, double const *bounds);
-double MACSIO_UTILS_YDelta(int const *dims, double const *bounds);
-double MACSIO_UTILS_ZDelta(int const *dims, double const *bounds);
-json_object * MACSIO_UTILS_MakeDimsJsonArray(int ndims, const int *dims);
-json_object * MACSIO_UTILS_MakeBoundsJsonArray(double const * bounds);
+extern double MACSIO_UTILS_XRange(double const *bounds);
+extern double MACSIO_UTILS_YRange(double const *bounds);
+extern double MACSIO_UTILS_ZRange(double const *bounds);
+extern double MACSIO_UTILS_XMin(double const *bounds);
+extern double MACSIO_UTILS_YMin(double const *bounds);
+extern double MACSIO_UTILS_ZMin(double const *bounds);
+extern double MACSIO_UTILS_XMax(double const *bounds);
+extern double MACSIO_UTILS_YMax(double const *bounds);
+extern double MACSIO_UTILS_ZMax(double const *bounds);
+extern double MACSIO_UTILS_XDelta(int const *dims, double const *bounds);
+extern double MACSIO_UTILS_YDelta(int const *dims, double const *bounds);
+extern double MACSIO_UTILS_ZDelta(int const *dims, double const *bounds);
+extern json_object * MACSIO_UTILS_MakeDimsJsonArray(int ndims, const int *dims);
+extern json_object * MACSIO_UTILS_MakeBoundsJsonArray(double const * bounds);
+
+extern char const *MACSIO_UTILS_PrintBytes(unsigned long long bytes, char const *fmt, char *str, int n);
+extern char const *MACSIO_UTILS_PrintSeconds(double seconds, char const *fmt, char *str, int n);
+extern char const *MACSIO_UTILS_PrintBandwidth(unsigned long long bytes, double seconds,
+    char const *fmt, char *str, int n);
 
 #ifdef __cplusplus
 }

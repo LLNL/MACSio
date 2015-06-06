@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,7 @@
 
 #include <macsio_clargs.h>
 #include <macsio_log.h>
+#include <macsio_utils.h>
 
 /* Flags for parameters */
 #define PARAM_ASSIGNED 0x01
@@ -31,18 +33,33 @@ typedef struct _knownArgInfo {
    struct _knownArgInfo *next;	/**< pointer to the next comand line argument */
 } MACSIO_KnownArgInfo_t;
 
-static int GetSizeFromModifierChar(char c)
+static double GetSizeFromModifierChar(char c)
 {
-    int n=1;
-    switch (c)
+    if (!strncasecmp(MACSIO_UTILS_UnitsPrefixSystem, "decimal",
+        sizeof(MACSIO_UTILS_UnitsPrefixSystem)))
     {
-        case 'b': case 'B': n=(1<< 0); break;
-        case 'k': case 'K': n=(1<<10); break;
-        case 'm': case 'M': n=(1<<20); break;
-        case 'g': case 'G': n=(1<<30); break;
-        default:  n=1; break;
+        switch (c)
+        {
+            case 'k': case 'K': return 1000.0;
+            case 'm': case 'M': return 1000.0*1000.0;
+            case 'g': case 'G': return 1000.0*1000.0*1000.0;
+            case 't': case 'T': return 1000.0*1000.0*1000.0*1000.0;
+            case 'p': case 'P': return 1000.0*1000.0*1000.0*1000.0*1000.0;
+        }
     }
-    return n;
+    else
+    {
+        switch (c)
+        {
+            case 'k': case 'K': return 1024.0;
+            case 'm': case 'M': return 1024.0*1024.0;
+            case 'g': case 'G': return 1024.0*1024.0*1024.0;
+            case 't': case 'T': return 1024.0*1024.0*1024.0*1024.0;
+            case 'p': case 'P': return 1024.0*1024.0*1024.0*1024.0*1024.0;
+        }
+    }
+
+    return 1;
 }
 
 /* Handles adding one or more params for a single key. If the key doesn't
@@ -144,7 +161,9 @@ MACSIO_CLARGS_ProcessCmdline(
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn, ("MPI is not initialized"));
+         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
+             flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+             ("MPI is not initialized"));
          return MACSIO_CLARGS_ERROR;
       }
    }
@@ -348,7 +367,8 @@ MACSIO_CLARGS_ProcessCmdline(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+          MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
+              flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
               ("invalid argument type encountered at position %d",invalidArgTypeFound));
 #warning FIX WARN FAILURE BEHAVIOR HERE
       return MACSIO_CLARGS_ERROR;
@@ -448,20 +468,21 @@ MACSIO_CLARGS_ProcessCmdline(
 	    for (j = 0; j < p->paramCount; j++)
 	    {
                if (i == argc - 1)
-                   MACSIO_LOG_MSG(Die, ("too few arguments for command-line options"));
+                   MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Die, ("too few arguments for command-line options"));
 	       switch (p->paramTypes[j])
 	       {
 	          case 'd':
 	          {
                      int n = strlen(argv[++i])-1;
                      int tmpInt;
-                     double tmpDbl;
-                     n = GetSizeFromModifierChar(argv[i][n]);
+                     double tmpDbl, ndbl;
+                     ndbl = GetSizeFromModifierChar(argv[i][n]);
 		     tmpInt = strtol(argv[i], (char **)NULL, 10);
-                     tmpDbl = tmpInt * n;
+                     tmpDbl = tmpInt * ndbl;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
+                             flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
                              ("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]));
                      }
                      else
@@ -540,7 +561,8 @@ MACSIO_CLARGS_ProcessCmdline(
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
-             MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+             MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
+                 flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
                  ("%s: unknown argument %s. Type %s --help for help",p,argv[i],p));
          return MACSIO_CLARGS_ERROR; 
       }
@@ -577,7 +599,7 @@ MACSIO_CLARGS_ProcessCmdline(
 
                       if (pka->paramFlags[j] & PARAM_ASSIGNED) continue;
 
-                      MACSIO_LOG_MSGV(flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                      MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Dbg2,
                           ("Default value of \"%s\" assigned for param %d of arg \"%s\"",defParam,j,pka->argName));
 
 	              switch (pka->paramTypes[j])
@@ -586,10 +608,10 @@ MACSIO_CLARGS_ProcessCmdline(
 	                 {
                             int n = strlen(defParam)-1;
                             int tmpInt;
-                            double tmpDbl;
-                            n = GetSizeFromModifierChar(defParam[n]);
+                            double tmpDbl, ndbl;
+                            ndbl = GetSizeFromModifierChar(defParam[n]);
 		            tmpInt = strtol(defParam, (char **)NULL, 10);
-                            tmpDbl = tmpInt * n;
+                            tmpDbl = tmpInt * ndbl;
                             if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                             {
 		                int *pInt = (int *) (pka->paramPtrs[j]);
@@ -666,5 +688,6 @@ MACSIO_CLARGS_ProcessCmdline(
    if (flags.route_mode == MACSIO_CLARGS_TOJSON)
        *retobj = ret_json_obj;
 
+   errno = 0;
    return MACSIO_CLARGS_OK;
 }

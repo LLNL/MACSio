@@ -398,6 +398,8 @@ make_structured_mesh_topology(int ndims, int const *dims)
     {
         json_object *topo_template = json_object_new_array();
 
+        /* For domain entity (zone i), here are the nodal offsets in
+           linear address space, left node followed by right node */
         json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(0)));
         json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(1)));
 

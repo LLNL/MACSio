@@ -155,6 +155,26 @@ extern double
 MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t id /**< The timer's ID, returned from a call to StartTimer */);
 
 /*!
+\brief Get data from a specific timer
+
+For field names, see definition of timerInfo_t
+*/
+extern double
+MACSIO_TIMING_GetTimer(
+    MACSIO_TIMING_TimerId_t tid, /**< The timer's ID, returned from a call to StartTimer */
+    char const *field            /**< The name of the field from the timer to return */
+);
+
+/*!
+\brief Get data from a specific reduced timer
+*/
+extern double
+MACSIO_TIMING_GetReducedTimer(
+    MACSIO_TIMING_TimerId_t tid, /**< The timer's ID, returned from a call to StartTimer */
+    char const *field            /**< The name of the field from the timer to return */
+);
+
+/*!
 \brief Dump timers to ascii strings
 
 This call will find all used timers in the hash table matching the specified \c gmask group mask and dumps
