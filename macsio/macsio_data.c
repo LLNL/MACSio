@@ -54,6 +54,7 @@ static double noise(
 
     int X, Y, Z, A, AA, AB, B, BA, BB;
     double u, v, w;
+    double x = 0, y = 0, z = 0;
 
     if (!p_initialized)
     {
@@ -64,9 +65,11 @@ static double noise(
     }
 
     /* Map point in bounds to point in unit cube */
-    double x = _x / (bounds[3] - bounds[0]);
-    double y = _y / (bounds[4] - bounds[1]);
-    double z = _z / (bounds[5] - bounds[2]);
+    x = _x / (bounds[3] - bounds[0]);
+    if (bounds[4] != bounds[1])
+        y = _y / (bounds[4] - bounds[1]);
+    if (bounds[5] != bounds[2])
+        z = _z / (bounds[5] - bounds[2]);
 
     /* Unit cube that contains the point */
     X = (int)floor(x) & 255;
@@ -537,13 +540,17 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     json_object *var_obj = json_object_new_object();
     int i,j,k,n;
     int dims2[3] = {1,1,1};
+    double dims_diameter2 = 1;
     int minus_one = strcmp(centering, "zone")?0:-1;
     json_object *data_obj;
     double *valdp;
     int    *valip;
 
     for (i = 0; i < ndims; i++)
+    { 
         dims2[i] = dims[i] + minus_one;
+        dims_diameter2 += dims[i]*dims[i];
+    }
 
 #warning NEED EXPLICIT NAME FOR VARIABLE
     json_object_object_add(var_obj, "name", json_object_new_string(kind));
@@ -579,6 +586,29 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = sqrt(x*x+y*y+z*z);
+                }
+                else if (!strcmp(kind, "noise"))
+                {
+                    double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
+                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
+                    double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
+                    valdp[n++] = noise(x,y,z,bounds);
+                }
+                else if (!strcmp(kind, "noise_sum"))
+                {
+#warning SHOULD USE GLOBAL DIMS DIAMETER HERE
+                    int q, nlevels = (int) log2(sqrt(dims_diameter2));
+                    double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
+                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
+                    double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
+                    double mult = 1;
+                    valdp[n++] = 0;
+printf("nlevels = %d\n", nlevels);
+                    for (q = 0; q < nlevels; q++)
+                    {
+                        valdp[n-1] += 1/mult * fabs(noise(mult*x,mult*y,mult*z,bounds));
+                        mult *= 2;
+                    }
                 }
                 else if (!strcmp(kind, "ysin"))
                 {
@@ -626,6 +656,8 @@ make_mesh_vars(int ndims, int const *dims, double const *bounds)
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "spherical"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "xramp"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "ysin"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "noise"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "noise_sum"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "int", "xlayers"));
 
     return vars_array;

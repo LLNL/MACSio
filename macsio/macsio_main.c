@@ -205,13 +205,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
-            "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
-            "(2^20) or 'G'igabytes (2^30). Mesh and variable data is then sized\n"
-            "by MACSio to hit this target byte count. However, due to contraints\n"
-            "involved in creating valid mesh topology and variable data with\n"
-            "realistic variation in features (e.g. zone- and node-centering),\n"
-            "this target byte count is hit exactly for only the most frequently\n"
-            "dumped objects and approximately for other objects.",
+            "character indicates 'B'ytes, 'K'ilo-, 'M'ega- or 'G'iga- bytes\n"
+            "representing powers of either 1000 or 1024 according to the selected\n"
+            "units prefix system. With no size modifier character, 'B' is assumed.\n"
+            "Mesh and variable data is then sized by MACSio to hit this target byte\n"
+            "count. However, due to contraints involved in creating valid mesh\n"
+            "topology and variable data with realistic variation in features (e.g.\n"
+            "zone- and node-centering), this target byte count is hit exactly for\n"
+            "only the most frequently dumped objects and approximately for other objects.",
         "--part_dim %d", "2",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s", "rectilinear",
