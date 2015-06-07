@@ -635,3 +635,8 @@ void MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask)
     clear_timers(timerHashTable, gmask);
     clear_timers(reducedTimerTable, MACSIO_TIMING_ALL_GROUPS);
 }
+
+double MACSIO_TIMING_GetCurrentTime(void)
+{
+    return get_current_time();
+}

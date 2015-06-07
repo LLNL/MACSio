@@ -95,6 +95,12 @@ of the timer explicitly.
 #define MACSIO_TIMING_ALL_GROUPS (~((MACSIO_TIMING_GroupMask_t)0))
 
 /*!
+\def MT_Time
+\brief Convenience macro for getting current time
+*/
+#define MT_Time MACSIO_TIMING_GetCurrentTime
+
+/*!
 \def MT_StartTimer
 \brief Convenience macro for starting a timer
 \param [in] LAB User defined timer label string
@@ -220,6 +226,11 @@ Clears and resets timers of specified group
 */
 extern void MACSIO_TIMING_ClearTimers(
     MACSIO_TIMING_GroupMask_t gmask /**< Group mask to filter only timers belonging to specific groups */);
+
+/*!
+\brief Get current time
+*/
+extern double MACSIO_TIMING_GetCurrentTime(void);
 
 #ifdef __cplusplus
 }

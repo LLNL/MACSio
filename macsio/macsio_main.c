@@ -351,11 +351,13 @@ static int
 main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
     int rank = 0, dumpNum = 0, dumpCount = 0;
-    unsigned long long problem_nbytes, dumpBytes = 0;
-    char nbytes_str[32], seconds_str[32], bandwidth_str[32];
+    unsigned long long problem_nbytes, dumpBytes = 0, summedBytes = 0;
+    char nbytes_str[32], seconds_str[32], bandwidth_str[32], seconds_str2[32];
     double dumpTime = 0;
-    double bandwidth, reducedBandwidth;
+    double bandwidth, summedBandwidth;
     MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
+    double dump_loop_start, dump_loop_end;
+    double min_dump_loop_start, max_dump_loop_end;
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
 
     /* Sanity check args */
@@ -383,6 +385,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
+    dump_loop_start = MT_Time();
     dumpTime = 0.0;
     for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
     {
@@ -439,23 +442,34 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
 
+    dump_loop_end = MT_Time();
+
     MACSIO_LOG_MSG(Info, ("Overall BW: %s/%s = %s",
         MU_PrByts(dumpBytes, 0, nbytes_str, sizeof(nbytes_str)),
         MU_PrSecs(dumpTime, 0, seconds_str, sizeof(seconds_str)),
         MU_PrBW(dumpBytes, dumpTime, 0, bandwidth_str, sizeof(bandwidth_str))));
 
     bandwidth = dumpBytes / dumpTime;
-    reducedBandwidth = bandwidth;
+    summedBandwidth = bandwidth;
+    min_dump_loop_start = dump_loop_start;
+    max_dump_loop_end = dump_loop_end;
 
 #ifdef HAVE_MPI
     MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
-    MPI_Reduce(&bandwidth, &reducedBandwidth, 1, MPI_DOUBLE, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&bandwidth, &summedBandwidth, 1, MPI_DOUBLE, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dumpBytes, &summedBytes, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_start, &min_dump_loop_start, 1, MPI_DOUBLE, MPI_MIN, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_end, &max_dump_loop_end, 1, MPI_DOUBLE, MPI_MAX, 0, MACSIO_MAIN_Comm);
 #endif
 
     if (rank == 0)
     {
-        MACSIO_LOG_MSG(Info, ("Total   BW: %s",
-            MU_PrBW(reducedBandwidth, 1.0, 0, bandwidth_str, sizeof(bandwidth_str))));
+        MACSIO_LOG_MSG(Info, ("Summed  BW: %s",
+            MU_PrBW(summedBandwidth, 1.0, 0, bandwidth_str, sizeof(bandwidth_str))));
+        MACSIO_LOG_MSG(Info, ("Total Bytes: %s; Last finisher - First starter = %s; BW = %s",
+            MU_PrByts(summedBytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(max_dump_loop_end - min_dump_loop_start, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(summedBytes, max_dump_loop_end - min_dump_loop_start, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
 }
 
