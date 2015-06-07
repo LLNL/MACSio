@@ -350,10 +350,11 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 static int
 main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
-    int dumpNum = 0, dumpCount = 0;
+    int rank = 0, dumpNum = 0, dumpCount = 0;
     unsigned long long problem_nbytes, dumpBytes = 0;
     char nbytes_str[32], seconds_str[32], bandwidth_str[32];
     double dumpTime = 0;
+    double bandwidth, reducedBandwidth;
     MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
 
@@ -442,6 +443,20 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
         MU_PrByts(dumpBytes, 0, nbytes_str, sizeof(nbytes_str)),
         MU_PrSecs(dumpTime, 0, seconds_str, sizeof(seconds_str)),
         MU_PrBW(dumpBytes, dumpTime, 0, bandwidth_str, sizeof(bandwidth_str))));
+
+    bandwidth = dumpBytes / dumpTime;
+    reducedBandwidth = bandwidth;
+
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+    MPI_Reduce(&bandwidth, &reducedBandwidth, 1, MPI_DOUBLE, MPI_SUM, 0, MACSIO_MAIN_Comm);
+#endif
+
+    if (rank == 0)
+    {
+        MACSIO_LOG_MSG(Info, ("Total   BW: %s",
+            MU_PrBW(reducedBandwidth, 1.0, 0, bandwidth_str, sizeof(bandwidth_str))));
+    }
 }
 
 #warning DO WE REALLY CALL IT THE MAIN_OBJ HERE

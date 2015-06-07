@@ -597,7 +597,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                 else if (!strcmp(kind, "noise_sum"))
                 {
 #warning SHOULD USE GLOBAL DIMS DIAMETER HERE
-                    int q, nlevels = (int) log2(sqrt(dims_diameter2));
+                    int q, nlevels = (int) log2(sqrt(dims_diameter2))+1;
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
@@ -656,7 +656,7 @@ make_mesh_vars(int ndims, int const *dims, double const *bounds)
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "xramp"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "ysin"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "noise"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "noise_sum"));
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "noise_sum"));
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "int", "xlayers"));
 
     return vars_array;
