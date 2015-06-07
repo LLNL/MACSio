@@ -603,7 +603,6 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     double mult = 1;
                     valdp[n++] = 0;
-printf("nlevels = %d\n", nlevels);
                     for (q = 0; q < nlevels; q++)
                     {
                         valdp[n-1] += 1/mult * fabs(noise(mult*x,mult*y,mult*z,bounds));
