@@ -535,9 +535,6 @@ main(int argc, char *argv[])
     for (i = 0; i < argc && !exercise_scr; i++)
         exercise_scr = !strcmp("exercise_scr", argv[i]);
 
-    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
-    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
-
 #warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
@@ -552,8 +549,11 @@ main(int argc, char *argv[])
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;
 #endif
-
     errno = 0;
+
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
+    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Process the command line and put the results in the problem */
