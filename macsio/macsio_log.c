@@ -138,6 +138,7 @@ MACSIO_LOG_LogInit(
     retval->lines_per_proc = path?lines_per_proc:1000000;
     retval->current_line = 1;
     retval->flags.was_logged = 0;
+    errno = 0;
     return retval;
 }
 

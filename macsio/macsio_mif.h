@@ -138,7 +138,7 @@ typedef void *(*MACSIO_MIF_OpenCB)  (const char *fname, const char *nsname,
 #warning MAKE CLOSE CALLBACK RETURN SUCCESS OR FAILURE
 typedef void  (*MACSIO_MIF_CloseCB) (void *file, void *udata);
 
-#warning ENSURE DIFFERENT PLUGINS USE DIFFERENT MPI TAGS
+#warning ENSURE DIFFERENT INSTANCES USE DIFFERENT MPI TAGS
 #ifdef HAVE_MPI
 extern MACSIO_MIF_baton_t *MACSIO_MIF_Init(int numFiles, MACSIO_MIF_ioFlags_t ioFlags,
     MPI_Comm mpiComm, int mpiTag,

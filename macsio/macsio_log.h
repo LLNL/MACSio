@@ -101,6 +101,7 @@ do                                                                   \
         case MACSIO_LOG_MsgDbg1: {MACSIO_LOG_MSG(Dbg1, MSG); break;} \
         case MACSIO_LOG_MsgDbg2: {MACSIO_LOG_MSG(Dbg2, MSG); break;} \
         case MACSIO_LOG_MsgDbg3: {MACSIO_LOG_MSG(Dbg3, MSG); break;} \
+        case MACSIO_LOG_MsgInfo: {MACSIO_LOG_MSG(Info, MSG); break;} \
         case MACSIO_LOG_MsgWarn: {MACSIO_LOG_MSG(Warn, MSG); break;} \
         case MACSIO_LOG_MsgErr:  {MACSIO_LOG_MSG(Err, MSG); break; } \
         case MACSIO_LOG_MsgDie:  {MACSIO_LOG_MSG(Die, MSG); break; } \
@@ -131,6 +132,7 @@ do                                                                   \
         case MACSIO_LOG_MsgDbg1: {MACSIO_LOG_MSGL(LOG, Dbg1, MSG); break;} \
         case MACSIO_LOG_MsgDbg2: {MACSIO_LOG_MSGL(LOG, Dbg2, MSG); break;} \
         case MACSIO_LOG_MsgDbg3: {MACSIO_LOG_MSGL(LOG, Dbg3, MSG); break;} \
+        case MACSIO_LOG_MsgInfo: {MACSIO_LOG_MSGL(LOG, Info, MSG); break;} \
         case MACSIO_LOG_MsgWarn: {MACSIO_LOG_MSGL(LOG, Warn, MSG); break;} \
         case MACSIO_LOG_MsgErr:  {MACSIO_LOG_MSGL(LOG, Err, MSG); break; } \
         case MACSIO_LOG_MsgDie:  {MACSIO_LOG_MSGL(LOG, Die, MSG); break; } \
@@ -146,6 +148,7 @@ typedef enum _MACSIO_LOG_MsgSeverity_t
     MACSIO_LOG_MsgDbg1,  /**< Debug level 1: For coarse grained debugging messages (rare enough performance isn't effected) */
     MACSIO_LOG_MsgDbg2,  /**< Debug level 2: For moderate grained debugging messages (may effect performance) */
     MACSIO_LOG_MsgDbg3,  /**< Debug level 3: For fine grained debugging messages (most likely effects performance) */
+    MACSIO_LOG_MsgInfo,  /**< Informational messages */
     MACSIO_LOG_MsgWarn,  /**< Warnings of minor problems that can be recovered from without undue effects */
     MACSIO_LOG_MsgErr,   /**< Error conditions that result in a change in expected/anticipated behavior */
     MACSIO_LOG_MsgDie    /**< Unrecoverable errors */

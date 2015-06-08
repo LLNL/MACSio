@@ -873,47 +873,6 @@ struct json_object* json_object_array_get_idx(struct json_object *jso,
   return (struct json_object*)array_list_get_idx(jso->o.c_array, idx);
 }
 
-/* json_object_extarr */
-enum json_extarr_type json_object_extarr_type(struct json_object* jso)
-{
-    if (!jso || !json_object_is_type(jso, json_type_extarr)) return json_extarr_type_null;
-    return jso->o.c_extarr.type;
-}
-
-int json_object_extarr_nvals(struct json_object* jso)
-{
-    int i, nvals;
-    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
-    for (i = 0, nvals=1; i < json_object_extarr_ndims(jso); i++)
-    {
-        struct json_object* dimobj = (struct json_object*) array_list_get_idx(jso->o.c_extarr.dims, i);
-        nvals *= json_object_get_int(dimobj);
-    }
-    return nvals;
-}
-
-int json_object_extarr_ndims(struct json_object* jso)
-{
-    if (!jso) return 0;
-    return array_list_length(jso->o.c_extarr.dims);
-}
-
-int json_object_extarr_dim(struct json_object* jso, int dimidx)
-{
-    struct json_object *dimobj;
-    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
-    if (dimidx < 0) return 0;
-    dimobj = (struct json_object *) array_list_get_idx(jso->o.c_extarr.dims, dimidx);
-    if (!dimobj) return 0;
-    return json_object_get_int(dimobj);
-}
-
-void const *json_object_extarr_data(struct json_object* jso)
-{
-    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
-    return jso->o.c_extarr.data;
-}
-
 static int json_object_extarr_to_json_string(struct json_object* jso,
                                              struct printbuf *pb,
                                              int level,
@@ -1006,7 +965,91 @@ static void json_object_extarr_delete(struct json_object* jso)
   json_object_generic_delete(jso);
 }
 
-struct json_object* json_object_new_extarr(void const *data, enum json_extarr_type type, int ndims, int const *dims)
+#warning MOVE ADDTOGROUP TO TOP OF NON-STATIC FUNCTIONS
+
+/**
+ * \addtogroup jsonclib JSON-C Library
+ * \brief JSON-C is a library used within MACSio to manage data
+ *
+ * This is a modified version of the JSON-C library.
+ *
+ * The initial version was obtained from here, https://github.com/json-c/json-c/releases,
+ * numbered 0.12-20140410.
+ *
+ * It has been modified to support HPC applications in some key ways.
+ *  - Optimized, homogenously typed, multi-dimensional arrays.
+ *    That is, arrays whose members are NOT json objects but
+ *    the individual array elements in a larger buffer. These
+ *    are 'extarr' object types.
+ *  - Enumerations.
+ *  - Path-oriented object get/set methods that support
+ *    intermediate arrays so that in the object path, "/a/gorfo/5/foo/7/8", the
+ *    '5', '7' and '8' can be interpreted as indexes into arrays preceding them
+ *    in the path. In other words, when this path is successfully applied to an
+ *    object, the object has a member 'a', which is in turn an object with a member,
+ *    'gorfo', which is an array. Then, '5' picks the member of that array at index 5.
+ *    That object has a member, 'foo', which is an array. The '7' indexes that array
+ *    which returns another array which is in turn indexed by the '8'.
+ *  - A find method that is a lot like Unix' find except that it can
+ *    find a matching sub-path from the specified root.
+ *
+ * These modifications have not been and most likely will not ever be pushed
+ * back to JSON-C implementors. This is primarily because many of these
+ * enhancements kinda sorta fall outside the original design scope (IMHO)
+ * of JSON in general and JSON-C in particular. In fact, the extarr and enum
+ * types break the JSON-C ascii string syntax.
+ *
+ @{
+ */
+
+/**
+ * \addtogroup aggregate Aggregate Types
+ @{
+ */
+
+/**
+ * \addtogroup extarr External Arrays
+ * \brief Object for maintaining pointer to large, bulk data
+ *
+ * External array (or extarr) objects are an extension to JSON-C not
+ * available in nor likely to be appropriate for the original JSON-C
+ * implementation. HPC applications require external array objects
+ * defined here because the arrays HPC applications use are very, very
+ * large. In ordinary JSON arrays, each member of an array is a fully
+ * self-contained JSON object. For large arrays, that means a lot of
+ * unnecessary overhead. In addition, ordinary JSON arrays are single
+ * dimensional whereas HPC applications often require arrays that are
+ * multi-dimensional.
+ *
+ * Here, extarr objects are implemented as an extension to JSON-C. Changes
+ * were made to JSON-C internals, parser and serialization methods to support
+ * extarr objects. This means that any serialized string of a JSON-C object
+ * that includes extarr objects within it, will be incompatible with any
+ * standard JSON implementation. Another route is to implement extarr
+ * objects <em>on top of</em> JSON-C and this may be more appropriate in
+ * a future implementation.
+ @{
+*/
+
+/** Create new external array object using existing buffer 
+ *
+ * Buffer data is \em not copied here. JSON-C does not take ownership
+ * of the buffer and will not free the buffer when the extarr object
+ * is deleted with json_object_put(). Caller is responsible for not
+ * freeing buffers out from underneath any respective JSON-C extarr 
+ * objects but is responsible for freeing the buffer after it is no
+ * longer needed either by JSON-C or by caller. At any point before
+ * deleting the extarr object with json_object_put(), caller can
+ * obtain the buffer pointer with json_object_extarr_data().
+ */
+struct json_object*
+json_object_new_extarr(
+    void const *data,           /**< [in] The array buffer pointer */
+    enum json_extarr_type type, /**< [in] The type of data in the array */
+    int ndims,                  /**< [in] The number of dimensions in the array */
+    int const *dims             /**< [in] Array of length \c ndims of integer values holding the size
+                                     in each dimension */
+)
 {
   int i;
   struct json_object *jso = json_object_new(json_type_extarr);
@@ -1021,7 +1064,20 @@ struct json_object* json_object_new_extarr(void const *data, enum json_extarr_ty
   return jso;
 }
 
-struct json_object* json_object_new_extarr_alloc(enum json_extarr_type etype, int ndims, int const *dims)
+/** Create new external array object and allocate associated buffer
+ *
+ * Although the JSON-C library allocates the buffer, this is just a convenience.
+ * The caller is still responsible for freeing the buffer by getting its pointer
+ * using json_object_extarr_data(). Caller must do this before calling json_object_put()
+ * to delete the extarr object. The buffer is allocated but not initialized.
+ */
+struct json_object*
+json_object_new_extarr_alloc(
+    enum json_extarr_type etype, /**< [in] The type of data to be put into the buffer */
+    int ndims,                   /**< [in] The number of dimensions in the array */
+    int const *dims              /**< [in] Array of length \c ndims of integer values holding the
+                                      [in] in each dimension */
+)
 {
   int i, nvals;
   struct json_object *jso = json_object_new(json_type_extarr);
@@ -1044,6 +1100,133 @@ struct json_object* json_object_new_extarr_alloc(enum json_extarr_type etype, in
   return jso;
 }
 
+enum json_extarr_type json_object_extarr_type(struct json_object* jso)
+{
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return json_extarr_type_null;
+    return jso->o.c_extarr.type;
+}
+
+int json_object_extarr_nvals(struct json_object* jso)
+{
+    int i, nvals;
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
+    for (i = 0, nvals=1; i < json_object_extarr_ndims(jso); i++)
+    {
+        struct json_object* dimobj = (struct json_object*) array_list_get_idx(jso->o.c_extarr.dims, i);
+        nvals *= json_object_get_int(dimobj);
+    }
+    return nvals;
+}
+
+int json_object_extarr_valsize(struct json_object* obj)
+{
+    if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
+
+    switch (json_object_extarr_type(obj))
+    {
+        case json_extarr_type_null:  return(0);
+        case json_extarr_type_bit01: return(1);
+        case json_extarr_type_byt08: return(1);
+        case json_extarr_type_int32: return(4);
+        case json_extarr_type_int64: return(8);
+        case json_extarr_type_flt32: return(4);
+        case json_extarr_type_flt64: return(8);
+    }
+
+    return 0;
+}
+
+int64_t json_object_extarr_nbytes(struct json_object* obj)
+{
+    int64_t nvals;
+    int valsize;
+
+    if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
+
+    /* We include the space necessary to store the type, #dims and
+       size of each dim */
+    return json_object_extarr_nvals(obj) *
+           json_object_extarr_valsize(obj) +
+          (json_object_extarr_ndims(obj)+2) * sizeof(int);
+}
+
+int json_object_extarr_ndims(struct json_object* jso)
+{
+    if (!jso) return 0;
+    return array_list_length(jso->o.c_extarr.dims);
+}
+
+int json_object_extarr_dim(struct json_object* jso, int dimidx)
+{
+    struct json_object *dimobj;
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
+    if (dimidx < 0) return 0;
+    dimobj = (struct json_object *) array_list_get_idx(jso->o.c_extarr.dims, dimidx);
+    if (!dimobj) return 0;
+    return json_object_get_int(dimobj);
+}
+
+void const *json_object_extarr_data(struct json_object* jso)
+{
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;
+    return jso->o.c_extarr.data;
+}
+
+#define COPYNCAST_EXTARR_DATA(SRCT, SRCP, DSTT, DSTP, NVALS) \
+{                                                            \
+    if (!strcmp(#SRCT, #DSTT))                               \
+        memcpy(DSTP, SRCP, NVALS * sizeof(SRCT));            \
+    else                                                     \
+    {                                                        \
+        int i;                                               \
+        SRCT *psrc = (SRCT*) json_object_extarr_data(jso);   \
+        DSTT *pdst = (DSTT*) DSTP;                           \
+        for (i = 0; i < NVALS; i++)                          \
+            pdst[i] = (DSTT) psrc[i];                        \
+    }                                                        \
+}
+
+#define JSON_OBJECT_EXTARR_DATA_AS(DSTT,DSTN)                                                               \
+int json_object_extarr_data_as_ ## DSTN(struct json_object* jso, DSTT **buf)                                \
+{                                                                                                           \
+    json_extarr_type etype;                                                                                 \
+    int nvals;                                                                                              \
+    void const *srcp;                                                                                       \
+                                                                                                            \
+    if (buf == 0) return 0;                                                                                 \
+    if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;                                      \
+                                                                                                            \
+    etype = json_object_extarr_type(jso);                                                                   \
+    if (etype == json_extarr_type_null) return 0;                                                           \
+    nvals = json_object_extarr_nvals(jso);                                                                  \
+                                                                                                            \
+    if (*buf == 0)                                                                                          \
+        *buf = (DSTT*) malloc(nvals * sizeof(DSTT));                                                        \
+    srcp = json_object_extarr_data(jso);                                                                    \
+                                                                                                            \
+    switch (etype)                                                                                          \
+    {                                                                                                       \
+        case json_extarr_type_byt08: COPYNCAST_EXTARR_DATA(unsigned char, srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_int32: COPYNCAST_EXTARR_DATA(int,           srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_int64: COPYNCAST_EXTARR_DATA(int64_t,       srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_flt32: COPYNCAST_EXTARR_DATA(float,         srcp, DSTT, *buf, nvals); break;  \
+        case json_extarr_type_flt64: COPYNCAST_EXTARR_DATA(double,        srcp, DSTT, *buf, nvals); break;  \
+        default: return 0;                                                                                  \
+    }                                                                                                       \
+                                                                                                            \
+    return 1;                                                                                               \
+}
+
+JSON_OBJECT_EXTARR_DATA_AS(unsigned char,unsigned_char)
+JSON_OBJECT_EXTARR_DATA_AS(int,int)
+JSON_OBJECT_EXTARR_DATA_AS(int64_t,int64_t)
+JSON_OBJECT_EXTARR_DATA_AS(float,float)
+JSON_OBJECT_EXTARR_DATA_AS(double,double)
+
+/**@} External Arrays */
+
+/**@} Aggregate Types */
+
 /* json_object_enum */
 static void json_object_enum_delete(struct json_object* jso)
 {
@@ -1052,6 +1235,36 @@ static void json_object_enum_delete(struct json_object* jso)
   json_object_generic_delete(jso);
 }
 
+/**
+  * \addtogroup prim Primitive Types
+  *
+  * The primitive types in JSON-C library are boolean, int, int64_t, enum, double and string.
+  @{
+  */
+
+/**
+ * \addtogroup enums Enumerations
+ * \brief Support for enumerated types
+ *
+ * Enumerations are an extension of JSON-C. The are not really relevant
+ * to MACSio but were implemented as part of a hack-a-thon.
+ *
+ * A challenge with enumerations is that they kinda sorta involve two
+ * different kinds of information.  One is a list of possible values
+ * (e.g. the available enumerations). The other is an instance of a JSON
+ * object of that enumeration type and its associated value (e.g. one of
+ * the available enumerations). Here, these two different sources of
+ * information wind up being combined into a single JSON object. This
+ * single object maintains both a list of the available enumeration values
+ * and the currently selected choice.
+ @{
+ */
+
+/**
+  * \brief Create a new, empty enumeration object
+  *
+  * The enumeration's choice (e.g. selected value) is uninitialized.
+  */
 struct json_object* json_object_new_enum(void)
 {
   struct json_object *jso = json_object_new(json_type_enum);
@@ -1060,40 +1273,70 @@ struct json_object* json_object_new_enum(void)
   jso->_to_json_string = &json_object_enum_to_json_string;
   jso->o.c_enum.choices = lh_kchar_table_new(JSON_OBJECT_DEF_HASH_ENTRIES,
                                         NULL, &json_object_lh_entry_free);
-  jso->o.c_enum.choice = -1;
+  jso->o.c_enum.choice = 0;
   return jso;
 }
 
-void json_object_enum_add(struct json_object* jso, char const *choice_name, int64_t choice_val, json_bool selected)
+/**
+  * \brief Add a name/value pair to an enumeration
+  *
+  * Caller can also choose to indicate that the given name/value pair should
+  * be the currently selected value for the enumeration by passing \c JSON_C_TRUE
+  * for \c selected argument. Alternatively, caller can use either 
+  * json_object_set_enum_choice_val() or json_object_set_enum_choice_name() to
+  * adjust the current value for an enumeration.
+  */
+void 
+json_object_enum_add(
+    struct json_object* jso, /**< [in] The JSON enumeration object to update */
+    char const *name,        /**< [in] The symbolic name of the new enumeration choice */
+    int64_t val,             /**< [in] The numerical value of the new enumeration choice. */
+    json_bool selected       /**< [in] Make this value is the currently selected value of the enumeration */
+)
 {
-  if (!choice_name) return;
-  if (choice_val < 0) return;
+  if (!name) return;
   if (!jso || !json_object_is_type(jso, json_type_enum)) return;
 
   if (selected)
-      jso->o.c_enum.choice = choice_val;
+      jso->o.c_enum.choice = val;
   /* We lookup the entry and replace the value, rather than just deleting
      and re-adding it, so the existing key remains valid.  */
   json_object *existing_value = NULL;
   struct lh_entry *existing_entry;
-  existing_entry = lh_table_lookup_entry(jso->o.c_enum.choices, (void*)choice_name);
+  existing_entry = lh_table_lookup_entry(jso->o.c_enum.choices, (void*)name);
   if (!existing_entry)
   {
-    lh_table_insert(jso->o.c_enum.choices, strdup(choice_name), json_object_new_int(choice_val));
+    lh_table_insert(jso->o.c_enum.choices, strdup(name), json_object_new_int(val));
     return;
   }
   existing_value = (json_object *)existing_entry->v;
   if (existing_value)
     json_object_put(existing_value);
-  existing_entry->v = json_object_new_int(choice_val);
+  existing_entry->v = json_object_new_int(val);
 }
 
+/**
+  * \brief Get the length (or size) of an enumeration
+  *
+  * \return The number of available name/value pairs in the enumeration.
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, -1 is returned.
+  */
 int json_object_enum_length(struct json_object* jso)
 {
   if (!jso || !json_object_is_type(jso, json_type_enum)) return -1;
   return lh_table_length(jso->o.c_enum.choices);
 }
 
+/**
+  * \brief Get the name of a specific name/value pair in the enumeration
+  *
+  * Enumeration name/value pairs are indexed starting from zero.
+  *
+  * \return The name of the ith name/value pair in the enumeration.
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, null is returned.
+  */
 char const *json_object_enum_get_idx_name(struct json_object* jso, int idx)
 {
   int i = 0;
@@ -1108,7 +1351,14 @@ char const *json_object_enum_get_idx_name(struct json_object* jso, int idx)
   return NULL;
 }
 
-char const *json_object_enum_get_name_from_val(struct json_object* jso, int64_t val)
+/**
+  * \brief Get name of value in an enumeration
+  *
+  * \return The name of the name/value pair whose value matches the given value.
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, null is returned.
+  */
+char const *json_object_enum_get_name(struct json_object* jso, int64_t val)
 {
   struct lh_entry *ent;
   if (!jso || !json_object_is_type(jso, json_type_enum)) return NULL;
@@ -1120,6 +1370,16 @@ char const *json_object_enum_get_name_from_val(struct json_object* jso, int64_t 
   return NULL;
 }
 
+#warning MAY WANT TO USE -INT_MAX FOR BAD ENUM VALUE
+/**
+  * \brief Get the value of a specific name/value pair in the enumeration
+  *
+  * Enumeration name/value pairs are indexed starting from zero.
+  *
+  * \return The value of the ith name/value pair in the enumeration.
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, -1 is returned.
+  */
 int64_t json_object_enum_get_idx_val(struct json_object* jso, int idx)
 {
   int i = 0;
@@ -1134,7 +1394,14 @@ int64_t json_object_enum_get_idx_val(struct json_object* jso, int idx)
   return -1;
 }
 
-int64_t json_object_enum_get_val_from_name(struct json_object *jso, char const *name)
+/**
+  * \brief Get value of name in an enumeration
+  *
+  * \return The value of the name/value pair whose name matches the given name.
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, -1 is returned.
+  */
+int64_t json_object_enum_get_val(struct json_object *jso, char const *name)
 {
   struct lh_entry *ent;
   if (!jso || !json_object_is_type(jso, json_type_enum)) return -1;
@@ -1146,17 +1413,34 @@ int64_t json_object_enum_get_val_from_name(struct json_object *jso, char const *
   return -1;
 }
 
+/**
+  * \brief Get chosen value of an enumeration
+  *
+  * \return The value of the selected choice of the enumeration 
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, -1 is returned.
+  */
 int64_t json_object_enum_get_choice_val(struct json_object* jso)
 {
   if (!jso || !json_object_is_type(jso, json_type_enum)) return -1;
   return jso->o.c_enum.choice;
 }
 
+/**
+  * \brief Get chosen name of an enumeration
+  *
+  * \return The name of the selected choice of the enumeration 
+  * If \c jso is either null or does not reference a JSON-C object
+  * which is an enumeration, null is returned.
+  */
 char const *json_object_enum_get_choice_name(struct json_object* jso)
 {
   if (!jso || !json_object_is_type(jso, json_type_enum)) return NULL;
-  return json_object_enum_get_name_from_val(jso, jso->o.c_enum.choice);
+  return json_object_enum_get_name(jso, jso->o.c_enum.choice);
 }
+
+/**@} Enumerations */
+/**@} Primitive Types */
 
 static int json_object_enum_to_json_string(struct json_object* jso,
                                             struct printbuf *pb,
@@ -1215,7 +1499,19 @@ static int json_object_enum_to_json_string(struct json_object* jso,
 		return sprintbuf(pb, ">");
 }
 
-/* primitive (leaf) overwrite (put) methods */
+/** \addtogroup prim Primitive Values
+  @{ */
+
+/**
+ * \addtogroup setprim Set Primitive Object Values
+ * \brief Set (overwrite) value associated with a primitive object
+ *
+ * In all these methods, if the object whose value is being set does not match
+ * the type for the given method, the object is unchanged and the return value
+ * is \c JSON_C_FALSE. Otherwise, the value is changed and the return value is
+ * \c JSON_C_TRUE.
+ @{
+ */
 json_bool json_object_set_boolean(struct json_object *bool_obj, json_bool val)
 {
     if (!bool_obj || !json_object_is_type(bool_obj, json_type_boolean)) return JSON_C_FALSE;
@@ -1274,50 +1570,9 @@ json_bool json_object_set_string(struct json_object *string_obj, char const *val
     string_obj->o.c_string.len = strlen(val);
     return JSON_C_TRUE;
 }
+/**@} Set Primitive Object Value */
 
-#if 0
-static void *json_object_get_voidptr(struct json_object *obj)
-{
-    static char garbage[32];
-    if (json_object_is_type(obj, json_type_boolean))
-        return (void*) &obj->o.c_boolean;
-    if (json_object_is_type(obj, json_type_int))
-        return (void*) &obj->o.c_int64;
-    if (json_object_is_type(obj, json_type_double))
-        return (void*) &obj->o.c_double;
-    if (json_object_is_type(obj, json_type_string))
-        return (void*) &obj->o.c_string.str;
-    return (void*) &garbage[0];
-}
-
-static void *json_object_path_get_voidptr_recurse(struct json_object *src, char *key_path, json_type jtype)
-{
-    struct json_object *sub_object = 0;
-    char *slash_char_p = strchr(key_path,'/');
-    /* we need to support . and .. notation here too */
-    if (slash_char_p)
-    {
-        *slash_char_p = '\0';
-        if (json_object_object_get_ex(src, key_path, &sub_object))
-            return json_object_path_get_voidptr_recurse(sub_object, slash_char_p+1, jtype);
-    }
-    else
-    {
-        if (json_object_object_get_ex(src, key_path, &sub_object) &&
-            json_object_is_type(sub_object, jtype))
-            return json_object_get_voidptr(sub_object);
-    }
-    return 0;
-}
-
-static void *json_object_path_get_voidptr(struct json_object *src, char const *key_path, json_type jtype)
-{
-    char *kp = strdup(key_path);
-    void *retval = json_object_path_get_voidptr_recurse(src, kp, jtype);
-    free(kp);
-    return retval;
-}
-#endif
+/**@} Primitive Types */
 
 /* "apath" methods handle paths with possible array indexes embedded within them
    (e.g. "/foo/bar/123/front/567/back") */
@@ -1327,11 +1582,12 @@ static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char
     int idx;
     struct json_object *sub_object = 0;
     char *slash_char_p, *next = 0;
-    int add1 = key_path[0]=='/'?1:0;
+    int add1;
 
     if (!src) return 0;
     if (!key_path) return src;
 
+    add1 = key_path[0]=='/'?1:0;
     slash_char_p = strchr(key_path+add1, '/');
     if (slash_char_p)
     {
@@ -1372,6 +1628,40 @@ static struct json_object* json_object_apath_get_leafobj(struct json_object *obj
     return retval;
 }
 
+/**
+  * \addtogroup objquery Object Introspection and Query
+  @{
+  */
+
+/**
+ * \addtogroup altpathkeys Alternative Path Queries 
+ * \brief JSON object hierarchy path query methods
+ *
+ * These methods allow querying of a large, JSON object hiearchy using a unix-style
+ * path for the keys (e.g. "/foo/bar/gorfo"). These alternative path (or apath) methods
+ * support object hierarchies with intermediate arrays. For example,
+ * the path "/foo/bar/16/gorfo" where 'bar' is an array object and '16' is the index
+ * of the 'bar' array we want to query is allowed. Thus, "/foo/bar/16/gorfo" is
+ * conceptually equivalent to "/foo/bar[16]/gorfo". However, if the object at the
+ * path "/foo/bar" is not an array and is instead a normal object, then if it contains
+ * a member whose key is the string "16", then that path will be queried. Likewise,
+ * the path "/gorfo/32/11/dims" where "gorfo" is an array object whose members in turn
+ * are also array objects works by first finding the array at index 32 in the 
+ * "gorfo" array and then finding the object at index 11 in that array and then
+ * finally the "dims" member of that object. In short, whenever possible, the apath
+ * methods try to prefer treating path components consisting entirely of numbers
+ * as indices into arrays. When this fails at any point in the query process,
+ * then the numbers are treated as literal strings to form the key strings to query.
+ * These methods also do sane casting (e.g. type coercion) to caller's return type
+ * whenever needed.
+ @{
+ */
+
+/**
+ * \brief Query boolean value at specified path
+ *
+ * For return and type corecion, see json_object_path_get_boolean().
+ */
 json_bool json_object_apath_get_boolean(struct json_object *obj, char const *key_path)
 {
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
@@ -1404,6 +1694,11 @@ json_bool json_object_apath_get_boolean(struct json_object *obj, char const *key
     return JSON_C_FALSE;
 }
 
+/**
+ * \brief Query int64_t value at specified path
+ *
+ * For return and type corecion, see json_object_path_get_int64().
+ */
 int64_t json_object_apath_get_int64(struct json_object *obj, char const *key_path)
 {
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
@@ -1442,6 +1737,11 @@ int64_t json_object_apath_get_int64(struct json_object *obj, char const *key_pat
     return 0;
 }
 
+/**
+ * \brief Query int value at specified path
+ *
+ * For return and type corecion, see json_object_path_get_int().
+ */
 int json_object_apath_get_int(struct json_object *obj, char const *key_path)
 {
     int64_t val64 = json_object_apath_get_int64(obj, key_path);
@@ -1451,6 +1751,11 @@ int json_object_apath_get_int(struct json_object *obj, char const *key_path)
         return 0;
 }
 
+/**
+ * \brief Query double value at specified path
+ *
+ * For return and type corecion, see json_object_path_get_double().
+ */
 double json_object_apath_get_double(struct json_object *obj, char const *key_path)
 {
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
@@ -1502,6 +1807,11 @@ static char *circbuf_retval[CIRCBUF_SIZE];
     return retval;                             \
 }
 
+/**
+ * \brief Query string value at specified path
+ *
+ * For return and type corecion, see json_object_path_get_string().
+ */
 char const *json_object_apath_get_string(struct json_object *obj, char const *key_path)
 {
     char *retval;
@@ -1517,6 +1827,11 @@ char const *json_object_apath_get_string(struct json_object *obj, char const *ke
     }
 }
 
+/**
+ * \brief Query any object at specified path
+ *
+ * For return and type corecion, see json_object_path_get_any().
+ */
 struct json_object *json_object_apath_get_object(struct json_object *obj, char const *key_path)
 {
     struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
@@ -1524,7 +1839,52 @@ struct json_object *json_object_apath_get_object(struct json_object *obj, char c
     return 0;
 }
 
-char const *json_paste_apath(char const *va_args_str, char const *first, ...)
+struct json_object *json_object_apath_find_object(struct json_object *root, char const *key_path)
+{
+    struct json_object *foundobj = json_object_apath_get_object(root, key_path);
+
+    /* if we found a matching key_path from root, we're done */
+    if (foundobj) return foundobj;
+
+    if (json_object_is_type(root, json_type_object))
+    {
+        struct json_object_iter iter;
+
+        /* Ok, we need to recurse on the members of root */
+        json_object_object_foreachC(root, iter)
+        {
+            foundobj = json_object_apath_find_object(iter.val, key_path);
+            if (foundobj) return foundobj;
+        }
+    }
+    else if (json_object_is_type(root, json_type_array))
+    {
+        int i;
+        for (i = 0; i < json_object_array_length(root); i++)
+        {
+            struct json_object *arrmember = json_object_array_get_idx(root, i);
+            foundobj = json_object_apath_find_object(arrmember, key_path);
+            if (foundobj) return foundobj;
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * \brief Helper method to automatically construct paths from values
+ *
+ * This is an internal method called indirectly from JsonGetXXX convenience
+ * macros to automatically construct the path string from arguments.
+ *
+ * Currently, this method works only for cases of strings intermingled with
+ * integer variables being used for array indices.
+ */
+char const *json_paste_apath(
+    char const *va_args_str, /**< [in] The string representation of all the arguments */
+    char const *first,       /**< [in] The first argument must always be a string */
+    ...                      /**< [in] Any remaining arguments */
+)
 {
     static char retbuf[4096];
     int nargs = 1, i = 0, n = sizeof(retbuf);
@@ -1576,6 +1936,7 @@ char const *json_paste_apath(char const *va_args_str, char const *first, ...)
 
     return retbuf;
 }
+/**@} Alternative Path Queries */
 
 static void *json_object_path_get_leafobj_recurse(struct json_object *src, char *key_path, json_type jtype)
 {
@@ -1614,6 +1975,16 @@ static struct json_object* json_object_path_get_leafobj(struct json_object *obj,
     return retval;
 }
 
+/**
+ * \addtogroup pathsetprim Set Primitive Object Values at Path
+ * \brief Set (overwrite) primitive value at given path
+ *
+ * In all these methods, if an object does not exist at the given path or
+ * if its type does not match the type for the given method, the object is
+ * unchanged and the return value is \c JSON_C_FALSE. Otherwise, the value
+ * is changed and the return value is \c JSON_C_TRUE.
+ @{
+ */
 json_bool json_object_path_set_boolean(struct json_object *obj, char const *key_path, json_bool val)
 {
     struct json_object *leafobj = json_object_path_get_leafobj(obj, key_path, json_type_boolean);
@@ -1662,7 +2033,36 @@ json_bool json_object_path_set_string(struct json_object *obj, char const *key_p
     if (leafobj) return json_object_set_string(leafobj, val);
     return JSON_C_FALSE;
 }
+/**@} Set Primitive Object Values at Path */
 
+/**
+ * \addtogroup oldpathkeys Obsolete Path Queries 
+ * \brief Query JSON object hierarchy using key paths (obsolete)
+ *
+ * These methods support querying values from a hierarchy of JSON objects
+ * using unix-style pathnames for sequences of keys. In addition, for
+ * those methods that are intended to return a primitive \em value
+ * (e.g. not an object), sane type casting (coercion) is performed if
+ * the requested type and matching object's type are different.
+ *
+ * Due to the need to construct key path strings used in these calls,
+ * it is often more convenient to use the JsonGetXXX macros instead.
+ * See, for example, JsonGetInt().
+ @{
+ */
+
+/**
+ * \brief Get integer value for object at specified path
+ *
+ * \return If the object being queried does not exist, zero is returned.
+ * If the object being queried exists and is type
+ *   - json_bool, \c JSON_C_TRUE returns 1 and \c JSON_C_FALSE returns 0.
+ *   - number, the value of the number cast to an int type is returned.
+ *   - string
+ *     -# holding a number, the value after casting to int the result of strtod on the string is returned.
+ *     -# holding anything else, the length of the string is returned.
+ *   - an object, the size of the object is returned.
+ */
 int32_t json_object_path_get_int(struct json_object *src, char const *key_path)
 {
     int32_t retval = 0;
@@ -1673,6 +2073,11 @@ int32_t json_object_path_get_int(struct json_object *src, char const *key_path)
     return retval;
 }
 
+/**
+  * \brief Get int64 value for object at specified path
+  *
+  * Same as json_object_path_get_int() except that an \c int64_t type value is returned.
+  */
 int64_t json_object_path_get_int64(struct json_object *src, char const *key_path)
 {
     int64_t retval = 0;
@@ -1683,6 +2088,18 @@ int64_t json_object_path_get_int64(struct json_object *src, char const *key_path
     return retval;
 }
 
+/**
+ * \brief Get a double value for the object at specified path
+ *
+ * \return If the object being queried does not exist, 0.0 is returned.
+ * If the object being queried exists and is type
+ *   - json_bool, \c JSON_C_TRUE returns 1.0 and \c JSON_C_FALSE returns 0.0.
+ *   - a number, the result of casting the number to type double is returned
+ *   - a string
+ *     -# holding a number, the value returned from strtod() on the string is returned.
+ *     -# holding anything else, the length of the string is returned.
+ *   - an object, the size of the object is returned.
+ */
 double json_object_path_get_double(struct json_object *src, char const *key_path)
 {
     double retval = 0;
@@ -1693,6 +2110,17 @@ double json_object_path_get_double(struct json_object *src, char const *key_path
     return retval;
 }
 
+/**
+ * \brief Get boolean value for the object at specified path
+ *
+ * \return If the object being queried does not exist, \c JSON_C_FALSE is returned.
+ * If the object being queried exists and its type is a
+ *   - json_bool, its value is returned. 
+ *   - number, if the number's value is zero, \c JSON_C_FALSE is returned.
+ *   - string, if the string is empty, \c JSON_C_FALSE is returned.
+ *   - object, if the length of the object is zero, \c JSON_C_FALSE is returned.
+ *   - In all other cases, a value of \c JSON_C_TRUE is returned.
+ */
 json_bool json_object_path_get_boolean(struct json_object *src, char const *key_path)
 {
     json_bool retval = JSON_C_FALSE;
@@ -1703,6 +2131,33 @@ json_bool json_object_path_get_boolean(struct json_object *src, char const *key_
     return retval;
 }
 
+/**
+ * \brief Get a string value for the object at specified path
+ *
+ * Other path get methods return a fixed size value whether they
+ * succeed or fail. Queries for non-existent or mis-matching types are
+ * for the most part harmless. Here, however, as long as the object identified
+ * by path exists, this method will return a variable length ascii string
+ * representation. Therefore, callers should beware of the need to exercise
+ * more caution in ensuring the queried strings are actually needed. Also,
+ * the resultant strings are cached internally in their respective objects.
+ * The caller may wish to free printbuf memory associated with the string.
+ * That memory is associated with the queried object. So, the caller must
+ * first obtain a handle (pointer) to the queried object. 
+ *
+ * \code
+ * char const *some_string = json_object_path_get_string(obj, "/foo/bar");
+ * .
+ * . do some work with the string 
+ * .
+ * json_object *some_obj = json_object_path_get_object(obj, "/foo/bar");
+ * json_object_free_printbuf(some_obj);
+ * \endcode 
+ *
+ * \return If the object being queried does not exist, the string \c "null" is returned.
+ * If the object being queried exists, the result of json_object_to_json_string_ext() is returned.
+ *
+ */
 char const *json_object_path_get_string(struct json_object *src, char const *key_path)
 {
     char const *retval = "";
@@ -1713,6 +2168,13 @@ char const *json_object_path_get_string(struct json_object *src, char const *key
     return retval;
 }
 
+/**
+ * \brief Get the array object at specified path
+ *
+ * \return If the object being queried is does not exist, <code>(json_object *)0</code> is returned.
+ * If the object being queried is not an ordinary array, <code>(json_object *)0</code> is returned.
+ * Otherwise, the json_object* for the array object is returned.
+ */
 struct json_object *json_object_path_get_array(struct json_object *src, char const *key_path)
 {
     struct json_object *retval = 0;
@@ -1723,6 +2185,13 @@ struct json_object *json_object_path_get_array(struct json_object *src, char con
     return retval;
 }
 
+/**
+ * \brief Get the object at specified path
+ *
+ * \return If the object being queried is does not exist, <code>(json_object *)0</code> is returned.
+ * If the object being queried is not an ordinary object, <code>(json_object *)0</code> is returned.
+ * Otherwise, the json_object* for the object is returned.
+ */
 struct json_object *json_object_path_get_object(struct json_object *src, char const *key_path)
 {
     struct json_object *retval = 0;
@@ -1733,6 +2202,13 @@ struct json_object *json_object_path_get_object(struct json_object *src, char co
     return retval;
 }
 
+/**
+ * \brief Get the extarr object at specified path
+ *
+ * \return If the object being queried is does not exist, <code>(json_object *)0</code> is returned.
+ * If the object being queried is not an extarr object, <code>(json_object *)0</code> is returned.
+ * Otherwise, the json_object* for the extarr object is returned.
+ */
 struct json_object *json_object_path_get_extarr(struct json_object *src, char const *key_path)
 {
     struct json_object *retval = 0;
@@ -1743,6 +2219,12 @@ struct json_object *json_object_path_get_extarr(struct json_object *src, char co
     return retval;
 }
 
+/**
+ * \brief Get object of any type at specified path
+ *
+ * \return If the object being queried is does not exist, <code>(json_object *)0</code> is returned.
+ * Otherwise, the json_object* for the object is returned.
+ */
 struct json_object *json_object_path_get_any(struct json_object *src, char const *key_path)
 {
     struct json_object *retval = 0;
@@ -1752,41 +2234,57 @@ struct json_object *json_object_path_get_any(struct json_object *src, char const
     if (leafobj) retval = leafobj;
     return retval;
 }
+/**@} Obsolete Path Queries */
 
-struct json_object *json_object_apath_find_object(struct json_object *root, char const *key_path)
-{
-    struct json_object *foundobj = json_object_apath_get_object(root, key_path);
+/**@} Object Introspection and Query */
 
-    /* if we found a matching key_path from root, we're done */
-    if (foundobj) return foundobj;
-
-    if (json_object_is_type(root, json_type_object))
-    {
-        struct json_object_iter iter;
-
-        /* Ok, we need to recurse on the members of root */
-        json_object_object_foreachC(root, iter)
-        {
-            foundobj = json_object_apath_find_object(iter.val, key_path);
-            if (foundobj) return foundobj;
-        }
-    }
-    else if (json_object_is_type(root, json_type_array))
-    {
-        int i;
-        for (i = 0; i < json_object_array_length(root); i++)
-        {
-            struct json_object *arrmember = json_object_array_get_idx(root, i);
-            foundobj = json_object_apath_find_object(arrmember, key_path);
-            if (foundobj) return foundobj;
-        }
-    }
-
-    return 0;
-}
-
+/**
+ * \addtogroup serialize Serialization
+ *
+ * Ordinarily, JSON-C library keeps the strings resulting from any objects it has serialized
+ * cached with the objects and only frees this memory when the object itself is garbage
+ * collected (e.g. reference count goes to zero). This is not always convenient. So, this
+ * method is provided to free any printbuf string associated with a given object. If the
+ * object has no cached printbuf string, the call is harmless.
+ @{
+ */
 void json_object_free_printbuf(struct json_object* jso)
 {
   printbuf_free(jso->_pb);
   jso->_pb = 0;
 }
+/**@} Serialization */
+
+int64_t json_object_object_nbytes(struct json_object* obj)
+{
+    if (!obj) return 0;
+    switch (json_object_get_type(obj))
+    {
+        case json_type_null:    return 0;
+        case json_type_boolean: return sizeof(json_bool);
+        case json_type_int:     return sizeof(int64_t);
+        case json_type_double:  return sizeof(double);
+        case json_type_string:  return json_object_get_string_len(obj);
+        case json_type_extarr:  return json_object_extarr_nbytes(obj);
+        case json_type_enum:    return json_object_enum_length(obj) * sizeof(int);
+        case json_type_array:
+        {
+            int i;
+            int64_t retval = 0;
+            for (i = 0; i < json_object_array_length(obj); i++)
+                retval += json_object_object_nbytes(json_object_array_get_idx(obj, i));
+            return retval;
+        }
+        case json_type_object:
+        {
+            int64_t retval = 0;
+            struct json_object_iter iter;
+            json_object_object_foreachC(obj, iter)
+                retval += json_object_object_nbytes(iter.val);
+            return retval;
+        }
+    }
+    return 0;
+}
+
+/**@} JSON-C Library */

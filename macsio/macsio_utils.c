@@ -1,6 +1,11 @@
+#include <float.h>
 #include <math.h>
+#include <stdio.h>
+#include <strings.h>
 
 #include <macsio_utils.h>
+
+char MACSIO_UTILS_UnitsPrefixSystem[32];
 
 /*-------------------------------------------------------------------------
   Function: bjhash 
@@ -237,4 +242,159 @@ MACSIO_UTILS_MakeBoundsJsonArray(double const * bounds)
     json_object_array_add(bounds_array, json_object_new_double(bounds[4]));
     json_object_array_add(bounds_array, json_object_new_double(bounds[5]));
     return bounds_array;
+}
+
+static char const *print_bytes(double val, char const *_fmt, char *str, int n, char const *_persec)
+{
+    char const *persec = _persec ? _persec : "";
+    char const *fmt = _fmt ? _fmt : "%8.4f";
+
+    static double const ki = 1024.0;
+    static double const mi = 1024.0 * 1024.0;
+    static double const gi = 1024.0 * 1024.0 * 1024.0;
+    static double const ti = 1024.0 * 1024.0 * 1024.0 * 1024.0;
+    static double const pi = 1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0;
+
+    static char const *kistr = "Ki";
+    static char const *mistr = "Mi";
+    static char const *gistr = "Gi";
+    static char const *tistr = "Ti";
+    static char const *pistr = "Pi";
+
+    static double const kb = 1000.0;
+    static double const mb = 1000.0 * 1000.0;
+    static double const gb = 1000.0 * 1000.0 * 1000.0;
+    static double const tb = 1000.0 * 1000.0 * 1000.0 * 1000.0;
+    static double const pb = 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0;
+
+    static char const *kbstr = "Kb";
+    static char const *mbstr = "Mb";
+    static char const *gbstr = "Gb";
+    static char const *tbstr = "Tb";
+    static char const *pbstr = "Pb";
+
+    char fmt2[32];
+
+    double kv = ki;
+    double mv = mi;
+    double gv = gi;
+    double tv = ti;
+    double pv = pi;
+
+    char const *kvstr = kistr;
+    char const *mvstr = mistr;
+    char const *gvstr = gistr;
+    char const *tvstr = tistr;
+    char const *pvstr = pistr;
+
+    if (!strncasecmp(MACSIO_UTILS_UnitsPrefixSystem, "decimal",
+        sizeof(MACSIO_UTILS_UnitsPrefixSystem)))
+    {
+        kv = kb;
+        mv = mb;
+        gv = gb;
+        tv = tb;
+        pv = pb;
+        kvstr = kbstr;
+        mvstr = mbstr;
+        gvstr = gbstr;
+        tvstr = tbstr;
+        pvstr = pbstr;
+    }
+
+    if      (val >= pv)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s %s%s", fmt, pvstr, persec);
+        snprintf(str, n, fmt2, val / pv);
+    }
+    else if (val >= tv)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s %s%s", fmt, tvstr, persec);
+        snprintf(str, n, fmt2, val / tv);
+    }
+    else if (val >= gv)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s %s%s", fmt, gvstr, persec);
+        snprintf(str, n, fmt2, val / gv);
+    }
+    else if (val >= mv)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s %s%s", fmt, mvstr, persec);
+        snprintf(str, n, fmt2, val / mv);
+    }
+    else if (val >= kv)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s %s%s", fmt, kvstr, persec);
+        snprintf(str, n, fmt2, val / kv);
+    }
+    else
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s b%s", fmt, persec);
+        snprintf(str, n, fmt2, val);
+    }
+
+    return str;
+}
+
+char const *MACSIO_UTILS_PrintBytes(unsigned long long bytes, char const *fmt, char *str, int n)
+{
+    return print_bytes((double)bytes, fmt, str, n, 0);
+}
+
+char const *MACSIO_UTILS_PrintBandwidth(unsigned long long bytes, double seconds,
+    char const *fmt, char *str, int n)
+{
+    return print_bytes((double)bytes/seconds, fmt, str, n, "/sec");
+}
+
+char const *MACSIO_UTILS_PrintSeconds(double seconds, char const *fmt, char *str, int n)
+{
+    static double const min  = 60.0;
+    static double const hour = 60.0 * 60.0;
+    static double const day  = 60.0 * 60.0 * 24.0;
+    static double const week = 60.0 * 60.0 * 24.0 * 7.0;
+    char fmt2[32];
+
+    if (seconds >= week)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s wks", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/week);
+    }
+    else if (seconds >= day)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s days", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/day);
+    }
+    else if (seconds >= hour)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s hrs", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/hour);
+    }
+    else if (seconds >= min)  
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s mins", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/min);
+    }
+    else if (seconds >= 1)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s secs", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds);
+    }
+    else if (seconds >= 1e-3)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s msecs", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/1e-3);
+    }
+    else if (seconds >= 1e-6)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s usecs", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/1e-6);
+    }
+    else if (seconds >= 1e-9)
+    {
+        snprintf(fmt2, sizeof(fmt2), "%s nsecs", fmt?fmt:"%8.4f");
+        snprintf(str, n, fmt2, seconds/1e-9);
+    }
+
+    return str;
 }

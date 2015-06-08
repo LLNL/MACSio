@@ -10,6 +10,7 @@
 #endif
 
 #include <macsio_clargs.h>
+#include <macsio_data.h>
 #include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
@@ -21,6 +22,18 @@
 #ifdef HAVE_MPI
 #include <mpi.h>
 #endif
+
+/*!
+\addtogroup plugins
+@{
+*/
+
+/*!
+\addtogroup Silo
+@{
+*/
+
+#define NARRVALS(Arr) (sizeof(Arr)/sizeof(Arr[0]))
 
 /*
  *  BEGIN StringToDriver utility code from Silo's tests
@@ -218,15 +231,9 @@ static int StringToDriver(const char *str)
  *  END StringToDriver utility code from Silo's tests
  */
 
-/* convenient name mapping macors */
-#define FNAME2(FUNC,A) FUNC ## _ ## A
-#define FNAME(FUNC) FNAME2(FUNC,silo)
-#define INAME2(A) #A
-#define INAME INAME2(silo)
-
 /* the name you want to assign to the interface */
-static char const *iface_name = INAME;
-static char const *iface_ext = INAME;
+static char const *iface_name = "silo";
+static char const *iface_ext = "silo";
 
 static const char *filename;
 static int has_mesh = 0;
@@ -234,41 +241,49 @@ static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
 #warning MOVE LOG HANDLE TO IO CONTEXT
 
-static int FNAME(process_args)(int argi, int argc, char *argv[])
+static int process_args(int argi, int argc, char *argv[])
 {
-    const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
-    char driver_str[128];
-    char compression_str[512];
+    const MACSIO_CLARGS_ArgvFlags_t argFlags = {
+        MACSIO_CLARGS_WARN,
+        MACSIO_CLARGS_TOMEM,
+        MACSIO_CLARGS_ASSIGN_OFF};
+    char *driver_str = 0;
+    char *compression_str = 0;
     int cksums = 0;
     int hdf5friendly = 0;
     int show_all_errors = 0;
 
-    strcpy(driver_str, "DB_HDF5");
-    strcpy(compression_str, "");
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
-        "--driver %s",
-            "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants) [DB_HDF5]",
+        "--driver %s", "DB_HDF5",
+            "Specify Silo's I/O driver (DB_PDB|DB_HDF5 or variants)",
             &driver_str,
-        "--checksums",
-            "Enable checksum checks [no]",
+        "--checksums", "",
+            "Enable checksum checks",
             &cksums,
-        "--hdf5friendly",
-            "Generate HDF5 friendly files [no]",
+        "--hdf5friendly", "",
+            "Generate HDF5 friendly files",
             &hdf5friendly,
-        "--compression %s",
+        "--compression %s", MACSIO_CLARGS_NODEFAULT,
             "Specify compression method to use",
             &compression_str,
-        "--show-all-errors",
+        "--show-all-errors", "",
             "Show all errors Silo encounters",
             &show_all_errors,
     MACSIO_CLARGS_END_OF_ARGS);
 
-#warning MOVE THIS STUFF TO register METHOD
-    driver = StringToDriver(driver_str);
+    if (driver_str)
+    {
+        driver = StringToDriver(driver_str);
+        free(driver_str);
+    }
+    if (compression_str)
+    {
+        if (*compression_str)
+            DBSetCompression(compression_str);
+        free(compression_str);
+    }
     DBSetEnableChecksums(cksums);
     DBSetFriendlyHDF5Names(hdf5friendly);
-    if (compression_str[0] != '\0')
-        DBSetCompression(compression_str);
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
 
     return 0;
@@ -374,7 +389,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     /* Construct the lists of individual object names */
     for (i = 0; i < numChunks; i++)
     {
-        int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+        int rank_owning_chunk = MACSIO_DATA_GetRankOwningPart(main_obj, i);
         int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
         blockNames[i] = (char *) malloc(1024);
         if (groupRank == 0)
@@ -404,7 +419,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     {
         for (i = 0; i < numChunks; i++)
         {
-            int rank_owning_chunk = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+            int rank_owning_chunk = MACSIO_DATA_GetRankOwningPart(main_obj, i);
             int groupRank = MACSIO_MIF_RankOfGroup(bat, rank_owning_chunk);
             if (groupRank == 0)
             {
@@ -493,7 +508,7 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
         dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
     
     for (i = 0; i < total_parts; i++)
-        color[i] = MACSIO_MAIN_GetRankOwningPart(main_obj, i);
+        color[i] = MACSIO_DATA_GetRankOwningPart(main_obj, i);
     for (i = 0; i < ndims; i++)
         zdims[i] = dims[i]-1;
 
@@ -502,9 +517,8 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
 }
 
 #warning HOW IS A NEW DUMP CLASS HANDLED
-#warning ELIMINATE THIS IOPERF ARTIFACT FOR FNAME
 #warning ADD TIMING LOGIC
-static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
+static void main_dump(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
     int numGroups = -1;
@@ -519,7 +533,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
-    FNAME(process_args)(argi, argc, argv);
+    process_args(argi, argc, argv);
 
     rank = JsonGetInt(main_obj, "parallel/mpi_rank");
     size = JsonGetInt(main_obj, "parallel/mpi_size");
@@ -602,8 +616,9 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     {
         WriteMultiXXXObjects(main_obj, siloFile, dumpn, bat);
 
+#warning DECOMP MESH SHOULDN'T BE INCLUDED IN PERFORMANCE NUMBERS
         /* output a top-level quadmesh and vars to indicate processor decomp */
-        if (MACSIO_LOG_DebugLevel >= 1)
+        if (MACSIO_LOG_DebugLevel >= 2)
         {
             WriteDecompMesh(main_obj, siloFile, dumpn, bat);
         }
@@ -618,6 +633,215 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     MACSIO_MIF_Finish(bat);
 }
 
+#warning TO BE MOVED TO SILO LIBRARY
+static void DBSplitMultiName(char *mname, char **file, char **dir, char **obj)
+{
+    char *_file, *_dir, *_obj;
+    char *colon = strchr(mname, ':');
+    char *lastslash = strrchr(mname, '/');
+
+    /* Split the incoming string by inserting null chars */
+    if (colon)     *colon     = '\0';
+    if (lastslash) *lastslash = '\0';
+
+    if (colon)
+    {
+        if (file) *file = mname;
+        if (lastslash)
+        {
+            if (dir) *dir = colon+1;
+            if (obj) *obj = lastslash+1;
+        }
+        else
+        {
+            if (dir) *dir = 0;
+            if (obj) *obj = colon+1;
+        }
+    }
+    else
+    {
+        if (file) *file = 0;
+        if (lastslash)
+        {
+            if (dir) *dir = mname;
+            if (obj) *obj = lastslash+1;
+        }
+        else
+        {
+            if (dir) *dir = 0;
+            if (obj) *obj = mname;
+        }
+    }
+}
+
+#warning TO BE MOVED TO SILO LIBRARY
+static char const *
+DBGetFilename(DBfile const *f)
+{
+    return f->pub.name;
+}
+
+#warning SHOULD USE MACSIO_MIF FOR READ TOO BUT INTERFACE IS LACKING
+static
+void main_load(int argi, int argc, char **argv, char const *path, json_object *main_obj, json_object **data_read_obj)
+{
+    int my_rank = JsonGetInt(main_obj, "parallel/mpi_rank");
+    int mpi_size = JsonGetInt(main_obj, "parallel/mpi_rank");
+    int i, num_parts, my_part_cnt, use_ns = 0, maxlen = 0, bcast_data[3];
+    char *all_meshnames, *my_meshnames;
+    char *var_names_list = strdup(JsonGetStr(main_obj, "clargs/read_vars"));
+    char *var_names_list_orig = var_names_list;
+    char *vname;
+    int *my_part_ids, *all_part_cnts;
+    DBfile *partFile = 0;
+    int silo_driver = DB_UNKNOWN;
+
+    /* Open the root file */
+    if (my_rank == 0)
+    {
+        DBfile *rootFile = DBOpen(path, DB_UNKNOWN, DB_READ);
+        DBmultimesh *mm = DBGetMultimesh(rootFile, JsonGetStr(main_obj, "clargs/read_mesh"));
+
+        /* Examine multimesh for count of mesh pieces and count of files */
+        num_parts = mm->nblocks;
+        use_ns = mm->block_ns ? 1 : 0;
+
+        /* Reformat all the meshname strings to a single, long buffer */
+        if (!use_ns)
+        {
+            int i;
+            for (i = 0; i < num_parts; i++)
+            {
+                int len = strlen(mm->meshnames[i]);
+                if (len > maxlen) maxlen = len;
+            }
+            maxlen++; /* for nul char */
+            all_meshnames = (char *) calloc(num_parts * maxlen, sizeof(char));
+            for (i = 0; i < num_parts; i++)
+                strcpy(&all_meshnames[i*maxlen], mm->meshnames[i]);
+        }
+
+        bcast_data[0] = num_parts;
+        bcast_data[1] = use_ns;
+        bcast_data[2] = maxlen;
+
+        DBClose(rootFile);
+    }
+#ifdef HAVE_MPI
+    MPI_Bcast(bcast_data, NARRVALS(bcast_data), MPI_INT, 0, MACSIO_MAIN_Comm);
+#endif
+    num_parts = bcast_data[0];
+    use_ns    = bcast_data[1];
+    maxlen    = bcast_data[2];
+
+#if 0
+    MACSIO_DATA_SimpleAssignKPartsToNProcs(num_parts, mpi_size, my_rank, &all_part_cnts,
+        &my_part_cnt, &my_part_ids);
+#endif
+
+    my_meshnames = (char *) calloc(my_part_cnt * maxlen, sizeof(char));
+
+    if (use_ns)
+    {
+    }
+#ifdef HAVE_MPI
+    else
+    { 
+        int *displs = 0;
+
+        if (my_rank == 0)
+        {
+            displs = (int *) malloc(num_parts * sizeof(int));
+            displs[0] = 0;
+            for (i = 1; i < num_parts; i++)
+               displs[i] = displs[i-1] + all_part_cnts[i-1] * maxlen;
+        }
+
+        /* MPI_scatter the block names or the external arrays for any namescheme */
+        MPI_Scatterv(all_meshnames, all_part_cnts, displs, MPI_CHAR,
+                 my_meshnames, my_part_cnt, MPI_CHAR, 0, MACSIO_MAIN_Comm);
+
+        if (my_rank == 0)
+            free(displs);
+    }
+#endif
+
+    /* Iterate finding correct file/dir combo and reading mesh pieces and variables */
+    for (i = 0; i < my_part_cnt; i++)
+    {
+        char *partFileName, *partDirName, *partObjName;
+        DBObjectType silo_objtype;
+
+        DBSplitMultiName(&my_meshnames[i*maxlen], &partFileName, &partDirName, &partObjName);
+
+        /* if filename is different from current, close current */
+        if (partFile && strcmp(DBGetFilename(partFile), partFileName))
+            DBClose(partFile);
+
+        /* Open the file containing this part */
+        partFile = DBOpen(partFileName, silo_driver, DB_READ);
+        silo_driver = DBGetDriverType(partFile);
+
+        DBSetDir(partFile, partDirName);
+
+        /* Get the mesh part */
+        silo_objtype = (DBObjectType) DBInqMeshtype(partFile, partObjName);
+
+        switch (silo_objtype)
+        {
+            case DB_QUADRECT:
+            case DB_QUADCURV:
+            case DB_QUADMESH:
+            {
+                DBquadmesh *qm = DBGetQuadmesh(partFile, partObjName);
+                break;
+            }
+            case DB_UCDMESH:
+            {
+                break;
+            }
+            case DB_POINTMESH:
+            {
+                break;
+            }
+            default:
+            {
+            }
+        }
+
+        while (vname = strsep(&var_names_list, ", "))
+        {
+            DBObjectType silo_vartype = DBInqVarType(partFile, vname);
+            switch (silo_vartype)
+            {
+                case DB_QUADVAR:
+                {
+                    DBquadvar *qv = DBGetQuadvar(partFile, vname);
+                    break;
+                }
+                case DB_POINTVAR:
+                {
+                    break;
+                }
+                case DB_UCDVAR:
+                {
+                    break;
+                }
+                default: continue;
+            }
+        }
+        free(var_names_list_orig);
+
+        /* Add the mesh part to the returned json object */
+
+        DBSetDir(partFile, "/");
+    }
+
+    free(my_meshnames);
+    if (my_rank == 0)
+        free(all_meshnames);
+}
+
 static int register_this_interface()
 {
     MACSIO_IFACE_Handle_t iface;
@@ -630,8 +854,9 @@ static int register_this_interface()
     strcpy(iface.ext, iface_ext);
 
     /* Must define at least these two methods */
-    iface.dumpFunc = FNAME(main_dump);
-    iface.processArgsFunc = FNAME(process_args);
+    iface.dumpFunc = main_dump;
+    iface.loadFunc = main_load;
+    iface.processArgsFunc = process_args;
 
     if (!MACSIO_IFACE_Register(&iface))
         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface_name));
@@ -647,3 +872,7 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
+
+/*!@}*/
+
+/*!@}*/

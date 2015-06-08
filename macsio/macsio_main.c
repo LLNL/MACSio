@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 #include <macsio_clargs.h>
+#include <macsio_data.h>
 #include <macsio_iface.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
@@ -33,6 +34,68 @@ extern "C" {
 #include <mpi.h>
 #endif
 
+/*!
+ * \mainpage
+ *
+ * MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
+ *
+ * It is designed to support a number of goals with respect to parallel I/O performance benchmarking
+ * including the ability to test and compare various I/O libraries and I/O paradigms, to predict
+ * scalable performance of real applications and to help identify where improvements in I/O performance
+ * can be made.
+ *
+ * For an overview of MACSio's design goals and outline of its design, please see
+ * <A HREF="../../macsio_design_intro_final_html/macsio_design_intro_final.htm">this design document.</A>
+ * 
+ * MACSio is capable of generating a wide variety of mesh and variable data and of amorphous metadata
+ * typical of HPC multi-physics applications. Currently, the only supported mesh type in MACSio is 
+ * a rectilinear, multi-block type mesh in 2 or 3 dimensions. However, some of the functions to generate other
+ * mesh types such as curvilinear, block-structured AMR, unstructured, unstructured-AMR and arbitrary
+ * are already available. In addition, regardless of the particular type of mesh MACSio generates for 
+ * purposes of I/O performance testing, it stores and marshalls all of the resultant data in an uber
+ * JSON-C object that is passed around witin MACSio and between MACSIO and its I/O plugins.
+ *
+ * MACSio employs a very simple algorithm to generate and then decompose a mesh in parallel. However, the
+ * decomposition is also general enough to create multiple mesh pieces on individual MPI ranks and for
+ * the number of mesh pieces vary to between MPI ranks. At present, there is no support to explicitly specify
+ * a particular arrangement of mesh pieces and MPI ranks. However, such enhancement can be easily made at
+ * a later date.
+ *
+ * MACSio's command-line arguments are designed to give the user control over the nominal I/O request sizes
+ * emitted from MPI ranks for mesh bulk data and for amorphous metadata. The user specifies a size, in bytes,
+ * for mesh pieces. MACSio then computes a mesh part size, in nodes, necessary to hit this target byte count for
+ * double precision data. MACSio will determine an N dimensional logical size of a mesh piece that is a close
+ * to equal dimensional as possible. In addition, the user specifies an average number of mesh pieces that will be
+ * assigned to each MPI rank. This does not have to be a whole number. When it is a whole number, each MPI rank
+ * has the same number of mesh pieces. When it is not, some processors have one more mesh piece than others.
+ * This is common of HPC multi-physics applications. Together, the total processor count and average number of
+ * mesh pieces per processor gives a total number of mesh pieces that comprise the entire mesh. MACSio then
+ * finds an N dimensional arrangement (N=[1,2,3]) of the pieces that is as close to equal dimension as possible.
+ * If mesh piece size or total count of pieces wind up being prime numbers, MACSio will only be able to factor
+ * these into long, narrow shapes where 2 (or 3) of the dimensions are of size 1. That will make examination of
+ * the resulting data using visualization tools like VisIt a little less convenient but is otherwise harmless
+ * from the perspective of driving and assessing I/O performance.
+ *
+ * Once the global whole mesh shape is determined as a count of total pieces and as counts of pieces in each
+ * of the logical dimensions, MACSio uses a very simple algorithm to assign mesh pieces to MPI ranks.
+ * The global list of mesh pieces is numbered starting from 0. First, the number
+ * of pieces to assign to rank 0 is chosen. When the average piece count is non-integral, it is a value
+ * between K and K+1. So, MACSio randomly chooses either K or K+1 pieces but being carful to weight the
+ * randomness so that once all pieces are assigned to all ranks, the average piece count per rank target
+ * is achieved. MACSio then assigns the next K or K+1 numbered pieces to the next MPI rank. It continues
+ * assigning pieces to MPI ranks, in piece number order, until all MPI ranks have been assigned pieces.
+ * The algorithm runs indentically on all ranks. When the algorithm reaches the part assignment for the
+ * rank on which its executing, it then generates the K or K+1 mesh pieces for that rank. Although the
+ * algorithm is essentially a sequential algorithm with asymptotic behavior O(#total pieces), it is primarily
+ * a simple book-keeping loop which completes in a fraction of a second even for more than one million
+ * pieces.
+ *
+ * Each piece of the mesh is a simple rectangular region of space. The spatial bounds of that region are
+ * easily determined. Any variables to be placed on the mesh can be easily handled as long as the variable's
+ * spatial variation can be described in the global goemetric space.
+ *
+ */
+
 #define MAX(A,B) (((A)>(B))?(A):(B))
 
 extern char **enviornp;
@@ -40,782 +103,11 @@ extern char **enviornp;
 #ifdef HAVE_MPI
 MPI_Comm MACSIO_MAIN_Comm = MPI_COMM_WORLD;
 #else
-int MACSIO_MAIN_Comm = ;
+int MACSIO_MAIN_Comm = 0;
 #endif
 
 int MACSIO_MAIN_Size = 1;
 int MACSIO_MAIN_Rank = 0;
-
-static json_object *
-make_random_int()
-{
-    return json_object_new_int(random() % 100000);
-}
-
-static json_object *
-make_random_double()
-{
-     return json_object_new_double(
-         (double) (random() % 100000) / (random() % 100000 + 1));
-}
-
-static json_object *
-make_random_primitive()
-{
-    int rval = random() % 100;
-    if (rval < 33) /* favor doubles over ints 2:1 */
-        return make_random_int();
-    else
-        return make_random_double();
-}
-
-static json_object *
-make_random_string(int nthings)
-{
-    int i;
-    char *rval = (char *) malloc(nthings);
-    json_object *retval;
-
-    for (i = 0; i < nthings-1; i++)
-        rval[i] = 'A' + (random() % 61);
-    rval[nthings-1] = '\0';
-    retval = json_object_new_string(rval);
-    free(rval);
-
-    return retval;
-}
-
-static json_object *
-make_random_array(int nthings)
-{
-    int i, rval = random() % 100;
-    json_object *retval = json_object_new_array();
-    for (i = 0; i < nthings; i++)
-    {
-        if (rval < 33) /* favor double arrays over int arrays 2:1 */
-            json_object_array_add(retval, make_random_int());
-        else
-            json_object_array_add(retval, make_random_double());
-    }
-    return retval;
-}
-
-static json_object *
-make_random_extarr(int nthings)
-{
-    
-    int dims[2], ndims = random() % 2 + 1;
-    int rval = random() % 100;
-    json_extarr_type dtype;
-    void *data;
-
-    dims[0] = nthings;
-    if (ndims == 2)
-        MACSIO_UTILS_Best2DFactors(nthings, &dims[0], &dims[1]);
-
-    if (rval < 33) /* favor double arrays over int arrays 2:1 */
-    {
-        int i, *vals = (int *) malloc(nthings * sizeof(int));
-        for (i = 0; i < nthings; i++)
-            vals[i] = i % 11 ? i : random() % nthings;
-        dtype = json_extarr_type_int32;
-        data = vals;
-    }
-    else
-    {
-        int i;
-        double *vals = (double *) malloc(nthings * sizeof(double));
-        for (i = 0; i < nthings; i++)
-            vals[i] = (double) (random() % 100000) / (random() % 100000 + 1);
-        dtype = json_extarr_type_flt64;
-        data = vals;
-    }
-
-    return json_object_new_extarr(data, dtype, ndims, dims);
-}
-
-static json_object *
-make_random_object_recurse(int nthings, int depth)
-{
-    int rval = random() % 100;
-    int prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
-
-    /* adjust cutoffs to affect odds of different kinds of objects depending on total size */
-    if (depth == 0 && nthings > 1)
-    {
-        prim_cutoff = 0; string_cutoff = 0; array_cutoff = 0; extarr_cutoff = 0;
-    }
-    else if (nthings > 10000)
-    {
-        prim_cutoff = 0; string_cutoff = 5; array_cutoff = 10; extarr_cutoff = 30;
-    }
-    else if (nthings > 1000)
-    {
-        prim_cutoff = 0; string_cutoff = 10; array_cutoff = 20; extarr_cutoff = 60;
-    }
-    else if (nthings > 100)
-    {
-        prim_cutoff = 0; string_cutoff = 25; array_cutoff = 55; extarr_cutoff = 85;
-    }
-    else if (nthings > 10)
-    {
-        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 80; extarr_cutoff = 92;
-    }
-    else if (nthings > 1)
-    {
-        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 85; extarr_cutoff = 96;
-    }
-    else
-    {
-        prim_cutoff = 100;
-    }
-
-    if (rval < prim_cutoff)
-        return make_random_primitive();
-    else if (rval < string_cutoff)
-        return make_random_string(nthings);
-    else if (rval < array_cutoff)
-        return make_random_array(nthings);
-    else if (rval < extarr_cutoff)
-        return make_random_extarr(nthings);
-    else 
-    {
-        int i;
-        int nmembers = random() % (nthings > 100000 ? 500:
-                                  (nthings > 10000  ? 100:
-                                  (nthings > 1000   ?  25:
-                                  (nthings > 100    ?  10:
-                                  (nthings > 10     ?   3:
-                                   nthings)))));
-        json_object *obj = json_object_new_object();
-
-        nthings -= nmembers;
-        depth++;
-        for (i = 0; i < nmembers; i++)
-        {
-            char name[32];
-            int nthings_member = random() % nthings;
-            snprintf(name, sizeof(name), "member%04d", i++);
-            json_object_object_add(obj, name, make_random_object_recurse(nthings_member, depth));
-            nthings -= nthings_member;
-            if (nthings <= 0) break;
-        }
-        return obj;
-    }
-}
-
-static json_object *
-make_random_object(int nthings)
-{
-    return make_random_object_recurse(nthings, 0);
-}
-
-#warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
-static json_object *
-make_uniform_mesh_coords(int ndims, int const *dims, double const *bounds)
-{
-    json_object *coords = json_object_new_object();
-
-    json_object_object_add(coords, "CoordBasis", json_object_new_string("X,Y,Z"));
-    json_object_object_add(coords, "OriginX", json_object_new_double(MACSIO_UTILS_XMin(bounds)));
-    json_object_object_add(coords, "OriginY", json_object_new_double(MACSIO_UTILS_YMin(bounds)));
-    json_object_object_add(coords, "OriginZ", json_object_new_double(MACSIO_UTILS_ZMin(bounds)));
-    json_object_object_add(coords, "DeltaX", json_object_new_double(MACSIO_UTILS_XDelta(dims, bounds)));
-    json_object_object_add(coords, "DeltaY", json_object_new_double(MACSIO_UTILS_YDelta(dims, bounds)));
-    json_object_object_add(coords, "DeltaZ", json_object_new_double(MACSIO_UTILS_ZDelta(dims, bounds)));
-    json_object_object_add(coords, "NumX", json_object_new_int(MACSIO_UTILS_XDim(dims)));
-    json_object_object_add(coords, "NumY", json_object_new_int(MACSIO_UTILS_YDim(dims)));
-    json_object_object_add(coords, "NumZ", json_object_new_int(MACSIO_UTILS_ZDim(dims)));
-
-    return coords;
-}
-
-#warning PACKAGE EXTARR METHOD WITH CHECKSUM STUFF
-
-static json_object *
-make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
-{
-    json_object *coords = json_object_new_object();
-    double *vals, delta;
-    int i;
-
-#warning SUPPORT DIFFERENT DATATYPES HERE
-
-    json_object_object_add(coords, "CoordBasis", json_object_new_string("X,Y,Z"));
-
-    /* build X coordinate array */
-    delta = MACSIO_UTILS_XDelta(dims, bounds);
-    vals = (double *) malloc(MACSIO_UTILS_XDim(dims) * sizeof(double));
-    for (i = 0; i < MACSIO_UTILS_XDim(dims); i++)
-        vals[i] = MACSIO_UTILS_XMin(bounds) + i * delta;
-    json_object_object_add(coords, "XAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[0]));
-
-    if (ndims > 1)
-    {
-        /* build Y coordinate array */
-        delta = MACSIO_UTILS_YDelta(dims, bounds);
-        vals = (double *) malloc(MACSIO_UTILS_YDim(dims) * sizeof(double));
-        for (i = 0; i < MACSIO_UTILS_YDim(dims); i++)
-            vals[i] = MACSIO_UTILS_YMin(bounds) + i * delta;
-        json_object_object_add(coords, "YAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[1]));
-    }
-
-    if (ndims > 2)
-    {
-        /* build Z coordinate array */
-        delta = MACSIO_UTILS_ZDelta(dims, bounds);
-        vals = (double *) malloc(MACSIO_UTILS_ZDim(dims) * sizeof(double));
-        for (i = 0; i < MACSIO_UTILS_ZDim(dims); i++)
-            vals[i] = MACSIO_UTILS_ZMin(bounds) + i * delta;
-        json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2]));
-    }
-
-    return coords;
-}
-
-static json_object *
-make_curv_mesh_coords(int ndims, int const *dims, double const *bounds)
-{
-    json_object *coords = json_object_new_object();
-    double *x = 0, *y = 0, *z = 0;
-    double dx = MACSIO_UTILS_XDelta(dims, bounds);
-    double dy = MACSIO_UTILS_YDelta(dims, bounds);
-    double dz = MACSIO_UTILS_ZDelta(dims, bounds);
-    int nx = MACSIO_UTILS_XDim(dims), ny = MAX(MACSIO_UTILS_YDim(dims),1), nz = MAX(MACSIO_UTILS_ZDim(dims),1);
-    int i, j, k;
-
-    json_object_object_add(coords, "CoordBasis", json_object_new_string("X,Y,Z")); /* "R,Theta,Phi" */
-
-    x = (double *) malloc(nx * ny * nz * sizeof(double));
-    if (ndims > 1)
-        y = (double *) malloc(nx * ny * nz * sizeof(double));
-    if (ndims > 2)
-        z = (double *) malloc(nx * ny * nz * sizeof(double));
-    for (i = 0; i < nx; i++)
-    {
-        for (j = 0; j < ny; j++)
-        {
-            for (k = 0; k < nz; k++)
-            {
-                int idx = k * ny * nx  + j * nx + i;
-                       x[idx] = MACSIO_UTILS_XMin(bounds) + i * dx;
-                if (y) y[idx] = MACSIO_UTILS_YMin(bounds) + j * dy;
-                if (z) z[idx] = MACSIO_UTILS_ZMin(bounds) + k * dz;
-            }
-        }
-    }
-    json_object_object_add(coords, "XCoords", json_object_new_extarr(x, json_extarr_type_flt64, ndims, dims));
-    if (ndims > 1)
-        json_object_object_add(coords, "YCoords", json_object_new_extarr(y, json_extarr_type_flt64, ndims, dims));
-    if (ndims > 2)
-        json_object_object_add(coords, "ZCoords", json_object_new_extarr(z, json_extarr_type_flt64, ndims, dims));
-
-    return coords;
-}
-
-static json_object *
-make_ucdzoo_mesh_coords(int ndims, int const *dims, double const *bounds)
-{
-    /* same case as curvilinear mesh */
-    return make_curv_mesh_coords(ndims, dims, bounds);
-}
-
-static json_object *
-make_arb_mesh_coords(int ndims, int const *dims, double const *bounds)
-{
-    /* same case as curvilinear mesh */
-    return make_curv_mesh_coords(ndims, dims, bounds);
-}
-
-static json_object *
-make_structured_mesh_topology(int ndims, int const *dims)
-{
-    json_object *topology = json_object_new_object();
-    int nx = MACSIO_UTILS_XDim(dims);
-    int ny = MACSIO_UTILS_YDim(dims);
-    int nz = MACSIO_UTILS_ZDim(dims);
-
-    json_object_object_add(topology, "Type", json_object_new_string("Templated"));
-    json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
-    json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
-
-    /* would be better for elem types to be enum or int */
-    /* We can use a bonified json array here because the template is small. But,
-       should we? */
-
-    if (ndims == 1)
-    {
-        json_object *topo_template = json_object_new_array();
-
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(0)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(1)));
-
-        json_object_object_add(topology, "ElemType", json_object_new_string("Beam2"));
-        json_object_object_add(topology, "Template", topo_template);
-    }
-    else if (ndims == 2)
-    {
-        json_object *topo_template = json_object_new_array();
-
-        /* For domain entity (zone i,j), here are the nodal offsets in
-           linear address space, right-hand-rule starting from lower-left corner */
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(0,0,nx)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(1,0,nx)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(1,1,nx)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(0,1,nx)));
-
-        json_object_object_add(topology, "ElemType", json_object_new_string("Quad4"));
-        json_object_object_add(topology, "Template", topo_template);
-    }
-    else if (ndims == 3)
-    {
-        json_object *topo_template = json_object_new_array();
-
-        /* For domain entity (zone i,j,k), here are the nodal offsets
-           in linear address space, starting from lower-left-back corner,
-           back-face first with inward normal using rhr then front face with
-           outward normal using rhr. */
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(0,0,0,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(1,0,0,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(1,1,0,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(0,1,0,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(0,0,1,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(1,0,1,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(1,1,1,nx,ny)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx3(0,1,1,nx,ny)));
-
-        json_object_object_add(topology, "ElemType", json_object_new_string("Hex8"));
-        json_object_object_add(topology, "Template", topo_template);
-    }
-
-    return topology;
-}
-
-static json_object *
-make_uniform_mesh_topology(int ndims, int const *dims)
-{
-    return make_structured_mesh_topology(ndims, dims);
-}
-
-static json_object *
-make_rect_mesh_topology(int ndims, int const *dims)
-{
-    return make_structured_mesh_topology(ndims, dims);
-}
-
-static json_object *
-make_curv_mesh_topology(int ndims, int const *dims)
-{
-    return make_structured_mesh_topology(ndims, dims);
-}
-
-static json_object *
-make_ucdzoo_mesh_topology(int ndims, int const *dims)
-{
-    json_object *topology = json_object_new_object();
-    int i,j,k,n=0;
-    int nx = MACSIO_UTILS_XDim(dims), ny = MAX(MACSIO_UTILS_YDim(dims),1), nz = MAX(MACSIO_UTILS_ZDim(dims),1);
-    int ncells = nx * ny * nz;
-    int cellsize = 2 * ndims;
-    int *nodelist = (int *) malloc(ncells * cellsize * sizeof(int));
-    int nl_dims[2] = {ncells, cellsize};
-
-    json_object_object_add(topology, "Type", json_object_new_string("Explicit"));
-    json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
-    json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
-
-    if (ndims == 1)
-    {
-        for (i = 0; i < nx; i++) 
-        {
-            nodelist[n++] = MU_SeqIdx1(i+0);
-            nodelist[n++] = MU_SeqIdx1(i+1);
-        }
-        json_object_object_add(topology, "ElemType", json_object_new_string("Beam2"));
-    }
-    else if (ndims == 2)
-    {
-        for (i = 0; i < nx; i++)
-        {
-            for (j = 0; j < ny; j++)
-            {
-                nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx);
-                nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx);
-                nodelist[n++] = MU_SeqIdx2(i+1,j+1,nx);
-                nodelist[n++] = MU_SeqIdx2(i+0,j+1,nx);
-            }
-        }
-        json_object_object_add(topology, "ElemType", json_object_new_string("Quad4"));
-    }
-    else if (ndims == 3)
-    {
-        for (i = 0; i < nx; i++)
-        {
-            for (j = 0; j < ny; j++)
-            {
-                for (k = 0; k < nz; k++)
-                {
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+1,nx,ny);
-                }
-            }
-        }
-        json_object_object_add(topology, "ElemType", json_object_new_string("Hex8"));
-    }
-    json_object_object_add(topology, "ElemSize", json_object_new_int(cellsize));
-    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims));
-
-    return topology;
-}
-
-#warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
-static json_object *
-make_scalar_var(int ndims, int const *dims, double const *bounds,
-    char const *centering, char const *dtype, char const *kind)
-{
-    json_object *var_obj = json_object_new_object();
-    int i,j,k,n;
-    int dims2[3] = {1,1,1};
-    int minus_one = strcmp(centering, "zone")?0:-1;
-    json_object *data_obj;
-    double *valdp;
-    int    *valip;
-
-    for (i = 0; i < ndims; i++)
-        dims2[i] = dims[i] + minus_one;
-
-#warning NEED EXPLICIT NAME FOR VARIABLE
-    json_object_object_add(var_obj, "name", json_object_new_string(kind));
-    json_object_object_add(var_obj, "centering", json_object_new_string(centering));
-    if (!strcmp(dtype, "double"))
-        data_obj = json_object_new_extarr_alloc(json_extarr_type_flt64, ndims, dims2);
-    else if (!strcmp(dtype, "int"))
-        data_obj = json_object_new_extarr_alloc(json_extarr_type_int32, ndims, dims2);
-    json_object_object_add(var_obj, "data", data_obj);
-    valdp = (double *) json_object_extarr_data(data_obj);
-    valip = (int *) json_object_extarr_data(data_obj);
-
-    n = 0;
-#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
-    srandom(0xBabeFace);
-    for (k = 0; k < dims2[2]; k++)
-    {
-        for (j = 0; j < dims2[1]; j++)
-        {
-            for (i = 0; i < dims2[0]; i++)
-            {
-#warning PUT THESE INTO A GENERATOR FUNCTION
-#warning ACCOUNT FOR HALF ZONE OFFSETS
-                if (!strcmp(kind, "constant"))
-                    valdp[n++] = 1.0;
-                else if (!strcmp(kind, "random"))
-                    valdp[n++] = (double) (random() % 1000) / 1000;
-                else if (!strcmp(kind, "xramp"))
-                    valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
-                else if (!strcmp(kind, "spherical"))
-                {
-                    double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
-                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
-                    double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
-                    valdp[n++] = sqrt(x*x+y*y+z*z);
-                }
-                else if (!strcmp(kind, "ysin"))
-                {
-                    double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
-                    valdp[n++] = sin(y*3.1415266);
-                }
-                else if (!strcmp(kind, "xlayers"))
-                {
-                    valip[n++] = (i / 20) % 3;
-                }
-            }
-        }
-    }
-#warning ADD CHECKSUM TO JSON OBJECT
-
-    return var_obj; 
-
-}
-
-static json_object *
-make_vector_var(int ndims, int const *dims, double const *bounds)
-{
-    return 0;
-}
-
-static json_object *
-make_tensor_var(int ndims, int const *dims, double const *bounds)
-{
-    return 0;
-}
-
-static json_object *
-make_subset_var(int ndims, int const *dims, double const *bounds)
-{
-    return 0;
-}
-
-static json_object *
-make_mesh_vars(int ndims, int const *dims, double const *bounds)
-{
-    json_object *vars_array = json_object_new_array();
-
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "constant"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "random"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "spherical"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "xramp"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "ysin"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "int", "xlayers"));
-
-    return vars_array;
-}
-
-static json_object *
-make_arb_mesh_topology(int ndims, int const *dims)
-{
-    return 0;
-}
-
-#warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
-#warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
-static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
-{
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("uniform"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_uniform_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_uniform_mesh_topology(ndims, dims));
-    return mesh_chunk;
-}
-
-#warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
-static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
-{
-    json_object *chunk_obj = json_object_new_object();
-    json_object *mesh_obj = json_object_new_object();
-    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("rectilinear"));
-    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_obj, "Coords", make_rect_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_obj, "Topology", make_rect_mesh_topology(ndims, dims));
-    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
-#warning ADD NVARS AND VARMAPS ARGS HERE
-    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds));
-    return chunk_obj;
-}
-
-static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
-{
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("curvilinear"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_curv_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_curv_mesh_topology(ndims, dims));
-    return mesh_chunk;
-}
-
-static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
-{
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("ucdzoo"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_ucdzoo_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_ucdzoo_mesh_topology(ndims, dims));
-    return mesh_chunk;
-}
-
-/* dims are # nodes in x, y and z,
-   bounds are xmin,ymin,zmin,xmax,ymax,zmax */
-static json_object *
-make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, char const *type)
-{
-         if (!strncasecmp(type, "uniform", sizeof("uniform")))
-        return make_uniform_mesh_chunk(chunkId, ndims, dims, bounds);
-    else if (!strncasecmp(type, "rectilinear", sizeof("rectilinear")))
-        return make_rect_mesh_chunk(chunkId, ndims, dims, bounds);
-    else if (!strncasecmp(type, "curvilinear", sizeof("curvilinear")))
-        return 0;
-    else if (!strncasecmp(type, "unstructured", sizeof("unstructured")))
-        return make_ucdzoo_mesh_chunk(chunkId, ndims, dims, bounds);
-    else if (!strncasecmp(type, "arbitrary", sizeof("arbitrary")))
-        return 0;
-    return 0;
-}
-
-static int choose_part_count(int K, int mod, int *R, int *Q)
-{
-    /* We have either K or K+1 parts so randomly select that for each rank */
-    int retval = K + random() % mod;
-    if (retval == K)
-    {
-        if (*R > 0)
-        {
-            *R--;
-        }
-        else if (*Q > 0)
-        {
-            retval = K+1;
-            *Q--;
-        }
-    }
-    else
-    {
-        if (*Q > 0)
-        {
-            *Q--;
-        }
-        else if (*R > 0)
-        {
-            retval = K;
-            *R--;
-        }
-    }
-    return retval;
-}
-
-#warning GET FUNTION NAMING CONSISTENT THROUGHOUT SOURCE FILES
-#warning MAYBE PASS IN SEED HERE OR ADD TO MAIN_OBJ
-#warning COULD IMPROVE DESIGN A BIT BY SEPARATING ALGORITHM FOR GEN WITH A CALLBACK
-/* Just a very simple spatial partitioning. We use the same exact algorithm
-   to determine which rank owns a chunk. So, we overload this method and
-   for that purpose as well even though in that case, it doesn generate
-   anything. */
-static json_object *
-MACSIO_GenerateStaticDumpObject(json_object *main_obj, int *rank_owning_chunkId)
-{
-#warning FIX LEAK OF OBJECTS FOR QUERY CASE
-    json_object *mesh_obj = rank_owning_chunkId?0:json_object_new_object();
-    json_object *global_obj = rank_owning_chunkId?0:json_object_new_object();
-    json_object *part_array = rank_owning_chunkId?0:json_object_new_array();
-    int size = json_object_path_get_int(main_obj, "parallel/mpi_size");
-    int part_size = json_object_path_get_int(main_obj, "clargs/part_size") / sizeof(double);
-    double avg_num_parts = json_object_path_get_double(main_obj, "clargs/avg_num_parts");
-    int dim = json_object_path_get_int(main_obj, "clargs/part_dim");
-    double total_num_parts_d = size * avg_num_parts;
-    int total_num_parts = (int) lround(total_num_parts_d);
-    int myrank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
-
-    int K = floor(avg_num_parts); /* some ranks get K parts */
-    int K1 = K+1;                 /* some ranks get K+1 parts */
-    int Q = total_num_parts - size * K; /* # ranks with K+1 parts */
-    int R = size - Q;                   /* # ranks with K parts */
-    int mod = ((double)K == avg_num_parts)?1:2;
-    int nx_parts = total_num_parts, ny_parts = 1, nz_parts = 1;
-    int nx = part_size, ny = 1, nz = 1;
-    int ipart_width = 1, jpart_width = 0, kpart_width = 0;
-    int ipart, jpart, kpart, chunk, rank, parts_on_this_rank;
-    int part_dims[3], part_block_dims[3], global_log_dims[3], global_indices[3];
-    double part_bounds[6], global_bounds[6];
-
-    /* Determine spatial size and arrangement of parts */
-    if (dim == 1)
-    {
-        ; /* no-op */
-    }
-    else if (dim == 2)
-    {
-        MACSIO_UTILS_Best2DFactors(total_num_parts, &nx_parts, &ny_parts);
-        MACSIO_UTILS_Best2DFactors(part_size, &nx, &ny);
-        jpart_width = 1;
-    }
-    else if (dim == 3)
-    {
-        MACSIO_UTILS_Best3DFactors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
-        MACSIO_UTILS_Best3DFactors(part_size, &nx, &ny, &nz);
-        kpart_width = 1;
-    }
-    MACSIO_UTILS_SetDims(part_dims, nx, ny, nz);
-    MACSIO_UTILS_SetDims(part_block_dims, nx_parts, ny_parts, nz_parts);
-    MACSIO_UTILS_SetDims(global_log_dims, nx * nx_parts, ny * ny_parts, nz * nz_parts);
-    MACSIO_UTILS_SetBounds(global_bounds, 0, 0, 0,
-        nx_parts * ipart_width, ny_parts * jpart_width, nz_parts * kpart_width);
-    if (!rank_owning_chunkId)
-    {
-        json_object_object_add(global_obj, "TotalParts", json_object_new_int(total_num_parts));
-#warning NOT SURE PartsLogDims IS USEFUL IN GENERAL CASE
-        json_object_object_add(global_obj, "PartsLogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, part_block_dims));
-        json_object_object_add(global_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, global_log_dims));
-        json_object_object_add(global_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(global_bounds));
-        json_object_object_add(mesh_obj, "global", global_obj);
-    }
-
-    rank = 0;
-    chunk = 0;
-    srandom(0xDeadBeef); /* initialize for choose_part_count */
-    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
-    for (ipart = 0; ipart < nx_parts; ipart++)
-    {
-        for (jpart = 0; jpart < ny_parts; jpart++)
-        {
-            for (kpart = 0; kpart < nz_parts; kpart++)
-            {
-                if (!rank_owning_chunkId && rank == myrank)
-                {
-                    int global_log_origin[3];
-
-                    /* build mesh part on this rank */
-                    MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
-                        (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
-                    json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
-                        json_object_path_get_string(main_obj, "clargs/part_type"));
-                    MACSIO_UTILS_SetDims(global_indices, ipart, jpart, kpart);
-#warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
-#warning GlogalLogIndices MAY NOT BE NEEDED
-                    json_object_object_add(part_obj, "GlobalLogIndices",
-                        MACSIO_UTILS_MakeDimsJsonArray(dim, global_indices));
-                    MACSIO_UTILS_SetDims(global_log_origin, ipart * nx, jpart * ny, kpart * nz);
-                    json_object_object_add(part_obj, "GlobalLogOrigin",
-                        MACSIO_UTILS_MakeDimsJsonArray(dim, global_log_origin));
-                    json_object_array_add(part_array, part_obj);
-                }
-                else if (rank_owning_chunkId && *rank_owning_chunkId == chunk)
-                {
-                    *rank_owning_chunkId = rank;
-                    return 0;
-                }
-                chunk++;
-                parts_on_this_rank--;
-                if (parts_on_this_rank == 0)
-                {
-                    rank++;
-                    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
-                }
-            }
-        }
-    } 
-    json_object_object_add(mesh_obj, "parts", part_array);
-
-    return mesh_obj;
-
-}
-
-int MACSIO_MAIN_GetRankOwningPart(json_object *main_obj, int chunkId)
-{
-    int tmp = chunkId;
-    MACSIO_GenerateStaticDumpObject(main_obj, &tmp);
-    return tmp;
-}
 
 static void handle_help_request_and_exit(int argi, int argc, char **argv)
 {
@@ -875,11 +167,21 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     int plugin_args_start = -1;
     int cl_result;
 
+#warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
+#warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
+
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
-        "--interface %s",
+        "--units_prefix_system %s", "binary",
+            "Specify which SI units prefix system to use both in reporting performance\n"
+            "data and in interpreting sizing modifiers to arguments. The options are\n"
+            "\"binary\" and \"decimal\". For \"binary\" unit prefixes, sizes are reported\n"
+            "in powers of 1024 and unit symbols Ki, Mi, Gi, Ti, Pi are used. For \"decimal\",\n"
+            "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
+            "See http://en.wikipedia.org/wiki/Binary_prefix. for more information",
+        "--interface %s", "miftmpl",
             "Specify the name of the interface to be tested. Use keyword 'list'\n"
             "to print a list of all known interface names and then exit.",
-        "--parallel_file_mode %s %d",
+        "--parallel_file_mode %s %d", "MIF 4",
             "Specify the parallel file mode. There are several choices.\n"
             "Use 'MIF' for Multiple Independent File (Poor Man's) mode and then\n"
             "also specify the number of files. Or, use 'MIFFPP' for MIF mode and\n"
@@ -890,7 +192,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "It will produce the specified number of files by grouping ranks in the\n"
             "the same way MIF does, but I/O within each group will be to a single,\n"
             "shared file using SIF mode.",
-        "--avg_num_parts %f",
+        "--avg_num_parts %f", "1",
             "The average number of mesh parts per MPI rank. Non-integral values\n"
             "are acceptable. For example, a value that is half-way between two\n"
             "integers, K and K+1, means that half the ranks have K mesh parts\n"
@@ -899,37 +201,49 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "ranks get 2 parts. Note that the total number of parts is this\n"
             "number multiplied by the MPI communicator size. If the result of that\n"
             "product is non-integral, it will be rounded and a warning message will\n"
-            "be generated. [1]",
-        "--part_size %d",
+            "be generated.",
+        "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
-            "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
-            "(2^20) or 'G'igabytes (2^30). Mesh and variable data is then sized\n"
-            "by MACSio to hit this target byte count. However, due to contraints\n"
-            "involved in creating valid mesh topology and variable data with\n"
-            "realistic variation in features (e.g. zone- and node-centering),\n"
-            "this target byte count is hit exactly for only the most frequently\n"
-            "dumped objects and approximately for other objects.",
-        "--part_dim %d",
+            "character indicates 'B'ytes, 'K'ilo-, 'M'ega- or 'G'iga- bytes\n"
+            "representing powers of either 1000 or 1024 according to the selected\n"
+            "units prefix system. With no size modifier character, 'B' is assumed.\n"
+            "Mesh and variable data is then sized by MACSio to hit this target byte\n"
+            "count. However, due to contraints involved in creating valid mesh\n"
+            "topology and variable data with realistic variation in features (e.g.\n"
+            "zone- and node-centering), this target byte count is hit exactly for\n"
+            "only the most frequently dumped objects and approximately for other objects.",
+        "--part_dim %d", "2",
             "Spatial dimension of parts; 1, 2, or 3",
-        "--part_type %s",
+        "--part_type %s", "rectilinear",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
             "and 'arbitrary' (currently, only rectilinear is implemented)",
-        "--part_distribution %s",
-            "Specify how parts are distributed to MPI tasks. (currently ignored)",
-        "--vars_per_part %d",
+        "--part_map %s", MACSIO_CLARGS_NODEFAULT,
+            "Specify the name of an ascii file containing part assignments to MPI ranks.\n"
+            "The ith line in the file, numbered from 0, holds the MPI rank to which the\n"
+            "ith part is to be assigned. (currently ignored)",
+        "--vars_per_part %d", "20",
             "Number of mesh variable objects in each part. The smallest this can\n"
             "be depends on the mesh type. For rectilinear mesh it is 1. For\n"
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
-        "--meta_type %s",
+        "--topology_change_probability %f", "0.0",
+            "The probability that the topology of the mesh (e.g. something fundamental\n"
+            "about the mesh's structure) will change between dumps. A value of 1.0\n"
+            "indicates it should be changed every dump. A value of 0.0, the default,\n"
+            "indicates it will never change. A value of 0.1 indicates it will change\n"
+            "about once every 10 dumps. Note: at present MACSio will not actually\n"
+            "compute/construct a different topology. It will only inform a plugin\n"
+            "that a given dump should be treated as a change in topology.",
+        "--meta_type %s", "tabular",
             "Specify the type of metadata objects to include in each main dump.\n"
             "Options are 'tabular', 'amorphous'. For tabular type data, MACSio\n"
             "will generate a random set of tables of somewhat random structure\n"
             "and content. For amorphous, MACSio will generate a random hierarchy\n"
             "of random type and sized objects.",
-        "--meta_size %d %d",
+#warning MAY WANT SOME PORTIONS OF METADATA TO SCALE WITH MESH PIECE COUNT
+        "--meta_size %d %d", "10000 50000",
             "Specify the size of the metadata objects on each processor and\n"
             "separately, the root (or master) processor (MPI rank 0). The size\n"
             "is specified in terms of the total number of bytes in the metadata\n"
@@ -941,9 +255,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "2400 bytes and a 3rd table of 40 unnamed records where each record\n"
             "is a 40 byte struct comprised of ints and doubles for a total of 1600\n"
             "bytes.",
-        "--num_dumps %d",
-            "Total number of dumps to marshal [10]",
-        "--max_dir_size %d",
+        "--num_dumps %d", "10",
+            "Total number of dumps to marshal",
+        "--max_dir_size %d", MACSIO_CLARGS_NODEFAULT,
             "The maximum number of filesystem objects (e.g. files or subdirectories)\n"
             "that MACSio will create in any one subdirectory. This is typically\n"
             "relevant only in MIF mode because MIF mode can wind up generating many\n"
@@ -963,37 +277,55 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "be 4 or more levels with the first 32 dumps' dir-trees going into the\n"
             "first dir, etc.",
 #ifdef HAVE_SCR
-        "--exercise_scr",
+        "--exercise_scr", "",
             "Exercise the Scalable Checkpoint and Restart (SCR)\n"
             "(https://computation.llnl.gov/project/scr/library) to marshal\n"
             "files. Note that this works only in MIFFPP mode. A request to exercise\n"
             "SCR in any other mode will be ignored and en error message generated.",
 #endif
-        "--debug_level %d",
+        "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
-            "more frequent and detailed output [0]. A value of zero, the default,\n"
+            "more frequent and detailed output. A value of zero, the default,\n"
             "turns all debugging output off. A value of 1 should not adversely\n"
             "effect performance. A value of 2 may effect performance and a value\n"
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
-        "--log_line_cnt %d",
-            "Set number of lines per rank in the log file [64].",
-        "--log_line_length %d",
-            "Set log file line length [128].",
-        "--alignment %d",
+        "--log_file_name %s", "macsio-log.log",
+            "The name of the log file.",
+        "--log_line_cnt %d", "64",
+            "Set number of lines per rank in the log file.",
+        "--log_line_length %d", "128",
+            "Set log file line length.",
+        "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
-        "--filebase %s",
-            "Basename of generated file(s). ['macsio_']",
-        "--fileext %s",
-            "Extension of generated file(s). ['.dat']",
-        "--plugin-args %n",
+        "--filebase %s", "macsio",
+            "Basename of generated file(s).",
+        "--fileext %s", "dat",
+            "Extension of generated file(s).",
+        "--read_path %s", MACSIO_CLARGS_NODEFAULT,
+            "Specify a path name (file or dir) to start reading for a read test.",
+        "--num_loads %d", MACSIO_CLARGS_NODEFAULT,
+            "Number of loads in succession to test.",
+        "--no_validate_read", "",
+            "Don't validate data on read.",
+        "--read_mesh %s", MACSIO_CLARGS_NODEFAULT,
+            "Specficify mesh name to read.",
+        "--read_vars %s", MACSIO_CLARGS_NODEFAULT,
+            "Specify variable names to read. \"all\" means all variables. If listing more\n"
+            "than one, be sure to either enclose space separated list in quotes or\n"
+            "use a comma-separated list with no spaces",
+        "--time_randomize_seeds", "",
+            "Make randomness in MACSio vary from dump to dump and run to run by\n"
+            "time-modulating all random number seeding.",
+#if 0
+        MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
+#endif
+        "--plugin-args %n", MACSIO_CLARGS_NODEFAULT,
             "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
     MACSIO_CLARGS_END_OF_ARGS);
-
-#warning DETERMINE IF THIS IS A WRITE TEST OR A READ TEST
 
 #warning FIXME
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
@@ -1016,6 +348,178 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     return mainJargs;
 }
 
+static int
+main_write(int argi, int argc, char **argv, json_object *main_obj)
+{
+    int rank = 0, dumpNum = 0, dumpCount = 0;
+    unsigned long long problem_nbytes, dumpBytes = 0, summedBytes = 0;
+    char nbytes_str[32], seconds_str[32], bandwidth_str[32], seconds_str2[32];
+    double dumpTime = 0;
+    double bandwidth, summedBandwidth;
+    MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
+    double dump_loop_start, dump_loop_end;
+    double min_dump_loop_start, max_dump_loop_end;
+    int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
+
+    /* Sanity check args */
+
+    /* Generate a static problem object to dump on each dump */
+    json_object *problem_obj = MACSIO_DATA_GenerateTimeZeroDumpObject(main_obj,0);
+    problem_nbytes = (unsigned long long) json_object_object_nbytes(problem_obj);
+
+#warning MAKE JSON OBJECT KEY CASE CONSISTENT
+    json_object_object_add(main_obj, "problem", problem_obj);
+
+    /* Just here for debugging for the moment */
+    if (MACSIO_LOG_DebugLevel >= 3)
+    {
+        char outfName[256];
+        FILE *outf;
+
+#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
+#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
+        snprintf(outfName, sizeof(outfName), "main_obj_write_%03d.json", MACSIO_MAIN_Rank);
+        outf = fopen(outfName, "w");
+        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+        fclose(outf);
+    }
+
+#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
+
+    dump_loop_start = MT_Time();
+    dumpTime = 0.0;
+    for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
+    {
+        double dt;
+        int scr_need_checkpoint_flag = 1;
+        MACSIO_TIMING_TimerId_t heavy_dump_tid;
+
+#warning ADD OPTION TO UNLINK OLD FILE SETS
+
+#ifdef HAVE_SCR
+        if (exercise_scr)
+            SCR_Need_checkpoint(&scr_need_checkpoint_flag);
+#endif
+
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
+            json_object_path_get_string(main_obj, "clargs/interface"));
+
+        /* log dump start */
+
+        if (!exercise_scr || scr_need_checkpoint_flag)
+        {
+            int scr_valid = 0;
+
+#ifdef HAVE_SCR
+            if (exercise_scr)
+                SCR_Start_checkpoint();
+#endif
+
+            /* Start dump timer */
+            heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
+
+#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
+#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
+            /* do the dump */
+            (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+
+            dt = MT_StopTimer(heavy_dump_tid);
+
+#ifdef HAVE_SCR
+            if (exercise_scr)
+                SCR_Complete_checkpoint(scr_valid);
+#endif
+        }
+
+        /* stop timer */
+        dumpTime += dt;
+        dumpBytes += problem_nbytes;
+        dumpCount += 1;
+
+        /* log dump timing */
+        MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
+            MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+    }
+
+    dump_loop_end = MT_Time();
+
+    MACSIO_LOG_MSG(Info, ("Overall BW: %s/%s = %s",
+        MU_PrByts(dumpBytes, 0, nbytes_str, sizeof(nbytes_str)),
+        MU_PrSecs(dumpTime, 0, seconds_str, sizeof(seconds_str)),
+        MU_PrBW(dumpBytes, dumpTime, 0, bandwidth_str, sizeof(bandwidth_str))));
+
+    bandwidth = dumpBytes / dumpTime;
+    summedBandwidth = bandwidth;
+    min_dump_loop_start = dump_loop_start;
+    max_dump_loop_end = dump_loop_end;
+
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+    MPI_Reduce(&bandwidth, &summedBandwidth, 1, MPI_DOUBLE, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dumpBytes, &summedBytes, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_start, &min_dump_loop_start, 1, MPI_DOUBLE, MPI_MIN, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_end, &max_dump_loop_end, 1, MPI_DOUBLE, MPI_MAX, 0, MACSIO_MAIN_Comm);
+#endif
+
+    if (rank == 0)
+    {
+        MACSIO_LOG_MSG(Info, ("Summed  BW: %s",
+            MU_PrBW(summedBandwidth, 1.0, 0, bandwidth_str, sizeof(bandwidth_str))));
+        MACSIO_LOG_MSG(Info, ("Total Bytes: %s; Last finisher - First starter = %s; BW = %s",
+            MU_PrByts(summedBytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(max_dump_loop_end - min_dump_loop_start, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(summedBytes, max_dump_loop_end - min_dump_loop_start, 0, bandwidth_str, sizeof(bandwidth_str))));
+    }
+}
+
+#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
+static int
+main_read(int argi, int argc, char **argv, json_object *main_obj)
+{
+    int loadNum;
+    MACSIO_TIMING_GroupMask_t main_rd_grp = MACSIO_TIMING_GroupMask("main_read");
+
+    for (loadNum = 0; loadNum < json_object_path_get_int(main_obj, "clargs/num_loads"); loadNum++)
+    {
+        json_object *data_read_obj;
+        MACSIO_TIMING_TimerId_t heavy_load_tid;
+
+        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
+            json_object_path_get_string(main_obj, "clargs/interface"));
+
+        /* log load start */
+
+        /* Start load timer */
+        heavy_load_tid = MT_StartTimer("heavy load", main_rd_grp, loadNum);
+
+        /* do the load */
+        (*(iface->loadFunc))(argi, argc, argv,
+            JsonGetStr(main_obj, "clargs/read_path"), main_obj, &data_read_obj);
+
+        /* stop timer */
+        MT_StopTimer(heavy_load_tid);
+
+        /* log load completion */
+
+        /* Validate the data */
+        if (JsonGetBool(main_obj, "clargs/validate_read"))
+            MACSIO_DATA_ValidateDataRead(data_read_obj);
+    }
+
+    /* Just here for debugging for the moment */
+    if (MACSIO_LOG_DebugLevel >= 3)
+    {
+        char outfName[256];
+        FILE *outf;
+        snprintf(outfName, sizeof(outfName), "main_obj_read_%03d.json", MACSIO_MAIN_Rank);
+        outf = fopen(outfName, "w");
+        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+        fclose(outf);
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1023,22 +527,14 @@ main(int argc, char *argv[])
     json_object *parallel_obj = json_object_new_object();
     json_object *problem_obj = 0;
     json_object *clargs_obj = 0;
-    MACSIO_TIMING_TimerId_t main_tid;
     MACSIO_TIMING_GroupMask_t main_grp;
-    const MACSIO_IFACE_Handle_t *ioiface;
-    double t0,t1;
+    MACSIO_TIMING_TimerId_t main_tid;
     int i, argi, exercise_scr = 0;
     int size = 1, rank = 0;
-    double dumpTime = 0;
-    char outfName[64];
-    FILE *outf;
 
     /* quick pre-scan for scr cl flag */
     for (i = 0; i < argc && !exercise_scr; i++)
         exercise_scr = !strcmp("exercise_scr", argv[i]);
-
-    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
-    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
 #warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
@@ -1054,17 +550,27 @@ main(int argc, char *argv[])
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;
 #endif
+    errno = 0;
 
-#warning SET DEFAULT VALUES FOR CLARGS
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
+    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
     json_object_object_add(main_obj, "clargs", clargs_obj);
 
-    errno = 0;
+    strncpy(MACSIO_UTILS_UnitsPrefixSystem, JsonGetStr(clargs_obj, "units_prefix_system"),
+        sizeof(MACSIO_UTILS_UnitsPrefixSystem));
+
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
+        JsonGetStr(clargs_obj, "log_file_name"),
+        JsonGetInt(clargs_obj, "log_line_length"),
+        JsonGetInt(clargs_obj, "log_line_cnt"));
+
+#warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, "macsio-log.log", 128, 64);
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Setup parallel information */
     json_object_object_add(parallel_obj, "mpi_size", json_object_new_int(MACSIO_MAIN_Size));
@@ -1075,71 +581,11 @@ main(int argc, char *argv[])
 #warning CREATE AN IO CONTEXT OBJECT
     /* Acquire an I/O context handle from the plugin */
 
-    /* Sanity check args */
-
-    /* Generate a static problem object to dump on each dump */
-    problem_obj = MACSIO_GenerateStaticDumpObject(main_obj,0);
-#warning MAKE JSON OBJECT KEY CASE CONSISTENT
-    json_object_object_add(main_obj, "problem", problem_obj);
-
-    /* Just here for debugging for the moment */
-    if (MACSIO_LOG_DebugLevel >= 3)
-    {
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
-#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
-        snprintf(outfName, sizeof(outfName), "main_obj_%03d.json", MACSIO_MAIN_Rank);
-        outf = fopen(outfName, "w");
-        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
-        fclose(outf);
-    }
-
-#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
-
-    dumpTime = 0.0;
-    for (int dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
-    {
-        int scr_need_checkpoint_flag = 1;
-        MACSIO_TIMING_TimerId_t heavy_dump_tid;
-
-#ifdef HAVE_SCR
-        if (exercise_scr)
-            SCR_Need_checkpoint(&scr_need_checkpoint_flag);
-#endif
-
-        /* Use 'Fill' or 'Load' as name for read operation */
-#warning MOVE PLUGINS TO SEPARATE SRC DIR
-        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
-            json_object_path_get_string(main_obj, "clargs/interface"));
-
-        /* log dump start */
-
-        /* Start dump timer */
-        heavy_dump_tid = MT_StartTimer("heavy dump", main_grp, dumpNum);
-
-        if (scr_need_checkpoint_flag)
-        {
-            int scr_valid = 0;
-
-#ifdef HAVE_SCR
-            if (exercise_scr)
-                SCR_Start_checkpoint();
-#endif
-
-            /* do the dump */
-            (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
-
-#ifdef HAVE_SCR
-            if (exercise_scr)
-                SCR_Complete_checkpoint(scr_valid);
-#endif
-
-        }
-
-        /* stop timer */
-        MT_StopTimer(heavy_dump_tid);
-
-        /* log dump completion */
-    }
+    /* Do a read or write test */
+    if (strcmp(JsonGetStr(clargs_obj, "read_path"),"null"))
+        main_read(argi, argc, argv, main_obj);
+    else
+        main_write(argi, argc, argv, main_obj);
 
     /* stop total timer */
     MT_StopTimer(main_tid);
@@ -1156,7 +602,7 @@ main(int argc, char *argv[])
         {
             /* For now, just log to stderr */
 #warning NEED A LOG FILE FOR SPECIFIC SET OF PROCESSORS, OR JUST ONE
-            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Dbg1, (timer_strs[i]));
+            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Info, (timer_strs[i]));
             free(timer_strs[i]);
         }
         free(timer_strs);
@@ -1165,8 +611,8 @@ main(int argc, char *argv[])
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
 #warning ATEXIT THESE
-    MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
+    MACSIO_LOG_LogFinalize(MACSIO_LOG_StdErr);
 
 #ifdef HAVE_SCR
     if (exercise_scr)

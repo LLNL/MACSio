@@ -6,15 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* error modes */
+#define MACSIO_CLARGS_WARN 0
+#define MACSIO_CLARGS_ERROR 1
+
+/* route modes */
 #define MACSIO_CLARGS_TOMEM     0 
 #define MACSIO_CLARGS_TOJSON    1
 
+/* default modes */
+#define MACSIO_CLARGS_ASSIGN_OFF 0
+#define MACSIO_CLARGS_ASSIGN_ON 0
+
 #define MACSIO_CLARGS_HELP  -1
-#define MACSIO_CLARGS_ERROR 1
-#define MACSIO_CLARGS_WARN 0
 #define MACSIO_CLARGS_OK 0
 #define MACSIO_CLARGS_SEPARATOR(SEPSTR) "macsio_args_sep_" #SEPSTR
 #define MACSIO_CLARGS_END_OF_ARGS "macsio_end_of_args"
+#define MACSIO_CLARGS_NODEFAULT (void*)0
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,8 +30,9 @@ extern "C" {
 
 typedef struct _MACSIO_CLARGS_ArgvFlags_t
 {
-    unsigned int error_mode : 1;
-    unsigned int route_mode : 2;
+    unsigned int error_mode    : 1;
+    unsigned int route_mode    : 2;
+    unsigned int defaults_mode : 1;
 } MACSIO_CLARGS_ArgvFlags_t;
 
 #warning RE-THINK THESE NAMES

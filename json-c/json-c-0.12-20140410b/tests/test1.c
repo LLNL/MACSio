@@ -135,12 +135,26 @@ int main(int argc, char **argv)
           int dims[3] = {2, 7, 3}; 
           int nvals = dims[0]*dims[1]*dims[2];
           struct json_object *extarr = json_object_new_extarr_alloc(json_extarr_type_flt64, 3, dims);
+          float *fbuf = 0;
+          int *ibuf;
           for (i = 0; i < nvals; i++)
           {
             double *p = (double*)json_object_extarr_data(extarr)+i;
             *p = (double) i/2.0;
           }
 	  printf("extarr.to_string()=%s\n", json_object_to_json_string(extarr));
+
+          json_object_extarr_data_as_float(extarr, &fbuf);
+          for (i = 0; i < nvals; i++)
+              printf("fbuf[%d]=%f\n",i,fbuf[i]);
+          free(fbuf);
+
+          ibuf = (int *) malloc(nvals * sizeof(int));
+          json_object_extarr_data_as_int(extarr, &ibuf);
+          for (i = 0; i < nvals; i++)
+              printf("ibuf[%d]=%d\n",i,ibuf[i]);
+          free(ibuf);
+        
           json_object_put(extarr);
         }
         {
@@ -153,7 +167,8 @@ int main(int argc, char **argv)
         {
             json_object *filobj = json_object_from_file("foo.json");
             json_object *tmpobj;
-	    printf("filobj=%s\n", json_object_to_json_string(filobj));
+	    printf("filobj=%s, nbytes=%d\n", json_object_to_json_string(filobj),
+                json_object_object_nbytes(filobj));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_path_get_int(filobj, "steve/cameron/b"),
                 json_object_path_get_int(filobj, "abc"));

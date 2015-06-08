@@ -254,6 +254,9 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
 {
     double stop_time = get_current_time();
     double timer_time = stop_time - timerHashTable[tid].start_time;
+
+    if (tid >= MACSIO_TIMING_HASH_TABLE_SIZE) return DBL_MAX;
+
     if (timerHashTable[tid].is_restart)
     {
         timerHashTable[tid].total_time_this_iter += timer_time;
@@ -298,6 +301,50 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
     }
 
     return timer_time;
+}
+
+static double get_timer(timerInfo_t const *table, MACSIO_TIMING_TimerId_t tid, char const *field)
+{
+    if (tid >= MACSIO_TIMING_HASH_TABLE_SIZE) return DBL_MAX;
+
+    if      (!strncmp(field, "__line__", 8))
+        return table[tid].__line__;
+    else if (!strncmp(field, "iter_count", 10))
+        return table[tid].iter_count;
+    else if (!strncmp(field, "min_iter", 8))
+        return table[tid].min_iter;
+    else if (!strncmp(field, "max_iter", 8))
+        return table[tid].max_iter;
+    else if (!strncmp(field, "min_rank", 8))
+        return table[tid].min_rank;
+    else if (!strncmp(field, "max_rank", 8))
+        return table[tid].max_rank;
+    else if (!strncmp(field, "iter_num", 8))
+        return table[tid].iter_num;
+    else if (!strncmp(field, "depth", 5))
+        return table[tid].depth;
+    else if (!strncmp(field, "total_time", 10))
+        return table[tid].total_time;
+    else if (!strncmp(field, "min_time", 8))
+        return table[tid].min_time;
+    else if (!strncmp(field, "max_time", 8))
+        return table[tid].max_time;
+    else if (!strncmp(field, "running_mean", 12))
+        return table[tid].running_mean;
+    else if (!strncmp(field, "running_var", 11))
+        return table[tid].running_var;
+
+    return DBL_MAX;
+}
+
+double MACSIO_TIMING_GetTimer(MACSIO_TIMING_TimerId_t tid, char const *field)
+{
+    return get_timer(timerHashTable, tid, field);
+}
+
+double MACSIO_TIMING_GetReducedTimer(MACSIO_TIMING_TimerId_t tid, char const *field)
+{
+    return get_timer(reducedTimerTable, tid, field);
 }
 
 static void
@@ -587,4 +634,9 @@ void MACSIO_TIMING_ClearTimers(MACSIO_TIMING_GroupMask_t gmask)
 {
     clear_timers(timerHashTable, gmask);
     clear_timers(reducedTimerTable, MACSIO_TIMING_ALL_GROUPS);
+}
+
+double MACSIO_TIMING_GetCurrentTime(void)
+{
+    return get_current_time();
 }

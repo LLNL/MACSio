@@ -95,6 +95,12 @@ of the timer explicitly.
 #define MACSIO_TIMING_ALL_GROUPS (~((MACSIO_TIMING_GroupMask_t)0))
 
 /*!
+\def MT_Time
+\brief Convenience macro for getting current time
+*/
+#define MT_Time MACSIO_TIMING_GetCurrentTime
+
+/*!
 \def MT_StartTimer
 \brief Convenience macro for starting a timer
 \param [in] LAB User defined timer label string
@@ -155,6 +161,26 @@ extern double
 MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t id /**< The timer's ID, returned from a call to StartTimer */);
 
 /*!
+\brief Get data from a specific timer
+
+For field names, see definition of timerInfo_t
+*/
+extern double
+MACSIO_TIMING_GetTimer(
+    MACSIO_TIMING_TimerId_t tid, /**< The timer's ID, returned from a call to StartTimer */
+    char const *field            /**< The name of the field from the timer to return */
+);
+
+/*!
+\brief Get data from a specific reduced timer
+*/
+extern double
+MACSIO_TIMING_GetReducedTimer(
+    MACSIO_TIMING_TimerId_t tid, /**< The timer's ID, returned from a call to StartTimer */
+    char const *field            /**< The name of the field from the timer to return */
+);
+
+/*!
 \brief Dump timers to ascii strings
 
 This call will find all used timers in the hash table matching the specified \c gmask group mask and dumps
@@ -200,6 +226,11 @@ Clears and resets timers of specified group
 */
 extern void MACSIO_TIMING_ClearTimers(
     MACSIO_TIMING_GroupMask_t gmask /**< Group mask to filter only timers belonging to specific groups */);
+
+/*!
+\brief Get current time
+*/
+extern double MACSIO_TIMING_GetCurrentTime(void);
 
 #ifdef __cplusplus
 }

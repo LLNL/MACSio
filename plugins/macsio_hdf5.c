@@ -20,14 +20,18 @@
 #include <H5pubconf.h>
 #include <hdf5.h>
 
-/* convenient name mapping macors */
-#define FNAME2(FUNC,A) FUNC ## _ ## A
-#define FNAME(FUNC) FNAME2(FUNC,hdf5)
-#define INAME2(A) #A
-#define INAME INAME2(hdf5)
+/*!
+\addtogroup plugins
+@{
+*/
+
+/*!
+\addtogroup HDF5
+@{
+*/
 
 /* the name you want to assign to the interface */
-static char const *iface_name = INAME;
+static char const *iface_name = "hdf5";
 static char const *iface_ext = "h5";
 
 static int use_log = 0;
@@ -85,28 +89,28 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
-static int FNAME(process_args)(int argi, int argc, char *argv[])
+static int process_args(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
-        "--show_errors",
+        "--show_errors", "",
             "Show low-level HDF5 errors",
             &show_errors,
-        "--sieve_buf_size %d",
+        "--sieve_buf_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify sieve buffer size (see H5Pset_sieve_buf_size)",
             &sbuf_size,
-        "--meta_block_size %d",
+        "--meta_block_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify size of meta data blocks (see H5Pset_meta_block_size)",
             &mbuf_size,
-        "--small_block_size %d",
+        "--small_block_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify threshold size for data blocks considered to be 'small' (see H5Pset_small_data_block_size)",
             &rbuf_size,
-        "--log",
+        "--log", "",
             "Use logging Virtual File Driver (see H5Pset_fapl_log)",
             &use_log,
 #ifdef HAVE_SILO
-        "--silo_fapl %d %d",
+        "--silo_fapl %d %d", MACSIO_CLARGS_NODEFAULT,
             "Use Silo's block-based VFD and specify block size and block count", 
             &silo_block_size, &silo_block_count,
 #endif
@@ -136,6 +140,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
     MPI_Info mpiInfo = MPI_INFO_NULL;
 
+#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
 #warning INCLUDE ARGS FOR ISTORE AND K_SYM
 #warning INCLUDE ARG PROCESS FOR HINTS
 #warning FAPL PROPS: ALIGNMENT 
@@ -283,6 +288,7 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
     hid_t h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (h5File >= 0)
     {
+#warning USE NEWER GROUP CREATION SETTINGS OF HDF5
         if (nsname && userData)
         {
             user_data_t *ud = (user_data_t *) userData;
@@ -419,7 +425,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
 }
 
-static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_obj,
+static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
     int dumpn, double dumpt)
 {
     int rank, size, numFiles;
@@ -430,7 +436,7 @@ static void FNAME(main_dump)(int argi, int argc, char **argv, json_object *main_
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
-    FNAME(process_args)(argi, argc, argv);
+    process_args(argi, argc, argv);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
@@ -493,8 +499,8 @@ static int register_this_interface()
     /* Populate information about this plugin */
     strcpy(iface.name, iface_name);
     strcpy(iface.ext, iface_ext);
-    iface.dumpFunc = FNAME(main_dump);
-    iface.processArgsFunc = FNAME(process_args);
+    iface.dumpFunc = main_dump;
+    iface.processArgsFunc = process_args;
 
     /* Register this plugin */
     if (!MACSIO_IFACE_Register(&iface))
@@ -511,3 +517,7 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
+
+/*!@}*/
+
+/*!@}*/
