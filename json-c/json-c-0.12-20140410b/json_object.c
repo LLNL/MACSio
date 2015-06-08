@@ -1138,9 +1138,6 @@ int json_object_extarr_valsize(struct json_object* obj)
 
 int64_t json_object_extarr_nbytes(struct json_object* obj)
 {
-    int64_t nvals;
-    int valsize;
-
     if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
 
     /* We include the space necessary to store the type, #dims and
@@ -1191,7 +1188,7 @@ int json_object_extarr_data_as_ ## DSTN(struct json_object* jso, DSTT **buf)    
 {                                                                                                           \
     json_extarr_type etype;                                                                                 \
     int nvals;                                                                                              \
-    void *srcp;                                                                                             \
+    void const *srcp;                                                                                       \
                                                                                                             \
     if (buf == 0) return 0;                                                                                 \
     if (!jso || !json_object_is_type(jso, json_type_extarr)) return 0;                                      \
