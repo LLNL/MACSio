@@ -1579,11 +1579,12 @@ static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char
     int idx;
     struct json_object *sub_object = 0;
     char *slash_char_p, *next = 0;
-    int add1 = key_path[0]=='/'?1:0;
+    int add1;
 
     if (!src) return 0;
     if (!key_path) return src;
 
+    add1 = key_path[0]=='/'?1:0;
     slash_char_p = strchr(key_path+add1, '/');
     if (slash_char_p)
     {

@@ -205,13 +205,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
-            "character indicates 'B'ytes (2^0), 'K'ilobytes (2^10), 'M'egabytes\n"
-            "(2^20) or 'G'igabytes (2^30). Mesh and variable data is then sized\n"
-            "by MACSio to hit this target byte count. However, due to contraints\n"
-            "involved in creating valid mesh topology and variable data with\n"
-            "realistic variation in features (e.g. zone- and node-centering),\n"
-            "this target byte count is hit exactly for only the most frequently\n"
-            "dumped objects and approximately for other objects.",
+            "character indicates 'B'ytes, 'K'ilo-, 'M'ega- or 'G'iga- bytes\n"
+            "representing powers of either 1000 or 1024 according to the selected\n"
+            "units prefix system. With no size modifier character, 'B' is assumed.\n"
+            "Mesh and variable data is then sized by MACSio to hit this target byte\n"
+            "count. However, due to contraints involved in creating valid mesh\n"
+            "topology and variable data with realistic variation in features (e.g.\n"
+            "zone- and node-centering), this target byte count is hit exactly for\n"
+            "only the most frequently dumped objects and approximately for other objects.",
         "--part_dim %d", "2",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s", "rectilinear",
@@ -277,9 +278,10 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "first dir, etc.",
 #ifdef HAVE_SCR
         "--exercise_scr", "",
-            "Exercise the Scalable Checkpoint and Restart library to marshal files.\n"
-            "For more information, see https://computation.llnl.gov/project/scr\n"
-            "Note that this works only in MIFFPP mode.",
+            "Exercise the Scalable Checkpoint and Restart (SCR)\n"
+            "(https://computation.llnl.gov/project/scr/library) to marshal\n"
+            "files. Note that this works only in MIFFPP mode. A request to exercise\n"
+            "SCR in any other mode will be ignored and en error message generated.",
 #endif
         "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
@@ -349,11 +351,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 static int
 main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
-    int dumpNum = 0, dumpCount = 0;
-    unsigned long long problem_nbytes, dumpBytes = 0;
-    char nbytes_str[32], seconds_str[32], bandwidth_str[32];
+    int rank = 0, dumpNum = 0, dumpCount = 0;
+    unsigned long long problem_nbytes, dumpBytes = 0, summedBytes = 0;
+    char nbytes_str[32], seconds_str[32], bandwidth_str[32], seconds_str2[32];
     double dumpTime = 0;
+    double bandwidth, summedBandwidth;
     MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
+    double dump_loop_start, dump_loop_end;
+    double min_dump_loop_start, max_dump_loop_end;
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
 
     /* Sanity check args */
@@ -381,6 +386,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
+    dump_loop_start = MT_Time();
     dumpTime = 0.0;
     for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
     {
@@ -437,10 +443,35 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
 
+    dump_loop_end = MT_Time();
+
     MACSIO_LOG_MSG(Info, ("Overall BW: %s/%s = %s",
         MU_PrByts(dumpBytes, 0, nbytes_str, sizeof(nbytes_str)),
         MU_PrSecs(dumpTime, 0, seconds_str, sizeof(seconds_str)),
         MU_PrBW(dumpBytes, dumpTime, 0, bandwidth_str, sizeof(bandwidth_str))));
+
+    bandwidth = dumpBytes / dumpTime;
+    summedBandwidth = bandwidth;
+    min_dump_loop_start = dump_loop_start;
+    max_dump_loop_end = dump_loop_end;
+
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+    MPI_Reduce(&bandwidth, &summedBandwidth, 1, MPI_DOUBLE, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dumpBytes, &summedBytes, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_start, &min_dump_loop_start, 1, MPI_DOUBLE, MPI_MIN, 0, MACSIO_MAIN_Comm);
+    MPI_Reduce(&dump_loop_end, &max_dump_loop_end, 1, MPI_DOUBLE, MPI_MAX, 0, MACSIO_MAIN_Comm);
+#endif
+
+    if (rank == 0)
+    {
+        MACSIO_LOG_MSG(Info, ("Summed  BW: %s",
+            MU_PrBW(summedBandwidth, 1.0, 0, bandwidth_str, sizeof(bandwidth_str))));
+        MACSIO_LOG_MSG(Info, ("Total Bytes: %s; Last finisher - First starter = %s; BW = %s",
+            MU_PrByts(summedBytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(max_dump_loop_end - min_dump_loop_start, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(summedBytes, max_dump_loop_end - min_dump_loop_start, 0, bandwidth_str, sizeof(bandwidth_str))));
+    }
 }
 
 #warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
@@ -505,9 +536,6 @@ main(int argc, char *argv[])
     for (i = 0; i < argc && !exercise_scr; i++)
         exercise_scr = !strcmp("exercise_scr", argv[i]);
 
-    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
-    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
-
 #warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
@@ -522,8 +550,11 @@ main(int argc, char *argv[])
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;
 #endif
-
     errno = 0;
+
+    main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
+    main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
+
     MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
 
     /* Process the command line and put the results in the problem */
