@@ -4,19 +4,28 @@
 # numbers here cause them to appear later in the link line.
 HDF5_BUILD_ORDER = 1.0
 
-HDF5_HOME = /Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
+ifneq ($(HDF5_HOME),)
 
-# Libraries HDF5 may depend on
-SZIP_HOME = /Users/miller86/visit/visit/szip/2.1/i386-apple-darwin12_gcc-4.2
-
-HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -L$(SZIP_HOME)/lib -lhdf5 -lzfp -lsz -lz -lm
+HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -lhdf5
 HDF5_CFLAGS = -I$(HDF5_HOME)/include
 
 HDF5_SOURCES = macsio_hdf5.c
 
+ifneq ($(SZIP_HOME),)
+HDF5_LDFLAGS += -L$(SZIP_HOME)/lib -lsz
+endif
+
+ifneq ($(ZLIB_HOME),)
+HDF5_LDFLAGS += -L$(ZLIB_HOME)/lib
+endif
+
 PLUGIN_OBJECTS += $(HDF5_SOURCES:.c=.o)
 PLUGIN_LDFLAGS += $(HDF5_LDFLAGS)
 PLUGIN_LIST += hdf5
+
+HDF5_LDFLAGS += -lz -lm
+
+endif
 
 macsio_hdf5.o: ../plugins/macsio_hdf5.c
 	$(CXX) -c $(HDF5_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_hdf5.c

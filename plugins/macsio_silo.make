@@ -1,18 +1,29 @@
 SILO_BUILD_ORDER = 2.0
-SILO_HOME = /Users/miller86/visit/visit/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
 
-# Libraries Silo may depend on
-HDF5_LIB=/Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2/lib
-SZIP_LIB=/Users/miller86/visit/visit/szip/2.1/i386-apple-darwin12_gcc-4.2/lib
-
-SILO_LDFLAGS = -L$(SILO_HOME)/lib -L$(HDF5_LIB) -L$(SZIP_LIB) -lsiloh5 -lhdf5 -lsz -lz -lm
-SILO_CFLAGS = -I$(SILO_HOME)/include
+ifneq ($(SILO_HOME),)
 
 SILO_SOURCES = macsio_silo.c
 
 PLUGIN_OBJECTS += $(SILO_SOURCES:.c=.o)
 PLUGIN_LDFLAGS += $(SILO_LDFLAGS)
 PLUGIN_LIST += silo
+
+SILO_CFLAGS = -I$(SILO_HOME)/include
+SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsilo
+
+ifneq ($(HDF5_HOME),)
+HAVE_SILOH5 = $(shell ls $(SILO_HOME)/lib/libsiloh5.{a,so,dylib})
+ifneq ($(HAVE_SILOH5),)
+SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsiloh5 $(HDF5_LDFLAGS)
+else
+SILO_USES_HDF5=$(shell nm libsilo.{a,so,dylib} | grep -i h5 | wc -l)
+ifneq ($(SILO_USES_HDF5),)
+SILO_LDFLAGS += $(HDF5_LDFLAGS)
+endif # ifneq ($(SILO_USES_HDF5),)
+endif # ifneq ($(HAVE_SILOH5),)
+endif # ifneq ($(HDF5_HOME),)
+
+endif
 
 macsio_silo.o: ../plugins/macsio_silo.c
 	$(CXX) -c $(SILO_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_silo.c

@@ -646,6 +646,7 @@ static char const *iface_ext = "h5";
 
 static int use_log = 0;
 static int no_collective = 0;
+static int no_single_chunk = 0;
 static int silo_block_size = 0;
 static int silo_block_count = 0;
 static int sbuf_size = -1;
@@ -702,9 +703,103 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
+static int
+get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
+{
+    int toklen;
+
+    if (!src_str) return 0;
+    if (!token_to_match) return 0;
+
+    toklen = strlen(token_to_match);
+    if (!strncasecmp(src_str, token_to_match, toklen-2))
+    {
+        char dummy[16];
+        void *val_ptr_tmp = &dummy[0];
+        if (sscanf(&src_str[toklen-2], &token_to_match[toklen-2], val_ptr_tmp) != 1)
+            return 0;
+        sscanf(&src_str[toklen-2], &token_to_match[toklen-2], val_ptr);
+        return 1;
+    }
+    return 0;
+}
+
+static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id)
+{
+    int shuffle = -1;
+    int minsize = -1;
+    int level = -1;
+    int precision = -1;
+    int pixels_per_block = -1;
+    double rate = -1;
+    double accuracy = -1;
+    char options[64];
+    char *token, *string, *tofree;
+    hsize_t dims[4], maxdims[4];
+    hid_t retval = H5Pcreate(H5P_DATASET_CREATE);
+
+    if (!alg_str || !strlen(alg_str))
+        return retval;
+
+    /* We can make a pass through params string without being specific about
+       algorithm because there are presently no symbol collisions there */
+    tofree = string = strdup(params_str);
+    while ((token = strsep(&string, ",")) != NULL)
+    {
+        if (get_tokval(token, "minsize=%d", &minsize))
+            continue;
+        if (get_tokval(token, "shuffle=%d", &shuffle))
+            continue;
+        if (get_tokval(token, "level=%d", &level))
+            continue;
+        if (get_tokval(token, "rate=%f", &rate))
+            continue;
+        if (get_tokval(token, "precision=%d", &precision))
+            continue;
+        if (get_tokval(token, "accuracy=%f", &accuracy))
+            continue;
+        if (get_tokval(token, "options=%s", options))
+            continue;
+        if (get_tokval(token, "pixels_per_block=%d", &pixels_per_block))
+            continue;
+    }
+    free(tofree);
+
+    /* check for minsize threshold */
+    minsize = minsize != -1 ? minsize : 1024;
+    if (H5Sget_simple_extent_npoints(space_id) < minsize)
+        return retval;
+
+    /* set chunking (currently whole, single chunk) */
+    H5Sget_simple_extent_dims(space_id, dims, maxdims);
+    H5Pset_chunk(retval, H5Sget_simple_extent_ndims(space_id), dims);
+
+    if (!strncasecmp(alg_str, "lindstrom-zfp", 13))
+    {
+        shuffle = shuffle != -1 ? shuffle : 0;
+        if (shuffle) H5Pset_shuffle(retval);
+    }
+    else if (!strncasecmp(alg_str, "gzip", 4))
+    {
+        shuffle = shuffle != -1 ? shuffle : 1;
+        if (shuffle) H5Pset_shuffle(retval);
+        H5Pset_deflate(retval, level!=-1?level:9);
+    }
+    else if (!strncasecmp(alg_str, "szip", 4))
+    {
+        shuffle = shuffle != -1 ? shuffle : 1;
+        if (shuffle) H5Pset_shuffle(retval);
+    }
+
+    return retval;
+}
+
 static int process_args(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
+
+    char *c_alg = compression_alg_str;
+    char *c_params = compression_params_str;
 
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--show_errors", "",
@@ -718,7 +813,7 @@ static int process_args(int argi, int argc, char *argv[])
             "not specific to any algorithm. Those are described first followed by\n"
             "individual algorithm parameters.\n"
             "\n"
-            "minsize=<int> : min. size of dataset (in terms of a count of values)\n"
+            "minsize=%d : min. size of dataset (in terms of a count of values)\n"
             "    upon which compression will even be attempted. Default is 1024.\n"
             "shuffle=<int>: Boolean (zero or non-zero) to indicate whether to use\n"
             "    HDF5's byte shuffling filter *prior* to compression. Default depends\n"
@@ -730,39 +825,41 @@ static int process_args(int argi, int argc, char *argv[])
             "    The following options are *mutually*exclusive*. In any command-line\n"
             "    specifying more than one of the following options, only the last\n"
             "    specified will be honored.\n"
-            "        rate=<%f> : target # bits per compressed output datum. Fractional values\n"
+            "        rate=%f : target # bits per compressed output datum. Fractional values\n"
             "            are permitted. 0 selects defaults: 8 bits/flt or 11 bits/dbl.\n"
             "            Use this option to hit a target compressed size but where error\n"
             "            is unbounded. OTOH, use one of the following two options to bound\n"
             "            the error but amount of compression, if any, is unbounded.\n"
-            "        precision=<%d> : # bits of precision to preserve in each input datum.\n"
-            "        accuracy=<%f> : absolute error tolerance in each output datum.\n"
+            "        precision=%d : # bits of precision to preserve in each input datum.\n"
+            "        accuracy=%f : absolute error tolerance in each output datum.\n"
             "            In many respects, 'precision' represents a sort of relative error\n"
             "            tolerance while 'accuracy' represents an absolute tolerance.\n"
             "            See http://en.wikipedia.org/wiki/Accuracy_and_precision.\n"
             "\n"
             "\"szip\"\n"
-            "    options=<%2c> : specify 'ec' for entropy coding or 'nn' for nearest neighbor.\n"
+            "    options=%s : specify 'ec' for entropy coding or 'nn' for nearest neighbor.\n"
             "        There is no default. You must specify one of these options.\n"
             "    pixels_per_block=<%d> : must be an even integer <= 32. There is no default.\n"
             "        See H5Pset_szip for more information.\n"
             "\n"
             "\"gzip\"\n"
-            "    level=<%d> : A value in the range [0,9], inclusive, trading off time to\n"
-            "        compress with amount of compression. 0 results in no compression.\n"
-            "        1 results in best speed but worst compression whereas 9 results in\n"
-            "        best compression but worst speed. Values outside [0,9] are clamped.\n"
-            "        Default is 9.\n"
+            "    level=%d : A value in the range [1,9], inclusive, trading off time to\n"
+            "        compress with amount of compression. Level=1 results in best speed\n"
+            "        but worst compression whereas level=9 results in best compression\n"
+            "        but worst speed. Values outside [1,9] are clamped. Default is 9.\n"
             "\n"
             "Examples:\n"
             "    --compression lindstrom-zfp rate=18.5\n"
             "    --compression gzip minsize=1024,level=9\n"
             "    --compression szip shuffle=0,options=nn,pixels_per_block=16\n"
             "\n",
-            &compression_alg_str, &compression_params_str,
+            &c_alg, &c_params,
         "--no_collective", "",
             "Use independent, not collective, I/O calls in SIF mode.",
             &no_collective,
+        "--no_single_chunk", "",
+            "Do not single chunk the datasets (currently ignored).",
+            &no_single_chunk,
         "--sieve_buf_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify sieve buffer size (see H5Pset_sieve_buf_size)",
             &sbuf_size,
@@ -798,7 +895,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     int use_part_count;
 
     hid_t h5file_id;
-    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+    hid_t fapl_id = make_fapl();
     hid_t dxpl_id = H5Pcreate(H5P_DATASET_XFER);
     hid_t dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
     hid_t null_space_id = H5Screate(H5S_NULL);
@@ -848,8 +945,6 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     json_object *first_part_obj = json_object_array_get_idx(part_array, 0);
     json_object *first_part_vars_array = json_object_path_get_array(first_part_obj, "Vars");
 
-    /* Dataset creation property list used in all H5Dcreate calls */
-
     /* Dataset transfer property list used in all H5Dwrite calls */
 #if H5_HAVE_PARALLEL
     if (no_collective)
@@ -876,11 +971,14 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
         hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
+        hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
 #warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
+        
         hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id); 
         H5Sclose(fspace_id);
+        H5Pclose(dcpl_id);
 
         /* Loop to make write calls for this var for each part on this rank */
 #warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
@@ -1007,11 +1105,12 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 #warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
     int i;
     json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
+
     for (i = 0; i < json_object_array_length(vars_array); i++)
     {
         int j;
         hsize_t var_dims[3];
-        hid_t fspace_id, ds_id;
+        hid_t fspace_id, ds_id, dcpl_id;
         json_object *var_obj = json_object_array_get_idx(vars_array, i);
         json_object *data_obj = json_object_path_get_extarr(var_obj, "data");
         char const *varname = json_object_path_get_string(var_obj, "name");
@@ -1024,9 +1123,11 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
             var_dims[j] = json_object_extarr_dim(data_obj, j);
 
         fspace_id = H5Screate_simple(ndims, var_dims, 0);
-        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, H5P_DEFAULT); 
+        dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id);
+        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, dcpl_id); 
         H5Dwrite(ds_id, dtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
         H5Dclose(ds_id);
+        H5Pclose(dcpl_id);
         H5Sclose(fspace_id);
     }
 }

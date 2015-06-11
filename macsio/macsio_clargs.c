@@ -153,6 +153,7 @@ MACSIO_CLARGS_ProcessCmdline(
    int invalidArgTypeFound = 0;
    int firstArg;
    int terminalWidth = 120 - 10;
+   int haveSeenSeparatorArg = 0;
    MACSIO_KnownArgInfo_t *knownArgs;
    va_list ap;
    json_object *ret_json_obj = 0;
@@ -436,7 +437,7 @@ MACSIO_CLARGS_ProcessCmdline(
    if (flags.route_mode == MACSIO_CLARGS_TOJSON)
        ret_json_obj = json_object_new_object();
    i = argi;
-   while (i < argc)
+   while (i < argc && !haveSeenSeparatorArg)
    {
       int foundArg;
       MACSIO_KnownArgInfo_t *p;
@@ -504,8 +505,10 @@ MACSIO_CLARGS_ProcessCmdline(
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                      {
 		         char **pChar = (char **) (p->paramPtrs[j]);
+printf("%p\n", p->paramPtrs[j]);
                          if (*pChar == NULL)
 		             *pChar = (char*) malloc(strlen(argv[i])+1);
+printf("copying \"%s\"\n", argv[i]);
 		         strcpy(*pChar, argv[i]);
                      }
                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
@@ -527,6 +530,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	          }
 	          case 'n': /* special case to return arg index */
 	          {
+                     haveSeenSeparatorArg = 1;
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                      {
 		         int *pInt = (int *) (p->paramPtrs[j]);

@@ -278,9 +278,10 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "first dir, etc.",
 #ifdef HAVE_SCR
         "--exercise_scr", "",
-            "Exercise the Scalable Checkpoint and Restart library to marshal files.\n"
-            "For more information, see https://computation.llnl.gov/project/scr\n"
-            "Note that this works only in MIFFPP mode.",
+            "Exercise the Scalable Checkpoint and Restart (SCR)\n"
+            "(https://computation.llnl.gov/project/scr/library) to marshal\n"
+            "files. Note that this works only in MIFFPP mode. A request to exercise\n"
+            "SCR in any other mode will be ignored and en error message generated.",
 #endif
         "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"

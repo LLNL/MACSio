@@ -83,9 +83,9 @@ macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
-FOO_OBJ=$(shell make -C ../plugins objlist)
+FOO_OBJ=$(shell make --no-print-directory -C ../plugins objlist)
 FOO_OBJ2=$(foreach foo, $(FOO_OBJ), ../plugins/$(foo))
-FOO_LDFLAGS=$(shell make -C ../plugins ldflags)
+FOO_LDFLAGS=$(shell make --no-print-directory -C ../plugins ldflags)
 macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(FOO_OBJ2)
 	$(LINK) $< -o $@ $(FOO_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(FOO_LDFLAGS)
 
@@ -113,7 +113,7 @@ notes:
 	@echo
 
 plugins:
-	$(MAKE) CFLAGS="$(CFLAGS)" -C ../plugins $@
+	$(MAKE) -C ../plugins $@
 
 #
 # Test utility targets
