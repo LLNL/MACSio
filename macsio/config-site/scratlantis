@@ -1,5 +1,6 @@
 SILO_HOME=/Users/miller86/visit/visit/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
 HDF5_HOME=/Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
+ZFP_HOME=$(HDF5_HOME)
 EXODUS_HOME=/Users/miller86/Downloads/exodus-6.09/exodus/myinstall
 NETCDF_HOME=/Users/miller86/visit/thirdparty_shared/2.8/netcdf/4.3.2/i386-apple-darwin12_gcc-4.2
 CXX=/Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicxx

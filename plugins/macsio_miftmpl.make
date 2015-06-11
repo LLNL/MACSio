@@ -32,4 +32,4 @@ PLUGIN_LIST += miftmpl
 
 # Rules to build the object file(s) for this plugin
 macsio_miftmpl.o: ../plugins/macsio_miftmpl.c
-	$(CXX) -c $(MIFTMPL_CFLAGS) $(MACSIO_CFLAGS) $(CLFAGS) ../plugins/macsio_miftmpl.c
+	$(CXX) -c $(MIFTMPL_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_miftmpl.c

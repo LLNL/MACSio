@@ -320,15 +320,13 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #if 0
         MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
 #endif
-        "--plugin-args %n", MACSIO_CLARGS_NODEFAULT,
+        "--plugin_args %n", MACSIO_CLARGS_NODEFAULT,
             "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
     MACSIO_CLARGS_END_OF_ARGS);
 
-#warning FIXME
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
-    plugin_args_start = argc;
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_CLARGS_HELP)

@@ -113,7 +113,7 @@ notes:
 	@echo
 
 plugins:
-	$(MAKE) -C ../plugins $@
+	$(MAKE) CFLAGS="$(CFLAGS)" -C ../plugins $@
 
 #
 # Test utility targets

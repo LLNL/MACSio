@@ -11,4 +11,4 @@ PLUGIN_LDFLAGS += $(EXODUS_LDFLAGS)
 PLUGIN_LIST += exodus
 
 macsio_exodus.o: ../plugins/macsio_exodus.c
-	$(CXX) -c $(EXODUS_CFLAGS) $(MACSIO_CFLAGS) $(CLFAGS) ../plugins/macsio_exodus.c
+	$(CXX) -c $(EXODUS_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_exodus.c

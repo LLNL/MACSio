@@ -15,4 +15,4 @@ PLUGIN_LDFLAGS += $(SILO_LDFLAGS)
 PLUGIN_LIST += silo
 
 macsio_silo.o: ../plugins/macsio_silo.c
-	$(CXX) -c $(SILO_CFLAGS) $(MACSIO_CFLAGS) $(CLFAGS) ../plugins/macsio_silo.c
+	$(CXX) -c $(SILO_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_silo.c
