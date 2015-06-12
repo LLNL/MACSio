@@ -210,7 +210,7 @@ H5Z_can_apply_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
       return -1;
     }
 
-#ifndef NDEBUG
+#if 0
     /* TODO: print datatype name if debug-mode */
     ssize_t dname_size = 0;
     if(0 >= (dname_size = H5Iget_name(type_id, NULL, 0))) {
@@ -724,15 +724,15 @@ get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
     return 0;
 }
 
-static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id)
+static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id, hid_t dtype_id)
 {
     int shuffle = -1;
     int minsize = -1;
     int level = -1;
     int precision = -1;
     int pixels_per_block = -1;
-    double rate = -1;
-    double accuracy = -1;
+    float rate = -1;
+    float accuracy = -1;
     char options[64];
     char *token, *string, *tofree;
     hsize_t dims[4], maxdims[4];
@@ -774,17 +774,44 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     H5Sget_simple_extent_dims(space_id, dims, maxdims);
     H5Pset_chunk(retval, H5Sget_simple_extent_ndims(space_id), dims);
 
-    if (!strncasecmp(alg_str, "lindstrom-zfp", 13))
-    {
-        shuffle = shuffle != -1 ? shuffle : 0;
-        if (shuffle) H5Pset_shuffle(retval);
-    }
-    else if (!strncasecmp(alg_str, "gzip", 4))
+    if (!strncasecmp(alg_str, "gzip", 4))
     {
         shuffle = shuffle != -1 ? shuffle : 1;
         if (shuffle) H5Pset_shuffle(retval);
         H5Pset_deflate(retval, level!=-1?level:9);
     }
+#ifdef HAVE_ZFP
+    else if (!strncasecmp(alg_str, "lindstrom-zfp", 13))
+    {
+        int i;
+        zfp_params params;
+        unsigned int cd_values[32];
+        shuffle = shuffle != -1 ? shuffle : 0;
+        if (shuffle) H5Pset_shuffle(retval);
+
+        zfp_init(&params);
+        if (rate != -1)
+            zfp_set_rate(&params, (double) rate);
+        else if (precision != -1)
+            zfp_set_precision(&params, precision);
+        else if (accuracy != -1)
+            zfp_set_accuracy(&params, (double) accuracy);
+        else
+            zfp_set_rate(&params, 0.0); /* default rate-constrained */
+
+        cd_values[0] = (unsigned int) 0;
+        cd_values[1] = (unsigned int) 0;
+        cd_values[2] = (unsigned int) H5Tget_size(dtype_id);
+        cd_values[3] = (unsigned int) H5Sget_simple_extent_ndims(space_id);
+        for (i = 0; i < cd_values[3]; i++)
+            cd_values[4+i] = (unsigned int) dims[i];
+        cd_values[i++] = params.minbits;
+        cd_values[i++] = params.maxbits;
+        cd_values[i++] = params.maxprec;
+        cd_values[i++] = params.minexp;
+        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i, cd_values);
+    }
+#endif
     else if (!strncasecmp(alg_str, "szip", 4))
     {
         shuffle = shuffle != -1 ? shuffle : 1;
@@ -817,9 +844,10 @@ static int process_args(int argi, int argc, char *argv[])
             "    upon which compression will even be attempted. Default is 1024.\n"
             "shuffle=<int>: Boolean (zero or non-zero) to indicate whether to use\n"
             "    HDF5's byte shuffling filter *prior* to compression. Default depends\n"
-            "    on filter. By default, shuffling is NOT used for lindstrom-zfp but IS\n"
+            "    on algorithm. By default, shuffling is NOT used for lindstrom-zfp but IS\n"
             "    used with all other algorithms.\n"
             "\n"
+#ifdef HAVE_ZFP
             "\"lindstrom-zfp\"\n"
             "    Use Peter Lindstrom's ZFP compression (computation.llnl.gov/casc/zfp)\n"
             "    The following options are *mutually*exclusive*. In any command-line\n"
@@ -836,6 +864,7 @@ static int process_args(int argi, int argc, char *argv[])
             "            tolerance while 'accuracy' represents an absolute tolerance.\n"
             "            See http://en.wikipedia.org/wiki/Accuracy_and_precision.\n"
             "\n"
+#endif
             "\"szip\"\n"
             "    options=%s : specify 'ec' for entropy coding or 'nn' for nearest neighbor.\n"
             "        There is no default. You must specify one of these options.\n"
@@ -971,7 +1000,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
         hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
-        hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id);
+        hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
 #warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
@@ -1123,7 +1152,7 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
             var_dims[j] = json_object_extarr_dim(data_obj, j);
 
         fspace_id = H5Screate_simple(ndims, var_dims, 0);
-        dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id);
+        dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
         ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, dcpl_id); 
         H5Dwrite(ds_id, dtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
         H5Dclose(ds_id);
@@ -1276,7 +1305,7 @@ static int register_this_interface()
     iface.dumpFunc = main_dump;
     iface.processArgsFunc = process_args;
 
-    /* Register compression methods with HDF5 library */
+    /* Register custom compression methods with HDF5 library */
 #ifdef HAVE_ZFP
     H5Z_register_zfp();
 #endif

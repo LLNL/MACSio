@@ -505,10 +505,8 @@ MACSIO_CLARGS_ProcessCmdline(
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                      {
 		         char **pChar = (char **) (p->paramPtrs[j]);
-printf("%p\n", p->paramPtrs[j]);
                          if (*pChar == NULL)
 		             *pChar = (char*) malloc(strlen(argv[i])+1);
-printf("copying \"%s\"\n", argv[i]);
 		         strcpy(*pChar, argv[i]);
                      }
                      else if (flags.route_mode == MACSIO_CLARGS_TOJSON)
