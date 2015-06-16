@@ -10,11 +10,20 @@ else
 include $(CONFIG_SITE_FILE)
 endif
 
+# Set the download command so that '$(DLCMD) file url' works
+ifeq ($(OSTYPE),darwin)
+DLCMD = curl -o
+else
+DLCMD = wget -O
+endif
+
 help: list
 	@echo "Usage:"
 	@echo "    Default will attempt to build all available plugins"
 	@echo "    Target 'plugins' also builds all available plugins"
 	@echo "    Target 'list' lists all available plugins"
+	@echo "    Target 'list-tpls-X' lists all TPL(s) needed for plugin X"
+	@echo "    Target 'download-tpls-X' downloads all TPL(s) needed for plugin X"
 	@echo "    Target 'notes' list to do notes"
 
 list: notes

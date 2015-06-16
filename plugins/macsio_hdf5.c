@@ -559,6 +559,10 @@ H5Z_filter_zfp(unsigned int flags,
         params.maxbits = maxbits;
         params.maxprec = maxprec;
         params.minexp  = minexp;
+printf("in filter, params.minbits = %d\n", params.minbits);
+printf("in filter, params.maxbits = %d\n", params.maxbits);
+printf("in filter, params.maxprec = %d\n", params.maxprec);
+printf("in filter, params.minexp = %d\n", params.minexp);
 
         /* max.(!) size of compressed data */
         size_t buf_size_maxout = zfp_estimate_compressed_size(&params);
@@ -786,6 +790,7 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
         int i;
         zfp_params params;
         unsigned int cd_values[32];
+
         shuffle = shuffle != -1 ? shuffle : 0;
         if (shuffle) H5Pset_shuffle(retval);
 
@@ -805,11 +810,11 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
         cd_values[3] = (unsigned int) H5Sget_simple_extent_ndims(space_id);
         for (i = 0; i < cd_values[3]; i++)
             cd_values[4+i] = (unsigned int) dims[i];
-        cd_values[i++] = params.minbits;
-        cd_values[i++] = params.maxbits;
-        cd_values[i++] = params.maxprec;
-        cd_values[i++] = params.minexp;
-        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i, cd_values);
+        cd_values[4+i++] = (unsigned int) params.minbits;
+        cd_values[4+i++] = (unsigned int) params.maxbits;
+        cd_values[4+i++] = (unsigned int) params.maxprec;
+        cd_values[4+i++] = (unsigned int) params.minexp;
+        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i+4, cd_values);
     }
 #endif
     else if (!strncasecmp(alg_str, "szip", 4))
@@ -1297,7 +1302,6 @@ static int register_this_interface()
         MACSIO_LOG_MSG(Die, ("Interface name \"%s\" too long", iface_name));
 
 #warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
-#warning ADD LINDSTROM COMPRESSION STUFF
 
     /* Populate information about this plugin */
     strcpy(iface.name, iface_name);

@@ -96,6 +96,106 @@ extern "C" {
  *
  */
 
+/*! \page building Building MACSio
+ *  \brief Instructions on building MACSio
+ *
+ * MACSio uses GNU Makefiles with conditionally constructed variables and shell functions.
+ *
+ * MACSio source code is divided into two key directories; the main MACSio functionality is in the
+ * \c macsio directory while all plugins are in the \c plugins directory.
+ *
+ * \page building_main Building MACSio Main
+ * \brief Instructions for building MACSio's main
+ *
+ * From within the \c macsio sub-directory, these make targets are defined...
+ *   - <tt>make all</tt>: will build all of MACSio main + all plugins that have been enabled
+ *     via setting non-null values for their respective TPL(s) \c FOO_HOME variables in the
+ *     config-site file.
+ *   - <tt>make CONFIG_SITE_FILE=config-site/foo all</tt>: will build all of MACSio main + plugins
+ *     using the specified config-site file.
+ *   - <tt>make clean</tt>: will clean away main and plugin object files.
+ *   - <tt>make allclean</tt>: will clean away all test data files, main and plugin object files,
+ *     and the macsio executable.
+ * Note that part of building MACSio's main includes building the JSON-C library.
+ *
+ * \page building_plugins Building MACSio Plugins
+ * \brief Instructions for building plugins in MACSio
+ *
+ * By default, the only plugin(s) MACSio builds with automatically are those that depend upon
+ * ubiquitous system libraries such as stdio. In the initial release of MACSio, the only plugin
+ * that operates directly on system I/O interfaces is the raw-posix (miftmpl) plugin.
+ *
+ * Other plugins require associated third party libraries (TPLs). Consequently, before building
+ * MACSio, one must have installed the assocaited TPLs for the desired plugins.
+ *
+ * Here are some useful make targets defined for the \c plugins directory to help with plugin
+ * TPL(s).
+ *   - <tt>make list</tt>: lists all plugins for which source code exists in
+ *     the \c plugins directory.
+ *   - <tt>make list-tpls-X</tt>: lists all TPL(s) required for plugin X as well as
+ *     their last known URLs.
+ *   - <tt>make download-tpls-X</tt>: downloads (using either wget or curl) all TPL(s)
+ *     tarballs needed for plugin X.
+ *   - <tt>make install-tpls-X</tt>: will attempt to build and install all TPL(s)
+ *     for a given plugin to path specified in \c MACSIO_TPLS_PREFIX. (note: this
+ *     is currently an unreliable option).
+ *
+ * All essential make bootstraps can be set in a hostname-specific config-site file
+ * or by explicitly specifing a config-site file to be used using the \c CONFIG_SITE_FILE
+ * make variable (e.g. <tt>make CONFIG_SITE_FILE=config-site/foo</tt> will build using
+ * the contents of the file \c foo in the \c config-site directory.
+ *
+ * A given plugin is built only when installations of its needed TPL(s) are specified
+ * via its associated \c FOO_HOME variable. For example, to build the HDF5 plugin, the
+ * variable \c HDF5_HOME must specify a path to an installation of HDF5 where the 
+ * \c include and \c lib sub-directories for HDF5 can be found.
+ *
+ * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
+ * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
+ * foo plugin. \c macsio_foo.make includes is a makefile fragment, that gets included in the
+ * main Makefile in the \c plugins directory, to manage the creation of \c macsio_foo.o 
+ * object file. 
+ *
+ * Given the high likelihood that different plugins may depend on common TPL(s), there is
+ * a plugin-specific make variable, \c FOO_BUILD_ORDER that informs MACSio's make system
+ * of the order in which to build the plugin relative to other plugins. The
+ * \c FOO_BUILD_ORDER variable is a floating point number that is used to sort the order
+ * in which plugin's object files appear on the link line when linking MACSio.
+ *
+ * MACSio does not use \c dlopen() to manage plugins. Instead, MACSio uses a \em static approach
+ * to managing plugins. The set of plugins available in a \c macsio executable is determined at
+ * the time the executable is linked simply by listing all the plugin object files to be linked
+ * into the executable (along with their associated TPL(s)). MACSio exploits a feature in C++
+ * which permits initialization of static variables via non-constant expressions. All symbols in
+ * a plugin are defined with \c static scope. Every plugin defines an <tt>int registration(void)</tt>
+ * function and initializes a static dummy integer to the result of \c registration() like so...
+ *
+ * \code
+   static int register_this_interface(void)
+   {
+     MACSIO_IFACE_Handle_t iface;
+
+     /* Populate interface struct with information */
+     strcpy(iface.name, iface_name);
+     strcpy(iface.ext, iface_ext);
+
+     /* Call main method to register the interface */
+     if (!MACSIO_IFACE_Register(&iface))
+         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface.name));
+   }
+   static int dummy = register_this_interface();
+ * \endcode
+ *
+ * At the time the executable loads, the \c register_this_interface() method is called adding
+ * the plugin to MACSio's global list of plugins. This happens for each plugin. The order
+ * in which they are added to MACSio doesn't matter because plugins are identified by their
+ * (unique) names. If MACSio encounters a case where two different plugins have the same
+ * name, then it will fail to load and inform the user of the problem. The remedy is to
+ * adjust the name of one of the two plugins. MACSio is able to call \c static methods 
+ * defined within the plugin via function callback pointers registered with the interface.
+ *
+ */
+
 #define MAX(A,B) (((A)>(B))?(A):(B))
 
 extern char **enviornp;
@@ -169,6 +269,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 
 #warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
 #warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
+#warning OPTION TO CONTROL TOTAL BUFFER SIZE IN LOWER-LAYERS
+#warning OPTION TO SET OUTPUT PRECISION TO FLOAT
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
         "--units_prefix_system %s", "binary",
