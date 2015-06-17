@@ -83,11 +83,15 @@ macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 
-FOO_OBJ=$(shell make --no-print-directory -C ../plugins objlist)
-FOO_OBJ2=$(foreach foo, $(FOO_OBJ), ../plugins/$(foo))
-FOO_LDFLAGS=$(shell make --no-print-directory -C ../plugins ldflags)
-macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(FOO_OBJ2)
-	$(LINK) $< -o $@ $(FOO_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(FOO_LDFLAGS)
+ifneq ($(ENABLE_PLUGINS),)
+PLUGIN_OBJ=$(foreach enpl, $(ENABLE_PLUGINS), macsio_$(enpl).o)
+else
+PLUGIN_OBJ=$(shell make --no-print-directory -C ../plugins objlist)
+endif
+PLUGIN_OBJ2=$(foreach obj, $(PLUGIN_OBJ), ../plugins/$(obj))
+PLUGIN_LDFLAGS=$(shell make --no-print-directory -C ../plugins ldflags)
+macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(PLUGIN_OBJ2)
+	$(LINK) $< -o $@ $(PLUGIN_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(PLUGIN_LDFLAGS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)

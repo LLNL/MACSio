@@ -37,6 +37,8 @@ extern "C" {
 /*!
  * \mainpage
  *
+ * \tableofcontents
+ *
  * MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
  *
  * It is designed to support a number of goals with respect to parallel I/O performance benchmarking
@@ -94,32 +96,72 @@ extern "C" {
  * easily determined. Any variables to be placed on the mesh can be easily handled as long as the variable's
  * spatial variation can be described in the global goemetric space.
  *
- */
-
-/*! \page building Building MACSio
- *  \brief Instructions on building MACSio
+ * \section sec_building Building MACSio
  *
  * MACSio uses GNU Makefiles with conditionally constructed variables and shell functions.
  *
  * MACSio source code is divided into two key directories; the main MACSio functionality is in the
  * \c macsio directory while all plugins are in the \c plugins directory.
  *
- * \page building_main Building MACSio Main
- * \brief Instructions for building MACSio's main
+ * \subsection sec_building_main Building MACSio Main
+ *
+ * The main bootstrap for building MACSio is the \em config-site file. This file contains variable
+ * definitions for all the key Make variables necessary to control the build of MACSio and any of
+ * its plugins. Here is an example config-site file...
+ *
+ * \code
+SILO_HOME = /Users/miller86/visit/visit/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
+HDF5_HOME = /Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
+ZFP_HOME  = $(HDF5_HOME)
+EXODUS_HOME = /Users/miller86/Downloads/exodus-6.09/exodus/myinstall
+NETCDF_HOME = /Users/miller86/visit/thirdparty_shared/2.8/netcdf/4.3.2/i386-apple-darwin12_gcc-4.2
+CXX = /Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicxx
+CC  = /Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicc
+CFLAGS = -DHAVE_MPI -g
+LINK = $(CXX)
+ * \endcode
+ *
+ * Note that all package \c FOO_HOME make variables are treated as specifying a top-level
+ * package directory underneath which lives \c include and \c lib directories for the
+ * package header files and library files respectively. If you have a package that does not
+ * or is not installed in this industry standard way, the work-around is to use symlinks
+ * or explicit copies to create some \em proxy home directory for the package that is
+ * structured in the way MACSio's Makefiles need it.
+ *
+ * Ordinarily, we maintain separate config-site files for various hosts upon which MACSio is
+ * built. The files are named according to the build host they are associated with. However,
+ * it is also perfectly fine to maintain, for example, a config-site file for a generic host
+ * such as \em ubuntu and then just explicitly reference that config-site file when building
+ * MACSio on ubuntu systems.
+ *
+ * Although MACSio is C Language, at a minimum it must be linked using a C++ linker due to
+ * its use of non-constant expressions in static initializers to affect the static plugin
+ * behavior. However, its conceivable that some C++'isms have crept into the code causing
+ * warnings or outright errors with some C compiler.
+ *
+ * In addition, MACSio sources currently include a large number of \c #warning statements
+ * to help remind developers (namely me) of minor issues to be fixed. These produce a lot
+ * of sprurios output in stderr but are otherwise harmless.
  *
  * From within the \c macsio sub-directory, these make targets are defined...
  *   - <tt>make all</tt>: will build all of MACSio main + all plugins that have been enabled
  *     via setting non-null values for their respective TPL(s) \c FOO_HOME variables in the
  *     config-site file.
  *   - <tt>make CONFIG_SITE_FILE=config-site/foo all</tt>: will build all of MACSio main + plugins
- *     using the specified config-site file.
+ *     using the specified config-site file, \c config-site/foo.
  *   - <tt>make clean</tt>: will clean away main and plugin object files.
+ *   - <tt>make dataclean</tt>: will clean away data files MACSio has produced.
  *   - <tt>make allclean</tt>: will clean away all test data files, main and plugin object files,
  *     and the macsio executable.
- * Note that part of building MACSio's main includes building the JSON-C library.
  *
- * \page building_plugins Building MACSio Plugins
- * \brief Instructions for building plugins in MACSio
+ * Note that part of building MACSio's main includes building the \ref jsonclib. The JSON-C
+ * library is configured and installed from the Makefile in the \c macsio sub-directory but
+ * it is actually installed one directory level up in \c ../json-c/install.
+ * Whenever the JSON-C library is modified, it is necessary to re-install it and in that case
+ * requires one to manually cd to the \c ../json-c/build directory and
+ * issue the command <tt>make install</tt> there.
+ *
+ * \subsection sec_building_plugins Building MACSio Plugins
  *
  * By default, the only plugin(s) MACSio builds with automatically are those that depend upon
  * ubiquitous system libraries such as stdio. In the initial release of MACSio, the only plugin
@@ -150,6 +192,12 @@ extern "C" {
  * variable \c HDF5_HOME must specify a path to an installation of HDF5 where the 
  * \c include and \c lib sub-directories for HDF5 can be found.
  *
+ * Sometimes it is desireable to build only some of the available plugins. This can be
+ * achieved using the make variable \c ENABLE_PLUGINS setting it to a space separated
+ * string of the names of the plugins to include when linking the MACSio main executable.
+ * For example, the command <tt>make ENABLE_PLUGINS="miftmpl silo"</tt> will build the
+ * MACSio executable so that only the miftmpl and Silo plugins are included.
+ *
  * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
  * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
  * foo plugin. \c macsio_foo.make includes is a makefile fragment, that gets included in the
@@ -160,7 +208,9 @@ extern "C" {
  * a plugin-specific make variable, \c FOO_BUILD_ORDER that informs MACSio's make system
  * of the order in which to build the plugin relative to other plugins. The
  * \c FOO_BUILD_ORDER variable is a floating point number that is used to sort the order
- * in which plugin's object files appear on the link line when linking MACSio.
+ * in which plugin's object files appear on the link line when linking MACSio. A higher
+ * numerical value for the \c FOO_BUILD_ORDER variable will result in the \c foo plugin
+ * and its dependent libraries occuring later on the link command-line.
  *
  * MACSio does not use \c dlopen() to manage plugins. Instead, MACSio uses a \em static approach
  * to managing plugins. The set of plugins available in a \c macsio executable is determined at
@@ -175,19 +225,19 @@ extern "C" {
    {
      MACSIO_IFACE_Handle_t iface;
 
-     /* Populate interface struct with information */
+     Populate interface struct with information
      strcpy(iface.name, iface_name);
      strcpy(iface.ext, iface_ext);
 
-     /* Call main method to register the interface */
      if (!MACSIO_IFACE_Register(&iface))
          MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface.name));
    }
    static int dummy = register_this_interface();
  * \endcode
  *
- * At the time the executable loads, the \c register_this_interface() method is called adding
- * the plugin to MACSio's global list of plugins. This happens for each plugin. The order
+ * At the time the executable loads, the \c register_this_interface() method is called. The
+ * call to \c MACSIO_IFACE_Register() from within \c register_this_interface() winds up
+ * adding the plugin to MACSio's global list of plugins. This happens for each plugin. The order
  * in which they are added to MACSio doesn't matter because plugins are identified by their
  * (unique) names. If MACSio encounters a case where two different plugins have the same
  * name, then it will fail to load and inform the user of the problem. The remedy is to
