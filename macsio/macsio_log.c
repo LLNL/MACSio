@@ -99,6 +99,10 @@ MACSIO_LOG_LogInit(
     int rank=0, size=1;
     MACSIO_LOG_LogHandle_t *retval;
 
+    if (line_len <= 0) line_len = MACSIO_LOG_DEFAULT_LINE_LENGTH;
+    if (lines_per_proc <= 0) lines_per_proc = MACSIO_LOG_DEFAULT_LINE_COUNT;
+    if (extra_lines_proc0 <= 0) extra_lines_proc0 = MACSIO_LOG_DEFAULT_EXTRA_LINES;
+
 #ifdef HAVE_MPI
     MPI_Comm_size(comm, &size);
     MPI_Comm_rank(comm, &rank);

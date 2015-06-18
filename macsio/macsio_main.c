@@ -450,7 +450,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "for rank 0.",
         "--log_line_length %d", "128",
             "Set log file line length.",
-        "--timing_file_name %s", "macsio-timings.log",
+        "--timings_file_name %s", "macsio-timings.log",
             "Specify the name of the timings file. Passing an empty string, \"\"\n"
             "will disable the creation of a timings file.",
         "--alignment %d", MACSIO_CLARGS_NODEFAULT,
@@ -484,6 +484,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     MACSIO_CLARGS_END_OF_ARGS);
 
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
+    if (plugin_args_start == 0) plugin_args_start = -1;
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_CLARGS_HELP)
@@ -500,6 +501,52 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         *plugin_argi = plugin_args_start>-1?plugin_args_start+1:argc;
 
     return mainJargs;
+}
+
+static int
+write_timings_file(char const *filename)
+{
+    char **timer_strs = 0, **rtimer_strs = 0;
+    int i, ntimers, maxlen, rntimers = 0, rmaxlen = 0, rdata[3], rdata_out[3];
+    MACSIO_LOG_LogHandle_t *timing_log;
+        
+    MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
+    MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
+    if (MACSIO_MAIN_Rank == 0)
+        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &rtimer_strs, &rntimers, &rmaxlen);
+    rdata[0] = maxlen > rmaxlen ? maxlen : rmaxlen;
+    rdata[1] = ntimers;
+    rdata[2] = rntimers;
+#ifdef HAVE_MPI
+    MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
+#endif
+
+    timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, filename, rdata_out[0], rdata_out[1], rdata_out[2]+1);
+
+    /* dump this processor's timers */
+    for (i = 0; i < ntimers; i++)
+    {
+        if (!timer_strs[i]) continue;
+        MACSIO_LOG_MSGL(timing_log, Info, (timer_strs[i]));
+        free(timer_strs[i]);
+    }
+    free(timer_strs);
+
+    /* dump MPI reduced timers */
+    if (MACSIO_MAIN_Rank == 0)
+    {
+        MACSIO_LOG_MSGL(timing_log, Info, ("Reduced Timers..."));
+
+        for (i = 0; i < rntimers; i++)
+        {
+            if (!rtimer_strs[i]) continue;
+            MACSIO_LOG_MSGL(timing_log, Info, (rtimer_strs[i]));
+            free(rtimer_strs[i]);
+        }
+        free(rtimer_strs);
+    }
+
+    MACSIO_LOG_LogFinalize(timing_log);
 }
 
 static int
@@ -747,46 +794,7 @@ main(int argc, char *argv[])
 
     /* Write timings data file if requested */
     if (strlen(JsonGetStr(clargs_obj, "timings_file_name")))
-    {
-        char **timer_strs, **rtimer_strs;
-        int i, ntimers, maxlen, rntimers = 0, rmaxlen = 0, rdata[3], rdata_out[3];
-        MACSIO_LOG_LogHandle_t *timing_log;
-        
-        MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
-        MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
-        if (rank == 0)
-            MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &rtimer_strs, &rntimers, &rmaxlen);
-        rdata[0] = maxlen > rmaxlen ? maxlen : rmaxlen;
-        rdata[1] = ntimers;
-        rdata[2] = rntimers;
-#ifdef HAVE_MPI
-        MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
-#endif
-
-        timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
-            JsonGetStr(clargs_obj, "timings_file_name"), rdata_out[0], rdata_out[1], rdata_out[2]+1);
-
-        for (i = 0; i < ntimers; i++)
-        {
-            MACSIO_LOG_MSGL(timing_log, Info, (timer_strs[i]));
-            free(timer_strs[i]);
-        }
-        free(timer_strs);
-
-        if (rank == 0)
-        {
-            MACSIO_LOG_MSGL(timing_log, Info, ("Reduced Timers..."));
-
-            for (i = 0; i < rntimers; i++)
-            {
-                MACSIO_LOG_MSGL(timing_log, Info, (rtimer_strs[i]));
-                free(rtimer_strs[i]);
-            }
-            free(rtimer_strs);
-        }
-
-        MACSIO_LOG_LogFinalize(timing_log);
-    }
+        write_timings_file(JsonGetStr(clargs_obj, "timings_file_name"));
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
