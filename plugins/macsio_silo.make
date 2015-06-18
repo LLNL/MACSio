@@ -14,7 +14,7 @@ SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsilo
 ifneq ($(HDF5_HOME),)
 HAVE_SILOH5 = $(shell ls $(SILO_HOME)/lib/libsiloh5.{a,so,dylib})
 ifneq ($(HAVE_SILOH5),)
-SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsiloh5 $(HDF5_LDFLAGS)
+SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsiloh5 $(HDF5_LDFLAGS) -Wl,-rpath,$(SILO_HOME)/lib
 else
 SILO_USES_HDF5=$(shell nm libsilo.{a,so,dylib} | grep -i h5 | wc -l)
 ifneq ($(SILO_USES_HDF5),)

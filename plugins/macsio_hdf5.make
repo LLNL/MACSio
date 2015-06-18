@@ -18,7 +18,7 @@ HDF5_LDFLAGS += -L$(ZFP_HOME)/lib -lzfp
 endif
 
 ifneq ($(SZIP_HOME),)
-HDF5_LDFLAGS += -L$(SZIP_HOME)/lib -lsz
+HDF5_LDFLAGS += -L$(SZIP_HOME)/lib -lsz -Wl,-rpath,$(SZIP_HOME)/lib
 endif
 
 ifneq ($(ZLIB_HOME),)
