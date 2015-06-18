@@ -101,10 +101,10 @@ int main(int argc, char **argv)
     {
         int rbuf[2], sbuf[2] = {ntimer_strs, maxstrlen};
         MPI_Allreduce(sbuf, rbuf, 2, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-        MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tsttiming.log", rbuf[1]+32, 2*rbuf[0]+4);
+        MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tsttiming.log", rbuf[1]+32, 2*rbuf[0]+4,0);
     }
 #else
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(0, "tsttiming.log", maxstrlen+4, ntimer_strs+4);
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(0, "tsttiming.log", maxstrlen+4, ntimer_strs+4, 0);
 #endif
 
     for (i = 0; i < ntimer_strs; i++)

@@ -204,9 +204,9 @@ extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr;
 
 extern char const * MACSIO_LOG_MakeMsg(const char *format, ...);
 #ifdef HAVE_MPI
-extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(MPI_Comm comm, char const *path, int line_len, int lines_per_proc);
+extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(MPI_Comm comm, char const *path, int line_len, int lines_per_proc, int extra_lines_proc0);
 #else
-extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_len, int lines_per_proc);
+extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_len, int lines_per_proc, int extra_lines_proc0);
 #endif
 extern void MACSIO_LOG_LogMsg(MACSIO_LOG_LogHandle_t const *log, char const *fmt, ...);
 extern void MACSIO_LOG_LogMsgWithDetails(MACSIO_LOG_LogHandle_t const *log, char const *linemsg,

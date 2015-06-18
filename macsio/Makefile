@@ -67,6 +67,7 @@ help:
 	@echo "    Use target 'clean' to clean up objects and executables."
 	@echo "    Use target 'dataclean' to clean + remove various data files."
 	@echo "    Use target 'allclean' to dataclean + remove json-c install."
+	@echo "    Use target 'dox' to generate Doxygen documentation in ../docs dir."
 
 all: json-c tsttiming tstlog macsio probe
 
@@ -103,6 +104,13 @@ dataclean: clean
 
 allclean: dataclean
 	rm -rf ../json-c/{install,build}
+
+dox:	$(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
+	@echo $(DOXCMD)
+	$(MAKE) DOXCMD=$(DOXCMD) -C ../doc $@
+
+# Standard GNU target
+html:	dox
 
 #srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
 check: macsio

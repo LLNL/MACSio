@@ -88,7 +88,7 @@ extern "C" {
  * assigning pieces to MPI ranks, in piece number order, until all MPI ranks have been assigned pieces.
  * The algorithm runs indentically on all ranks. When the algorithm reaches the part assignment for the
  * rank on which its executing, it then generates the K or K+1 mesh pieces for that rank. Although the
- * algorithm is essentially a sequential algorithm with asymptotic behavior O(#total pieces), it is primarily
+ * algorithm is essentially a sequential algorithm with asymptotic behavior O(\#total pieces), it is primarily
  * a simple book-keeping loop which completes in a fraction of a second even for more than one million
  * pieces.
  *
@@ -139,7 +139,7 @@ LINK = $(CXX)
  * behavior. However, its conceivable that some C++'isms have crept into the code causing
  * warnings or outright errors with some C compiler.
  *
- * In addition, MACSio sources currently include a large number of \c #warning statements
+ * In addition, MACSio sources currently include a large number of \c \#warning statements
  * to help remind developers (namely me) of minor issues to be fixed. These produce a lot
  * of sprurios output in stderr but are otherwise harmless.
  *
@@ -200,7 +200,7 @@ LINK = $(CXX)
  *
  * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
  * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
- * foo plugin. \c macsio_foo.make includes is a makefile fragment, that gets included in the
+ * foo plugin. \c macsio_foo.make is a makefile fragment, that gets included in the
  * main Makefile in the \c plugins directory, to manage the creation of \c macsio_foo.o 
  * object file. 
  *
@@ -225,7 +225,6 @@ LINK = $(CXX)
    {
      MACSIO_IFACE_Handle_t iface;
 
-     Populate interface struct with information
      strcpy(iface.name, iface_name);
      strcpy(iface.ext, iface_ext);
 
@@ -235,12 +234,13 @@ LINK = $(CXX)
    static int dummy = register_this_interface();
  * \endcode
  *
- * At the time the executable loads, the \c register_this_interface() method is called. The
+ * At the time the executable loads, the \c register_this_interface() method is called. Note that
+ * this is called long before even \c main() is called. The
  * call to \c MACSIO_IFACE_Register() from within \c register_this_interface() winds up
  * adding the plugin to MACSio's global list of plugins. This happens for each plugin. The order
  * in which they are added to MACSio doesn't matter because plugins are identified by their
  * (unique) names. If MACSio encounters a case where two different plugins have the same
- * name, then it will fail to load and inform the user of the problem. The remedy is to
+ * name, then it will abort and inform the user of the problem. The remedy is to
  * adjust the name of one of the two plugins. MACSio is able to call \c static methods 
  * defined within the plugin via function callback pointers registered with the interface.
  *
@@ -445,10 +445,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "dump object prior to starting dumps.",
         "--log_file_name %s", "macsio-log.log",
             "The name of the log file.",
-        "--log_line_cnt %d", "64",
-            "Set number of lines per rank in the log file.",
+        "--log_line_cnt %d %d", "64 0",
+            "Set number of lines per rank in the log file and number of extra lines\n"
+            "for rank 0.",
         "--log_line_length %d", "128",
             "Set log file line length.",
+        "--timing_file_name %s", "macsio-timings.log",
+            "Specify the name of the timings file. Passing an empty string, \"\"\n"
+            "will disable the creation of a timings file.",
         "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
         "--filebase %s", "macsio",
@@ -705,7 +709,7 @@ main(int argc, char *argv[])
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
@@ -717,7 +721,8 @@ main(int argc, char *argv[])
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
         JsonGetStr(clargs_obj, "log_file_name"),
         JsonGetInt(clargs_obj, "log_line_length"),
-        JsonGetInt(clargs_obj, "log_line_cnt"));
+        JsonGetInt(clargs_obj, "log_line_cnt/0"),
+        JsonGetInt(clargs_obj, "log_line_cnt/1"));
 
 #warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
@@ -740,22 +745,47 @@ main(int argc, char *argv[])
     /* stop total timer */
     MT_StopTimer(main_tid);
 
-    MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
-
-    if (!rank)
+    /* Write timings data file if requested */
+    if (strlen(JsonGetStr(clargs_obj, "timings_file_name")))
     {
-        char **timer_strs;
-        int i, ntimers, maxlen;
+        char **timer_strs, **rtimer_strs;
+        int i, ntimers, maxlen, rntimers = 0, rmaxlen = 0, rdata[3], rdata_out[3];
+        MACSIO_LOG_LogHandle_t *timing_log;
+        
+        MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
+        MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
+        if (rank == 0)
+            MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &rtimer_strs, &rntimers, &rmaxlen);
+        rdata[0] = maxlen > rmaxlen ? maxlen : rmaxlen;
+        rdata[1] = ntimers;
+        rdata[2] = rntimers;
+#ifdef HAVE_MPI
+        MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
+#endif
 
-        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
+        timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
+            JsonGetStr(clargs_obj, "timings_file_name"), rdata_out[0], rdata_out[1], rdata_out[2]+1);
+
         for (i = 0; i < ntimers; i++)
         {
-            /* For now, just log to stderr */
-#warning NEED A LOG FILE FOR SPECIFIC SET OF PROCESSORS, OR JUST ONE
-            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Info, (timer_strs[i]));
+            MACSIO_LOG_MSGL(timing_log, Info, (timer_strs[i]));
             free(timer_strs[i]);
         }
         free(timer_strs);
+
+        if (rank == 0)
+        {
+            MACSIO_LOG_MSGL(timing_log, Info, ("Reduced Timers..."));
+
+            for (i = 0; i < rntimers; i++)
+            {
+                MACSIO_LOG_MSGL(timing_log, Info, (rtimer_strs[i]));
+                free(rtimer_strs[i]);
+            }
+            free(rtimer_strs);
+        }
+
+        MACSIO_LOG_LogFinalize(timing_log);
     }
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);

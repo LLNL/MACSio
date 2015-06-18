@@ -7,3 +7,4 @@ CXX=/Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicx
 CC=/Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicc
 CFLAGS=-DHAVE_MPI -g
 LINK=$(CXX)
+DOXCMD=/Users/miller86/Applications/Doxygen.app/Contents/Resources/doxygen
