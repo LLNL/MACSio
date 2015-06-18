@@ -22,7 +22,6 @@
 #include <H5pubconf.h>
 #include <hdf5.h>
 #include <H5Tpublic.h>
-#include <H5PLextern.h>
 
 /*!
 \addtogroup plugins

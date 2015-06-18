@@ -92,7 +92,7 @@ endif
 PLUGIN_OBJ2=$(foreach obj, $(PLUGIN_OBJ), ../plugins/$(obj))
 PLUGIN_LDFLAGS=$(shell make --no-print-directory -C ../plugins ldflags)
 macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(PLUGIN_OBJ2)
-	$(LINK) $< -o $@ $(PLUGIN_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(PLUGIN_LDFLAGS)
+	$(LINK) $< -o $@ $(PLUGIN_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(PLUGIN_LDFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
