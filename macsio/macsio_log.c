@@ -37,6 +37,7 @@ typedef struct _MACSIO_LOG_LogHandle_t
     int size;                 /**< Size of the communicator that created this log handle */
     int log_line_length;      /**< Maximum length of a message line in the log file */
     int lines_per_proc;       /**< Number of message lines allocated in the file for each processor */
+    int extra_lines_proc0;    /**< Additional number of message lines for processor with MPI rank 0 */
 #warning FIX USE OF MUTABLE HERE
     mutable int current_line; /**< Index into this processor's group of lines in the log file at
                                    which the next message will be written */
@@ -75,7 +76,6 @@ MACSIO_LOG_MakeMsg(
   return error_buffer;
 }
 
-#warning ADD OPTION TO SPECIFY MORE LINES AT THE ROOT/MASTER PROCESSOR
 /*!
 \brief Initialize a log
 
@@ -92,11 +92,16 @@ MACSIO_LOG_LogInit(
 #endif
     char const *path,     /**< [in] The name of the log file */
     int line_len,         /**< [in] The length of each message line in the log file */
-    int lines_per_proc    /**< [in] The number of message lines for each MPI task */
+    int lines_per_proc,   /**< [in] The number of message lines for each MPI task */
+    int extra_lines_proc0 /**< [in] The number of extra message lines for processor rank 0 */
 )
 {
     int rank=0, size=1;
     MACSIO_LOG_LogHandle_t *retval;
+
+    if (line_len <= 0) line_len = MACSIO_LOG_DEFAULT_LINE_LENGTH;
+    if (lines_per_proc <= 0) lines_per_proc = MACSIO_LOG_DEFAULT_LINE_COUNT;
+    if (extra_lines_proc0 <= 0) extra_lines_proc0 = MACSIO_LOG_DEFAULT_EXTRA_LINES;
 
 #ifdef HAVE_MPI
     MPI_Comm_size(comm, &size);
@@ -106,10 +111,10 @@ MACSIO_LOG_LogInit(
     if (path && rank == 0)
     {
         int i, filefd;
-        char *linbuf = (char*) malloc(line_len * lines_per_proc * sizeof(char));
+        char *linbuf = (char*) malloc((line_len * lines_per_proc + extra_lines_proc0) * sizeof(char));
         memset(linbuf, '-', line_len * sizeof(char));
-        memset(linbuf+line_len, ' ', line_len * (lines_per_proc-1) * sizeof(char));
-        for (i = 0; i < lines_per_proc; i++)
+        memset(linbuf+line_len, ' ', line_len * (lines_per_proc+extra_lines_proc0-1) * sizeof(char));
+        for (i = 0; i < lines_per_proc+extra_lines_proc0; i++)
             linbuf[(i+1)*line_len-1] = '\n';
         filefd = open(path, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP);
         for (i = 0; i < size; i++)
@@ -117,7 +122,10 @@ MACSIO_LOG_LogInit(
             char tmp[32];
             sprintf(tmp, "Processor %06d", i);
             memcpy(linbuf+line_len/2-strlen(tmp)/2, tmp, strlen(tmp));
-            write(filefd, linbuf, sizeof(char) * line_len * lines_per_proc);
+            if (i == 0)
+                write(filefd, linbuf, sizeof(char) * line_len * (lines_per_proc+extra_lines_proc0));
+            else
+                write(filefd, linbuf, sizeof(char) * line_len * lines_per_proc);
         }
         close(filefd);
     }
@@ -129,14 +137,13 @@ MACSIO_LOG_LogInit(
     retval = (MACSIO_LOG_LogHandle_t *) malloc(sizeof(MACSIO_LOG_LogHandle_t));
     retval->pathname = path?strdup(path):0;
     retval->comm = comm;
-#warning TURN OFF BUFFERING ON THE LOG FILE
-    /*retval->logfile = open(path, O_WRONLY|O_NONBLOCK);*/
     retval->logfile = path?open(path, O_WRONLY):fileno(stderr);
     retval->size = size;
     retval->rank = rank;
     retval->log_line_length = path?line_len:1024;
     retval->lines_per_proc = path?lines_per_proc:1000000;
-    retval->current_line = 1;
+    retval->extra_lines_proc0 = path?extra_lines_proc0:0;
+    retval->current_line = 1; /* never write to line '0' to preserve "Processor XXXX" headings */
     retval->flags.was_logged = 0;
     errno = 0;
     return retval;
@@ -194,13 +201,14 @@ MACSIO_LOG_LogMsg(
     }
     else
     {
-        off_t seek_offset = (log->rank * log->lines_per_proc + log->current_line) * log->log_line_length;
+        int extra_lines = log->rank?log->extra_lines_proc0:0;
+        off_t seek_offset = (log->rank * log->lines_per_proc + log->current_line + extra_lines) * log->log_line_length;
         pwrite(log->logfile, buf, sizeof(char) * log->log_line_length, seek_offset);
     }
     free(buf);
 
     log->current_line++;
-    if (log->current_line == log->lines_per_proc)
+    if (log->current_line == log->lines_per_proc + (log->rank==0?log->extra_lines_proc0:0))
         log->current_line = 1;
     log->flags.was_logged = 1;
 }

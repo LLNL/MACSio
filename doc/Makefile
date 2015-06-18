@@ -1,0 +1,2 @@
+dox:
+	$(DOXCMD) Doxyfile

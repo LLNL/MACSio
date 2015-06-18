@@ -20,10 +20,11 @@ gets its own group of lines within the file it may write to. Rank 0 gets the fir
 of lines. Rank 1, the next group of lines and so forth. Each line has a maximum length too.
 
 When a MACSIO_LOG is created with \c MACSIO_LOG_InitLog(), the caller specifies the MPI communicator
-the log will be used for, the number of message lines per MPI task to allocate and the maximum length
-of any message. Rank 0 initializes the text file with all space characters except for header lines
-to distinguish each processor's group of lines in the file. Note that for a large run on say 10^5
-processors, it may take rank 0 several seconds to create this file.
+the log will be used for, the number of message lines per MPI task to allocate plus a count of 
+extra lines for rank 0 and the maximum length of any message. Rank 0 initializes the text file
+with all space characters except for header lines to distinguish each processor's group of lines
+in the file. Note that for a large run on say 10^5 processors, it may take rank 0 several seconds
+to create this file.
 
 Messages are restricted to a single line of text. Any embedded new-line characters are removed
 from a message and replaced with a '!' character. If a processor's message is longer than the
@@ -33,6 +34,10 @@ fashion. As the set of messages issued from a processor reaches the end of its g
 within the file, it starts issuing new messages at the beginning of the group. So, older messages
 can wind up getting overwritten by newer messages. However, all the most recent messages prior
 to any significant error will at least be captured in the log.
+
+Parallelism in writing to a MACSIO_LOG file is achieved by ensuring no two processor attempt
+to write data in overlapping regions in the file \em by using \c pwrite() to do the actual
+writes.
 
 MACSIO's main creates a default log, \c MACSIO_LOG_MainLog, on the \c MACSIO_MAIN_Comm. That
 log is probably the only log needed by MACSIO proper or any of its plugins. The convenience macro,
@@ -78,6 +83,21 @@ do{                                                                             
 #endif
 
 #endif /*] DOXYGEN_IGNORE_THIS */
+
+/*!
+\def Default per-rank line count
+*/
+#define MACSIO_LOG_DEFAULT_LINE_COUNT 64
+
+/*!
+\def Default extra line count for rank 0
+*/
+#define MACSIO_LOG_DEFAULT_EXTRA_LINES 64
+
+/*!
+\def Default line length
+*/
+#define MACSIO_LOG_DEFAULT_LINE_LENGTH 128
 
 /*!
 \def MACSIO_LOG_MSG
@@ -204,9 +224,9 @@ extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr;
 
 extern char const * MACSIO_LOG_MakeMsg(const char *format, ...);
 #ifdef HAVE_MPI
-extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(MPI_Comm comm, char const *path, int line_len, int lines_per_proc);
+extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(MPI_Comm comm, char const *path, int line_len, int lines_per_proc, int extra_lines_proc0);
 #else
-extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_len, int lines_per_proc);
+extern MACSIO_LOG_LogHandle_t *MACSIO_LOG_LogInit(int comm, char const *path, int line_len, int lines_per_proc, int extra_lines_proc0);
 #endif
 extern void MACSIO_LOG_LogMsg(MACSIO_LOG_LogHandle_t const *log, char const *fmt, ...);
 extern void MACSIO_LOG_LogMsgWithDetails(MACSIO_LOG_LogHandle_t const *log, char const *linemsg,

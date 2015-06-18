@@ -12,7 +12,7 @@ int main (int argc, char **argv)
 {
     int i;
     int rank=0, size=1;
-    int num_cols = 128, num_rows = 20;
+    int num_cols = 128, num_rows = 20, extra_lines = 20;
 
     for (i = 0; i < argc; i++)
     {
@@ -20,6 +20,8 @@ int main (int argc, char **argv)
             num_cols = strtol(argv[i]+9, 0, 10);
         else if (!strncasecmp(argv[i], "num_rows=", 9))
             num_rows = strtol(argv[i]+9, 0, 10);
+        else if (!strncasecmp(argv[i], "extra_lines=", 9))
+            extra_lines = strtol(argv[i]+9, 0, 10);
     }
 
 #ifdef HAVE_MPI
@@ -29,8 +31,8 @@ int main (int argc, char **argv)
 #endif
 
     MACSIO_LOG_DebugLevel = 2; /* should only see debug messages level 1 and 2 */
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tstlog.log", num_cols, num_rows);
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MPI_COMM_WORLD, 0, 0, 0);
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tstlog.log", num_cols, num_rows, extra_lines);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MPI_COMM_WORLD, 0, 0, 0, 0);
 
     if (rank == 1)
     {
