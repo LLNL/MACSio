@@ -16,15 +16,106 @@
 @{
 */
 
+#warning ADD PWRITE OPTION
+#warning ADD MPI_FILE_WRITE OPTION
+#warning ADD AGGREGATION OPTION
 
 /*!
 \addtogroup MIF Template
 \brief A simple MIF Plugin Template
 
-This is intended to serve as a template for how to create a MIF-mode plugin for MACSio.
-This template code does indeed actually function correctly as a MACSio plugin. It does
-so by writing MACSio's internal JSON objects repesenting each mesh part as ascii strings
-to the individual files.
+Writing a new plugin for MACSio involves a mininum of two new files in the plugins directory.
+One is the C or C++ source code for the plugin. The other is a \c .make file that includes
+various plugin-specific variable definitions and logic to decode library dependencies that
+effect.
+
+We'll describe the structure and content of the \c .make using a generic plugin identified
+by the moniker \c plgn. In any plugin's \c .make file, all the variable names should be
+prepended with the plugin's name except for these three (examples below).
+
+\code
+PLUGIN_OBJECTS += $(PLGN_SOURCES:.c=.o)
+PLUGIN_LDFLAGS += $(PLGN_LDFLAGS)
+PLUGIN_LIST += plgn
+\endcode
+
+The first variable is the \c BUILD_ORDER variable. This variable is used to sort
+the order in which plugin object files as well as their dependent libraries appear
+on the link line when linking the MACSio main executable. The numerical value
+assigned to the \c BUILD_ORDER variable is a floating point number. Smaller numbers
+appear earlier on the link line. If plugin A depends on libraries that are also 
+used by plugin B, then plugin A should be assigned a \c BUILD_ORDER value that is
+larger than plugin B.
+
+\code
+PLGN_BUILD_ORDER = 1.7
+\endcode
+
+The next variables in the \c .make file define the version number, tarfile and URL
+for zero or more dependent libraries used by the plugin.
+
+\code
+PLGN_VERSION = 1.8.11
+PLGN_FILE = plgn-$(PLGN_VERSION).tar.gz
+PLGN_URL = http://www.greatplugins.org/ftp/PLGN/releases/$(PLGN_FILE)
+\endcode
+
+In addition, for each third party library a plugin uses, it is assumed there is
+an associated \em home variable that specifies a top-level directory underneath
+which lives \c include and \c lib directories for the library's header files and
+library files respectively. If you have a package that does not conform to this
+standard installation structure, the work-around is to use symlinks or explicit
+copies to create some \em proxy home directory for the library that is
+structured in the way MACSio's Makefiles need it. So, for our generic plugin,
+there is a \c PLGN_HOME variable that defines where the library is installed.
+Note that this variable is then typically defined in the \c config-site file.
+
+The next section of the makefile is the conditional logic necessary to decide
+if the plugin can be built based on whether its depndent library(s), if any,
+are defined.
+
+\code
+ifneq ($(PLGN_HOME),)
+
+PLGN_LDFLAGS = -L$(PLGN_HOME)/lib -lplgn
+PLGN_CFLAGS = -I$(PLGN_HOME)/include
+
+PLGN_SOURCES = macsio_plgn.c
+
+PLGN_LDFLAGS += -lz -lm
+
+PLUGIN_OBJECTS += $(PLGN_SOURCES:.c=.o)
+PLUGIN_LDFLAGS += $(PLGN_LDFLAGS)
+PLUGIN_LIST += plgn 
+
+endif
+\endcode
+
+The next section of the \c .make file indicates how to make the plugin
+object file.
+
+\code
+macsio_plgn.o: ../plugins/macsio_plgn.c
+	$(CXX) -c $(PLGN_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_plgn.c
+\endcode
+
+The final section of the \c .make file defines some pre-defined targets which having
+to do with obtaining the third party library(s) associated with the plugin.
+
+\code
+$(PLGN_FILE):
+	$(DLCMD) $(PLGN_FILE) $(PLGN_URL)
+
+list-tpls-plgn:
+	@echo "$(PLGN_FILE) ($(PLGN_URL))"
+
+download-tpls-plgn: $(PLGN_FILE)
+\endcode
+
+The \em miftmpl plugin is intended to serve as a template for how to create a basic MIF-mode plugin
+for MACSio.  This template code does indeed actually function correctly as a MACSio plugin.
+It does so by writing MACSio's internal JSON objects repesenting each mesh part as ascii
+strings to the individual files.
 
 Each processor in a MIF group serializes each JSON object representing a mesh part to an
 ascii string. Then, each of these strings is appended to the end of the file. For each

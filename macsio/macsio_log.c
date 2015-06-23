@@ -166,12 +166,12 @@ MACSIO_LOG_LogMsg(
     char *msg, *buf;
     va_list ptr;
 
-    msg = (char *) malloc(log->log_line_length);
-    buf = (char *) malloc(log->log_line_length);
+    msg = (char *) malloc(log->log_line_length+10);
+    buf = (char *) malloc(log->log_line_length+10);
 
     if (is_stderr) sprintf(msg, "%06d: ", log->rank);
     va_start(ptr, fmt);
-    vsnprintf(log?msg:&msg[8], log->log_line_length-1, fmt, ptr);
+    vsnprintf(is_stderr?&msg[8]:msg, log->log_line_length-1, fmt, ptr);
     va_end(ptr);
     msg[log->log_line_length-1] = '\0';
 
@@ -183,6 +183,7 @@ MACSIO_LOG_LogMsg(
             buf[i] = msg[i];
         i++;
     }
+    free(msg);
     if (is_stderr)
     {
         buf[i++] = '\n';

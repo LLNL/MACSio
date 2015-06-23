@@ -1309,8 +1309,11 @@ static int register_this_interface()
     iface.processArgsFunc = process_args;
 
     /* Register custom compression methods with HDF5 library */
+    H5dont_atexit();
+#if 0
 #ifdef HAVE_ZFP
     H5Z_register_zfp();
+#endif
 #endif
 
     /* Register this plugin */

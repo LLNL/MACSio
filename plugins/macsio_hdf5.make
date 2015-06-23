@@ -29,11 +29,11 @@ ifneq ($(ZLIB_HOME),)
 HDF5_LDFLAGS += -L$(ZLIB_HOME)/lib
 endif
 
+HDF5_LDFLAGS += -lz -lm
+
 PLUGIN_OBJECTS += $(HDF5_SOURCES:.c=.o)
 PLUGIN_LDFLAGS += $(HDF5_LDFLAGS)
 PLUGIN_LIST += hdf5
-
-HDF5_LDFLAGS += -lz -lm
 
 endif
 

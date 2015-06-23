@@ -15,12 +15,12 @@ ifneq ($(EXODUS_HOME),)
 
 EXODUS_SOURCES = macsio_exodus.c
 
+EXODUS_CFLAGS = -I$(EXODUS_HOME)/include -I$(NETCDF_HOME)/include
+EXODUS_LDFLAGS = -L$(EXODUS_HOME)/lib -lexodus -L$(NETCDF_HOME)/lib -lnetcdf
+
 PLUGIN_OBJECTS += $(EXODUS_SOURCES:.c=.o)
 PLUGIN_LDFLAGS += $(EXODUS_LDFLAGS)
 PLUGIN_LIST += exodus
-
-EXODUS_CFLAGS = -I$(EXODUS_HOME)/include -I$(NETCDF_HOME)/include
-EXODUS_LDFLAGS = -L$(EXODUS_HOME)/lib -lexodus -L$(NETCDF_HOME)/lib -lnetcdf
 
 NETCDF_USES_HDF5 = $(shell nm $(NETCDF_HOME)/lib/libnetcdf.{a,so,dylib} 2>/dev/null | grep -i h5fopen)
 

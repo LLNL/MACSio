@@ -526,7 +526,7 @@ write_timings_file(char const *filename)
     /* dump this processor's timers */
     for (i = 0; i < ntimers; i++)
     {
-        if (!timer_strs[i]) continue;
+        if (!timer_strs[i] || !strlen(timer_strs[i])) continue;
         MACSIO_LOG_MSGL(timing_log, Info, (timer_strs[i]));
         free(timer_strs[i]);
     }
@@ -535,11 +535,11 @@ write_timings_file(char const *filename)
     /* dump MPI reduced timers */
     if (MACSIO_MAIN_Rank == 0)
     {
-        MACSIO_LOG_MSGL(timing_log, Info, ("Reduced Timers..."));
+        MACSIO_LOG_LogMsg(timing_log, "Reduced Timers...");
 
         for (i = 0; i < rntimers; i++)
         {
-            if (!rtimer_strs[i]) continue;
+            if (!rtimer_strs[i] || !strlen(rtimer_strs[i])) continue;
             MACSIO_LOG_MSGL(timing_log, Info, (rtimer_strs[i]));
             free(rtimer_strs[i]);
         }
@@ -806,8 +806,12 @@ main(int argc, char *argv[])
     if (exercise_scr)
         SCR_Finalize();
 #endif
+
 #ifdef HAVE_MPI
-    MPI_Finalize();
+    {   int result;
+        if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
+            MPI_Finalize();
+    }
 #endif
 
     return (0);

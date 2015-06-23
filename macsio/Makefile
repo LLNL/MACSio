@@ -10,6 +10,16 @@ else
 include $(CONFIG_SITE_FILE)
 endif
 
+#
+# Set up doxygen command
+#
+ifeq ($(DOXCMD),)
+DOX_IN_PATH=$(shell which doxygen 2>/dev/null 1>/dev/null; echo $$?)
+ifeq ($(DOX_IN_PATH),0)
+DOXCMD=$(shell which doxygen)
+endif
+endif
+
 JSON_C_INC=../json-c/install/include
 JSON_C_LIB=../json-c/install/lib
 JSON_C_LDFLAGS=-ljson-c
@@ -106,6 +116,7 @@ allclean: dataclean
 	rm -rf ../json-c/{install,build}
 
 dox:	$(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
+	@echo $(DOX_IN_PATH)
 	@echo $(DOXCMD)
 	$(MAKE) DOXCMD=$(DOXCMD) -C ../doc $@
 
