@@ -443,6 +443,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
+        MACSIO_CLARGS_ARG_GROUP_BEG(Log File Options),
+            "Options to control size and shape of log file",
         "--log_file_name %s", "macsio-log.log",
             "The name of the log file.",
         "--log_line_cnt %d %d", "64 0",
@@ -453,6 +455,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         "--timings_file_name %s", "macsio-timings.log",
             "Specify the name of the timings file. Passing an empty string, \"\"\n"
             "will disable the creation of a timings file.",
+        MACSIO_CLARGS_ARG_GROUP_END(Log File Options),
         "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
         "--filebase %s", "macsio",

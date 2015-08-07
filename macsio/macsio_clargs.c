@@ -157,6 +157,8 @@ MACSIO_CLARGS_ProcessCmdline(
    MACSIO_KnownArgInfo_t *knownArgs;
    va_list ap;
    json_object *ret_json_obj = 0;
+   int depth;
+   int isgroup = 0;
 
 #ifdef HAVE_MPI
    {  int result;
@@ -197,19 +199,34 @@ MACSIO_CLARGS_ProcessCmdline(
 
    knownArgs = NULL;
    firstArg = 1;
+   depth = 1;
    while (1)
    {
       int n, paramCount, argNameLength;
       char *fmtStr, *defStr, *helpStr, *p, *paramTypes, *paramFlags;
       void **paramPtrs;
       MACSIO_KnownArgInfo_t *newArg, *oldArg;
+      int isgroup_begin, isgroup_end;
 
       /* get this arg's format specifier string */
       fmtStr = va_arg(ap, char *);
 
       /* check to see if we're done */
-      if (!strcmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS))
+      if (!strncmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS, strlen(MACSIO_CLARGS_END_OF_ARGS)))
 	 break;
+
+      /* check to see if this is a grouping item */
+      isgroup_begin = isgroup_end = 0;
+      if (!strncmp(fmtStr, MACSIO_CLARGS_GRP_BEG, strlen(MACSIO_CLARGS_GRP_BEG)))
+      {
+          isgroup_begin = 1;
+          depth++;
+      }
+      else if (!strncmp(fmtStr, MACSIO_CLARGS_GRP_END, strlen(MACSIO_CLARGS_GRP_END)))
+      {
+          isgroup_end = 1;
+          depth--;
+      }
 
       /* get this arg's default string */
       defStr = va_arg(ap, char *);
@@ -233,7 +250,12 @@ MACSIO_CLARGS_ProcessCmdline(
 	 }
 
 	 /* this arguments format string */
-	 fprintf(outFILE, "   %-s [%s]\n", fmtStr, defStr?defStr:"");
+         if (isgroup_begin)
+	     fprintf(outFILE, "\n%*s%s\n", 2*(depth-1), " ", &fmtStr[strlen(MACSIO_CLARGS_GRP_BEG)]);
+         else if (isgroup_end)
+	     fprintf(outFILE, "\n");
+         else
+	     fprintf(outFILE, "%*s%s [%s]\n", 2*depth, " ", fmtStr, defStr?defStr:"");
 
          if (has_embedded_newlines)
          {
@@ -242,14 +264,14 @@ MACSIO_CLARGS_ProcessCmdline(
              {
                  char *pnext = strchr(p, '\n');
                  int len = pnext ? pnext - p : strlen(p);
-	         fprintf(outFILE, "      %*.*s\n", len, len, p);
+	         fprintf(outFILE, "%*s%*.*s\n", 2*(depth+1), " ", len, len, p);
                  p = pnext ? pnext+1 : 0;
              }
          }
          else
          {
 	     /* this arguments help-line format string */
-	     sprintf(helpFmtStr, "      %%-%d.%ds", terminalWidth, terminalWidth);
+	     sprintf(helpFmtStr, "%%*s%%-%d.%ds", terminalWidth, terminalWidth);
 
 	     /* this arguments help string */
 	     p = helpStr;
@@ -257,7 +279,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	     i = 0;
 	     while (i < n)
 	     {
-	        fprintf(outFILE, helpFmtStr, p);
+	        fprintf(outFILE, helpFmtStr, 2*(depth+1), " ", p);
 	        p += terminalWidth;
 	        i += terminalWidth;
 	        if ((i < n) && (*p != ' '))
