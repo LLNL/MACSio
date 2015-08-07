@@ -23,6 +23,9 @@
 #include <hdf5.h>
 #include <H5Tpublic.h>
 
+/* Disable debugging messages */
+#define NDEBUG
+
 /*!
 \addtogroup plugins
 @{
@@ -35,7 +38,7 @@
 
 #ifdef HAVE_ZFP
 /*!
-\addtogroup ZFP Compression Filter
+\addtogroup ZFP As HDF5 Compression Filter
 
 Copyright (c) 2014-2015, RWTH Aachen University, JARA - Juelich Aachen Research Alliance.
 Produced at the RWTH Aachen University, Germany.
@@ -558,10 +561,6 @@ H5Z_filter_zfp(unsigned int flags,
         params.maxbits = maxbits;
         params.maxprec = maxprec;
         params.minexp  = minexp;
-printf("in filter, params.minbits = %d\n", params.minbits);
-printf("in filter, params.maxbits = %d\n", params.maxbits);
-printf("in filter, params.maxprec = %d\n", params.maxprec);
-printf("in filter, params.minexp = %d\n", params.minexp);
 
         /* max.(!) size of compressed data */
         size_t buf_size_maxout = zfp_estimate_compressed_size(&params);
@@ -738,7 +737,7 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     float accuracy = -1;
     char options[64];
     char *token, *string, *tofree;
-    hsize_t dims[4], maxdims[4];
+    hsize_t dims[4], maxdims[4], chunk_dims[4];
     hid_t retval = H5Pcreate(H5P_DATASET_CREATE);
 
     if (!alg_str || !strlen(alg_str))
@@ -803,17 +802,20 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
         else
             zfp_set_rate(&params, 0.0); /* default rate-constrained */
 
-        cd_values[0] = (unsigned int) 0;
-        cd_values[1] = (unsigned int) 0;
-        cd_values[2] = (unsigned int) H5Tget_size(dtype_id);
-        cd_values[3] = (unsigned int) H5Sget_simple_extent_ndims(space_id);
-        for (i = 0; i < cd_values[3]; i++)
-            cd_values[4+i] = (unsigned int) dims[i];
-        cd_values[4+i++] = (unsigned int) params.minbits;
-        cd_values[4+i++] = (unsigned int) params.maxbits;
-        cd_values[4+i++] = (unsigned int) params.maxprec;
-        cd_values[4+i++] = (unsigned int) params.minexp;
-        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i+4, cd_values);
+        i = 0;
+        cd_values[i++] = (unsigned int) params.minbits;
+        cd_values[i++] = (unsigned int) params.maxbits;
+        cd_values[i++] = (unsigned int) params.maxprec;
+        cd_values[i++] = (unsigned int) params.minexp;
+        cd_values[i++] = (unsigned int) minsize;
+#if 0
+        DONT DO THIS!! IT NEGATIVELY IMPACTS COMPRESSOR BY ORDER OF MAGNITUDE
+        chunk_dims[0] = 4;
+        chunk_dims[1] = 4;
+        chunk_dims[2] = 4;
+        H5Pset_chunk(retval, H5Sget_simple_extent_ndims(space_id), chunk_dims);
+#endif
+        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i, cd_values);
     }
 #endif
     else if (!strncasecmp(alg_str, "szip", 4))
@@ -842,7 +844,7 @@ static int process_args(int argi, int argc, char *argv[])
             "'param1=val1,param2=val2,param3=val3. The various algorithm names and\n"
             "their parameter meanings are described below. Note that some parameters are\n"
             "not specific to any algorithm. Those are described first followed by\n"
-            "individual algorithm parameters.\n"
+            "individual algorithm-specific parameters.\n"
             "\n"
             "minsize=%d : min. size of dataset (in terms of a count of values)\n"
             "    upon which compression will even be attempted. Default is 1024.\n"
@@ -858,10 +860,10 @@ static int process_args(int argi, int argc, char *argv[])
             "    specifying more than one of the following options, only the last\n"
             "    specified will be honored.\n"
             "        rate=%f : target # bits per compressed output datum. Fractional values\n"
-            "            are permitted. 0 selects defaults: 8 bits/flt or 11 bits/dbl.\n"
+            "            are permitted. 0 selects defaults: 4 bits/flt or 8 bits/dbl.\n"
             "            Use this option to hit a target compressed size but where error\n"
-            "            is unbounded. OTOH, use one of the following two options to bound\n"
-            "            the error but amount of compression, if any, is unbounded.\n"
+            "            varies. OTOH, use one of the following two options for fixed\n"
+            "            error but amount of compression, if any, varies.\n"
             "        precision=%d : # bits of precision to preserve in each input datum.\n"
             "        accuracy=%f : absolute error tolerance in each output datum.\n"
             "            In many respects, 'precision' represents a sort of relative error\n"
@@ -1310,10 +1312,8 @@ static int register_this_interface()
 
     /* Register custom compression methods with HDF5 library */
     H5dont_atexit();
-#if 0
 #ifdef HAVE_ZFP
     H5Z_register_zfp();
-#endif
 #endif
 
     /* Register this plugin */
