@@ -113,9 +113,9 @@ MACSIO_LOG_LogInit(
     if (path && rank == 0)
     {
         int i, filefd;
-        char *linbuf = (char*) malloc((line_len * lines_per_proc + extra_lines_proc0) * sizeof(char));
+        char *linbuf = (char*) malloc(line_len * (lines_per_proc + extra_lines_proc0) * sizeof(char));
         memset(linbuf, '-', line_len * sizeof(char));
-        memset(linbuf+line_len, ' ', (line_len * (lines_per_proc-1) + extra_lines_proc0) * sizeof(char));
+        memset(linbuf+line_len, ' ',  line_len * (lines_per_proc + extra_lines_proc0 - 1) * sizeof(char));
         for (i = 0; i < lines_per_proc+extra_lines_proc0; i++)
             linbuf[(i+1)*line_len-1] = '\n';
         filefd = open(path, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP);
