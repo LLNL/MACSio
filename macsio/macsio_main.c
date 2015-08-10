@@ -575,21 +575,24 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     json_object_object_add(main_obj, "problem", problem_obj);
 
     /* Just here for debugging for the moment */
-    if (MACSIO_LOG_DebugLevel >= 3)
+    if (MACSIO_LOG_DebugLevel >= 2)
     {
         char outfName[256];
         FILE *outf;
+        int json_c_print_flags = JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED;
 
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
-#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
+        if (MACSIO_LOG_DebugLevel < 3)
+            json_c_print_flags |= JSON_C_TO_STRING_NO_EXTARR_VALS;
+
         snprintf(outfName, sizeof(outfName), "main_obj_write_%03d.json", MACSIO_MAIN_Rank);
         outf = fopen(outfName, "w");
-        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, json_c_print_flags));
         fclose(outf);
     }
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
+#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)

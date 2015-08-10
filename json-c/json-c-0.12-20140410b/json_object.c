@@ -878,16 +878,24 @@ static int json_object_extarr_to_json_string(struct json_object* jso,
                                              int level,
                                              int flags)
 {
+        int do_vals = !(flags & JSON_C_TO_STRING_NO_EXTARR_VALS);
 	int had_children = 0;
 	int ii;
-	sprintbuf(pb, "( %d, %d, ",
-            (int) json_object_extarr_type(jso), json_object_extarr_ndims(jso));
+        if (do_vals)
+	    sprintbuf(pb, "( %d, %d, ",
+                (int) json_object_extarr_type(jso), json_object_extarr_ndims(jso));
+        else
+	    sprintbuf(pb, "[ %d, %d, ",
+                (int) json_object_extarr_type(jso), json_object_extarr_ndims(jso));
         for (ii = 0; ii < json_object_extarr_ndims(jso)-1; ii++)
 	    sprintbuf(pb, "%d, ", json_object_extarr_dim(jso, ii));
-	sprintbuf(pb, "%d,", json_object_extarr_dim(jso, ii));
+        if (do_vals)
+	    sprintbuf(pb, "%d,", json_object_extarr_dim(jso, ii));
+        else
+	    sprintbuf(pb, "%d", json_object_extarr_dim(jso, ii));
 	if (flags & JSON_C_TO_STRING_PRETTY)
 		sprintbuf(pb, "\n");
-	for(ii=0; ii < json_object_extarr_nvals(jso); ii++)
+	for(ii=0; ii < json_object_extarr_nvals(jso) && do_vals; ii++)
 	{
 		struct json_object *val = 0;
 		if (had_children)
@@ -952,10 +960,20 @@ static int json_object_extarr_to_json_string(struct json_object* jso,
 		indent(pb,level,flags);
 	}
 
-	if (flags & JSON_C_TO_STRING_SPACED)
+        if (do_vals)
+        {
+	    if (flags & JSON_C_TO_STRING_SPACED)
 		return sprintbuf(pb, " )");
-	else
+	    else
 		return sprintbuf(pb, ")");
+        }
+        else
+        {
+	    if (flags & JSON_C_TO_STRING_SPACED)
+		return sprintbuf(pb, " ]");
+	    else
+		return sprintbuf(pb, "]");
+        }
 }
 
 static void json_object_extarr_delete(struct json_object* jso)
