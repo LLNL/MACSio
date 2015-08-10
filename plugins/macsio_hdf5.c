@@ -24,7 +24,6 @@
 #include <H5Tpublic.h>
 
 /* Disable debugging messages */
-#define NDEBUG
 
 /*!
 \addtogroup plugins
@@ -355,6 +354,7 @@ H5Z_set_local_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
     size_t cd_nelmts_max = 12;
     unsigned int cd_values_in[]  = {0,0,0,0,0};
     unsigned int cd_values_out[] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    hsize_t dims[6];
 
     /* check datatype's byte-size per value - must be single(==4) or double(==8) */
     if(0 == (dsize = H5Tget_size(type_id))) {
@@ -369,7 +369,6 @@ H5Z_set_local_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
       PUSH_ERR("H5Z_set_local_zfp", H5E_CALLBACK, "no valid no. space dimensions");
       return -1;
     }
-    hsize_t dims[ndims];
     H5Sget_simple_extent_dims(space_id, dims, NULL);
 
     /* check filter */
@@ -709,39 +708,51 @@ static int
 get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
 {
     int toklen;
+    char dummy[16];
+    void *val_ptr_tmp = &dummy[0];
 
     if (!src_str) return 0;
     if (!token_to_match) return 0;
 
-    toklen = strlen(token_to_match);
-    if (!strncasecmp(src_str, token_to_match, toklen-2))
-    {
-        char dummy[16];
-        void *val_ptr_tmp = &dummy[0];
-        if (sscanf(&src_str[toklen-2], &token_to_match[toklen-2], val_ptr_tmp) != 1)
-            return 0;
-        sscanf(&src_str[toklen-2], &token_to_match[toklen-2], val_ptr);
-        return 1;
-    }
-    return 0;
+    toklen = strlen(token_to_match)-2;
+
+    if (strncasecmp(src_str, token_to_match, toklen))
+        return 0;
+
+    /* First, check matching sscanf *without* risk of writing to val_ptr */
+    if (sscanf(&src_str[toklen], &token_to_match[toklen], val_ptr_tmp) != 1)
+        return 0;
+
+    sscanf(&src_str[toklen], &token_to_match[toklen], val_ptr);
+    return 1;
 }
 
 static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id, hid_t dtype_id)
 {
     int shuffle = -1;
     int minsize = -1;
-    int level = -1;
-    int precision = -1;
-    int pixels_per_block = -1;
-    float rate = -1;
-    float accuracy = -1;
-    char options[64];
+    int gzip_level = -1;
+    int zfp_precision = -1;
+    unsigned int szip_pixels_per_block = 0;
+    float zfp_rate = -1;
+    float zfp_accuracy = -1;
+    char szip_method[64], szip_chunk_str[64];
     char *token, *string, *tofree;
-    hsize_t dims[4], maxdims[4], chunk_dims[4];
+    int ndims;
+    hsize_t dims[4], maxdims[4];
     hid_t retval = H5Pcreate(H5P_DATASET_CREATE);
+
+    szip_method[0] = '\0';
+    szip_chunk_str[0] = '\0';
+
+    /* set chunking (currently whole, single chunk) */
+    H5Pset_layout(retval, H5D_CONTIGUOUS);
 
     if (!alg_str || !strlen(alg_str))
         return retval;
+
+    ndims = H5Sget_simple_extent_ndims(space_id);
+    H5Sget_simple_extent_dims(space_id, dims, maxdims);
 
     /* We can make a pass through params string without being specific about
        algorithm because there are presently no symbol collisions there */
@@ -752,17 +763,19 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
             continue;
         if (get_tokval(token, "shuffle=%d", &shuffle))
             continue;
-        if (get_tokval(token, "level=%d", &level))
+        if (get_tokval(token, "level=%d", &gzip_level))
             continue;
-        if (get_tokval(token, "rate=%f", &rate))
+        if (get_tokval(token, "rate=%f", &zfp_rate))
             continue;
-        if (get_tokval(token, "precision=%d", &precision))
+        if (get_tokval(token, "precision=%d", &zfp_precision))
             continue;
-        if (get_tokval(token, "accuracy=%f", &accuracy))
+        if (get_tokval(token, "accuracy=%f", &zfp_accuracy))
             continue;
-        if (get_tokval(token, "options=%s", options))
+        if (get_tokval(token, "method=%s", szip_method))
             continue;
-        if (get_tokval(token, "pixels_per_block=%d", &pixels_per_block))
+        if (get_tokval(token, "block=%u", &szip_pixels_per_block))
+            continue;
+        if (get_tokval(token, "chunk=%s", szip_chunk_str))
             continue;
     }
     free(tofree);
@@ -772,15 +785,15 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     if (H5Sget_simple_extent_npoints(space_id) < minsize)
         return retval;
 
-    /* set chunking (currently whole, single chunk) */
-    H5Sget_simple_extent_dims(space_id, dims, maxdims);
-    H5Pset_chunk(retval, H5Sget_simple_extent_ndims(space_id), dims);
+    /* Initially, as a default in case nothing else is selected,
+       set chunk size equal to dataset size (e.g. single chunk) */
+    H5Pset_chunk(retval, ndims, dims);
 
     if (!strncasecmp(alg_str, "gzip", 4))
     {
-        shuffle = shuffle != -1 ? shuffle : 1;
-        if (shuffle) H5Pset_shuffle(retval);
-        H5Pset_deflate(retval, level!=-1?level:9);
+        if (shuffle == -1 || shuffle == 1)
+            H5Pset_shuffle(retval);
+        H5Pset_deflate(retval, gzip_level!=-1?gzip_level:9);
     }
 #ifdef HAVE_ZFP
     else if (!strncasecmp(alg_str, "lindstrom-zfp", 13))
@@ -789,16 +802,19 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
         zfp_params params;
         unsigned int cd_values[32];
 
-        shuffle = shuffle != -1 ? shuffle : 0;
-        if (shuffle) H5Pset_shuffle(retval);
+        /* We don't shuffle zfp. That is handled internally to zfp */
 
         zfp_init(&params);
-        if (rate != -1)
-            zfp_set_rate(&params, (double) rate);
-        else if (precision != -1)
-            zfp_set_precision(&params, precision);
-        else if (accuracy != -1)
-            zfp_set_accuracy(&params, (double) accuracy);
+        params.type = H5Tget_size(dtype_id) == 4 ? ZFP_TYPE_FLOAT : ZFP_TYPE_DOUBLE;
+        if (ndims >= 1) params.nx = dims[0];
+        if (ndims >= 2) params.ny = dims[1];
+        if (ndims >= 3) params.nz = dims[2];
+        if (zfp_rate != -1)
+            zfp_set_rate(&params, (double) zfp_rate);
+        else if (zfp_precision != -1)
+            zfp_set_precision(&params, zfp_precision);
+        else if (zfp_accuracy != -1)
+            zfp_set_accuracy(&params, (double) zfp_accuracy);
         else
             zfp_set_rate(&params, 0.0); /* default rate-constrained */
 
@@ -808,20 +824,43 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
         cd_values[i++] = (unsigned int) params.maxprec;
         cd_values[i++] = (unsigned int) params.minexp;
         cd_values[i++] = (unsigned int) minsize;
-#if 0
-        DONT DO THIS!! IT NEGATIVELY IMPACTS COMPRESSOR BY ORDER OF MAGNITUDE
-        chunk_dims[0] = 4;
-        chunk_dims[1] = 4;
-        chunk_dims[2] = 4;
-        H5Pset_chunk(retval, H5Sget_simple_extent_ndims(space_id), chunk_dims);
-#endif
         H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i, cd_values);
     }
 #endif
     else if (!strncasecmp(alg_str, "szip", 4))
     {
-        shuffle = shuffle != -1 ? shuffle : 1;
-        if (shuffle) H5Pset_shuffle(retval);
+        unsigned int method = H5_SZIP_NN_OPTION_MASK;
+        int const szip_max_blocks_per_scanline = 128;
+
+        if (shuffle == -1 || shuffle == 1)
+            H5Pset_shuffle(retval);
+
+        if (szip_pixels_per_block == 0)
+            szip_pixels_per_block = 4;
+        if (!strcasecmp(szip_method, "ec"))
+            method = H5_SZIP_EC_OPTION_MASK;
+
+        H5Pset_szip(retval, method, szip_pixels_per_block);
+
+        if (strlen(szip_chunk_str))
+        {
+            hsize_t chunk_dims[3];
+            int i, vals[3];
+            int nvals = sscanf(szip_chunk_str, "%d:%d:%d", &vals[0], &vals[1], &vals[2]);
+            if (nvals == ndims)
+            {
+                for (i = 0; i < ndims; i++)
+                    chunk_dims[i] = vals[i];
+                H5Pset_chunk(retval, ndims, chunk_dims);
+            }
+            else if (nvals == ndims-1)
+            {
+                chunk_dims[0] = szip_max_blocks_per_scanline * szip_pixels_per_block;
+                for (i = 1; i < ndims; i++)
+                    chunk_dims[i] = vals[i-1];
+                H5Pset_chunk(retval, ndims, chunk_dims);
+            }
+        }
     }
 
     return retval;
@@ -872,10 +911,13 @@ static int process_args(int argi, int argc, char *argv[])
             "\n"
 #endif
             "\"szip\"\n"
-            "    options=%s : specify 'ec' for entropy coding or 'nn' for nearest neighbor.\n"
-            "        There is no default. You must specify one of these options.\n"
-            "    pixels_per_block=<%d> : must be an even integer <= 32. There is no default.\n"
-            "        See H5Pset_szip for more information.\n"
+            "    method=%s : specify 'ec' for entropy coding or 'nn' for nearest\n"
+            "        neighbor. Default is 'nn'\n"
+            "    block=%d : (pixels-per-block) must be an even integer <= 32. See\n"
+            "        See H5Pset_szip in HDF5 documentation for more information.\n"
+            "        Default is 32.\n"
+            "    chunk=%d:%d : colon-separated dimensions specifying chunk size in\n"
+            "        each dimension higher than the first (fastest varying) dimension.\n"
             "\n"
             "\"gzip\"\n"
             "    level=%d : A value in the range [1,9], inclusive, trading off time to\n"
