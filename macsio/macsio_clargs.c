@@ -241,6 +241,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	 char helpFmtStr[32];
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
          int has_embedded_newlines = strchr(helpStr, '\n') != 0;
+         int help_str_len = strlen(helpStr);
 
 	 if (first)
 	 {
@@ -257,7 +258,7 @@ MACSIO_CLARGS_ProcessCmdline(
          else
 	     fprintf(outFILE, "%*s%s [%s]\n", 2*depth, " ", fmtStr, defStr?defStr:"");
 
-         if (has_embedded_newlines)
+         if (has_embedded_newlines || help_str_len < terminalWidth)
          {
 	     p = helpStr;
              while (p)
