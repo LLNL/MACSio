@@ -745,7 +745,7 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     szip_method[0] = '\0';
     szip_chunk_str[0] = '\0';
 
-    /* set chunking (currently whole, single chunk) */
+    /* Initially, set contiguous layout. May reset to chunked later */
     H5Pset_layout(retval, H5D_CONTIGUOUS);
 
     if (!alg_str || !strlen(alg_str))
@@ -780,11 +780,15 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     }
     free(tofree);
 
-    /* check for minsize threshold */
+    /* check for minsize compression threshold */
     minsize = minsize != -1 ? minsize : 1024;
     if (H5Sget_simple_extent_npoints(space_id) < minsize)
         return retval;
 
+    /*
+     * Ok, now handle various properties related to compression
+     */
+ 
     /* Initially, as a default in case nothing else is selected,
        set chunk size equal to dataset size (e.g. single chunk) */
     H5Pset_chunk(retval, ndims, dims);
@@ -829,14 +833,15 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
 #endif
     else if (!strncasecmp(alg_str, "szip", 4))
     {
+#ifdef HAVE_SZIP
         unsigned int method = H5_SZIP_NN_OPTION_MASK;
-        int const szip_max_blocks_per_scanline = 128;
+        int const szip_max_blocks_per_scanline = 128; /* from szip lib */
 
         if (shuffle == -1 || shuffle == 1)
             H5Pset_shuffle(retval);
 
         if (szip_pixels_per_block == 0)
-            szip_pixels_per_block = 4;
+            szip_pixels_per_block = 32;
         if (!strcasecmp(szip_method, "ec"))
             method = H5_SZIP_EC_OPTION_MASK;
 
@@ -844,23 +849,33 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
 
         if (strlen(szip_chunk_str))
         {
-            hsize_t chunk_dims[3];
+            hsize_t chunk_dims[3] = {0, 0, 0};
             int i, vals[3];
             int nvals = sscanf(szip_chunk_str, "%d:%d:%d", &vals[0], &vals[1], &vals[2]);
             if (nvals == ndims)
             {
                 for (i = 0; i < ndims; i++)
                     chunk_dims[i] = vals[i];
-                H5Pset_chunk(retval, ndims, chunk_dims);
             }
             else if (nvals == ndims-1)
             {
                 chunk_dims[0] = szip_max_blocks_per_scanline * szip_pixels_per_block;
                 for (i = 1; i < ndims; i++)
                     chunk_dims[i] = vals[i-1];
-                H5Pset_chunk(retval, ndims, chunk_dims);
             }
+            for (i = 0; i < ndims; i++)
+            {
+                if (chunk_dims[i] > dims[i]) chunk_dims[i] = dims[0];
+                if (chunk_dims[i] == 0) chunk_dims[i] = dims[0];
+            }
+            H5Pset_chunk(retval, ndims, chunk_dims);
         }
+#else
+        static int have_issued_warning = 0;
+        if (!have_issued_warning)
+            MACSIO_LOG_MSG(Warn, ("szip compressor not available in this build"));
+        have_issued_warning = 1;
+#endif
     }
 
     return retval;

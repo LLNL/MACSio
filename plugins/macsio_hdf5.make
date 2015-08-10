@@ -23,6 +23,7 @@ endif
 
 ifneq ($(SZIP_HOME),)
 HDF5_LDFLAGS += -L$(SZIP_HOME)/lib -lsz -Wl,-rpath,$(SZIP_HOME)/lib
+HDF5_CFLAGS += -DHAVE_SZIP
 endif
 
 ifneq ($(ZLIB_HOME),)
