@@ -124,9 +124,9 @@ LINK = $(CXX)
  * Note that all package \c FOO_HOME make variables are treated as specifying a top-level
  * package directory underneath which lives \c include and \c lib directories for the
  * package header files and library files respectively. If you have a package that does not
- * or is not installed in this industry standard way, the work-around is to use symlinks
+ * install or is not installed in this industry standard way, a work-around is to use symlinks
  * or explicit copies to create some \em proxy home directory for the package that is
- * structured in the way MACSio's Makefiles need it.
+ * structured in the way MACSio's Makefiles expect it.
  *
  * Ordinarily, we maintain separate config-site files for various hosts upon which MACSio is
  * built. The files are named according to the build host they are associated with. However,
@@ -137,11 +137,11 @@ LINK = $(CXX)
  * Although MACSio is C Language, at a minimum it must be linked using a C++ linker due to
  * its use of non-constant expressions in static initializers to affect the static plugin
  * behavior. However, its conceivable that some C++'isms have crept into the code causing
- * warnings or outright errors with some C compiler.
+ * warnings or outright errors with some C compilers.
  *
  * In addition, MACSio sources currently include a large number of \c \#warning statements
- * to help remind developers (namely me) of minor issues to be fixed. These produce a lot
- * of sprurios output in stderr but are otherwise harmless.
+ * to help remind developers (namely me) of minor issues to be fixed. When compiling, these
+ * produce a lot of sprurios output in stderr but are otherwise harmless.
  *
  * From within the \c macsio sub-directory, these make targets are defined...
  *   - <tt>make all</tt>: will build all of MACSio main + all plugins that have been enabled
@@ -168,7 +168,7 @@ LINK = $(CXX)
  * that operates directly on system I/O interfaces is the raw-posix (miftmpl) plugin.
  *
  * Other plugins require associated third party libraries (TPLs). Consequently, before building
- * MACSio, one must have installed the assocaited TPLs for the desired plugins.
+ * MACSio, one must have installed the associated TPLs for the desired plugins.
  *
  * Here are some useful make targets defined for the \c plugins directory to help with plugin
  * TPL(s).
@@ -195,7 +195,7 @@ LINK = $(CXX)
  * Sometimes it is desireable to build only some of the available plugins. This can be
  * achieved using the make variable \c ENABLE_PLUGINS setting it to a space separated
  * string of the names of the plugins to include when linking the MACSio main executable.
- * For example, the command <tt>make ENABLE_PLUGINS="miftmpl silo"</tt> will build the
+ * For example, the command <tt>make ENABLE_PLUGINS="miftmpl silo" all</tt> will build the
  * MACSio executable so that only the miftmpl and Silo plugins are included.
  *
  * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
@@ -205,10 +205,10 @@ LINK = $(CXX)
  * object file. 
  *
  * Given the high likelihood that different plugins may depend on common TPL(s), there is
- * a plugin-specific make variable, \c FOO_BUILD_ORDER that informs MACSio's make system
- * of the order in which to build the plugin relative to other plugins. The
- * \c FOO_BUILD_ORDER variable is a floating point number that is used to sort the order
- * in which plugin's object files appear on the link line when linking MACSio. A higher
+ * a plugin-specific make variable, \c FOO_BUILD_ORDER (for a fictitious foo plugin) that
+ * informs MACSio's make system of the order in which to build the plugin relative to other
+ * plugins. The \c FOO_BUILD_ORDER variable is a floating point number that is used to sort
+ * the order in which plugin's object files appear on the link line when linking MACSio. A higher
  * numerical value for the \c FOO_BUILD_ORDER variable will result in the \c foo plugin
  * and its dependent libraries occuring later on the link command-line.
  *
