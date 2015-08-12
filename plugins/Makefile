@@ -2,7 +2,7 @@
 # Produced at the Lawrence Livermore National Laboratory.
 # Written by Mark C. Miller
 # 
-# CODE-<R&R number> All rights reserved. 
+# LLNL-CODE-676051. All rights reserved. 
 # 
 # This file is part of MACSio
 # 
