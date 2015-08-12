@@ -1,0 +1,37 @@
+1. Create a file in macsio/config-site directory whose name is whatever
+   string the hostname command returns. Example...
+        % hostname
+        scratlantis
+        % touch macsio/config-site/scratlantis 
+
+2. Populate the file you created in step one with variables to
+   define where various third party libraries (TPLs) for plugins
+   can be found. MACSio will not attempt to build any plugins
+   for which the requisite TPL variables are not defined.
+   Example...
+        # For the silo plugin, we need Silo and, optionally, HDF5
+        SILO_HOME=/foo/bar/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
+        HDF5_HOME=/foo/bar/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
+
+        # Sometimes, HDF5 needs szip and the HDF5 plugin does szip compression
+        SZIP_HOME=/foo/bar/szip/2.1/i386-apple-darwin12_gcc-4.2
+
+        # For the Exodus plugin, we need Exodus and netCDF.
+        EXODUS_HOME=/foo/bar/exodus-6.09/exodus/myinstall
+        NETCDF_HOME=/foo/bar/netcdf/4.1.1/i386-apple-darwin12_mpicc
+
+3. Continue populating the file you created in step one with
+   variables to control the location of C/C++ compilers, compiler
+   flags, linker flags, etc. Note that a C++ compiler is used
+   only to link the executables. Most of the standard GNU make
+   variables are supported. Example...
+        CXX=mpicxx
+        CC=mpicc
+        CFLAGS=-DHAVE_MPI -g
+        LINK=$(CXX)
+        DOXCMD=doxygen
+
+4. Go into the macsio directory and type 'make all'. That should
+   produce the 'macsio' executable
+
+5. type './macsio --help' to get command-line arguments to use/run MACSio.

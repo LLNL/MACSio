@@ -93,26 +93,36 @@ DRIVER_OBJ=$(DRIVER_SRC:.c=.o)
 help:
 	@echo "Usage:"
 	@echo "    Make [CONFIG_SITE_FILE=<path-to-config-file>] <target>"
-	@echo "    If there is already a config-file in the config-site dir"
-	@echo "        for the host you are on, make should find it automatically."
 	@echo "    Use target 'all' to build everything."
 	@echo "    Use target 'tstlog' to build test for MACSIO_LOG."
 	@echo "    Use target 'tsttiming' to build test for MACSIO_TIMING."
+	@echo "    Use target 'probe' to build a test for installed memory size."
+	@echo "    Use target 'json-c' to re-build/re-install JSON-C lib."
 	@echo "    Use target 'clean' to clean up objects and executables."
-	@echo "    Use target 'dataclean' to clean + remove various data files."
-	@echo "    Use target 'allclean' to dataclean + remove json-c install."
+	@echo "    Use target 'dataclean' to remove various data files."
+	@echo "    Use target 'allclean' to clean + dataclean + remove json-c install."
+	@echo "    Use target 'dist' generate a distribution tarball"
 	@echo "    Use target 'dox' to generate Doxygen documentation in ../docs dir."
+	@echo "    You will need a file in config-site dir with variables"
+	@echo "        named according to the host on which you are building"
+	@echo "        and containing paths to TPLs for plugins."
+	@echo "    If there is already a file in the config-site dir"
+	@echo "        for the host you are on, make should find it automatically."
 
 all: json-c tsttiming tstlog macsio probe
 
-json-c: ../json-c/install
+json-c: ../json-c/build/timestamp
 
-../json-c/install:
+../json-c/build/timestamp: ../json-c/build ../json-c/json-c-0.12-20140410b/*.h
+	cd ../json-c/build; \
+        make install; \
+        touch timestamp
+
+../json-c/build:
 	cd ../json-c; \
 	mkdir build install; \
 	cd build; \
-	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install; \
-        make install
+	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install
 	
 macsio_timing.o: macsio_timing.h
 
@@ -133,10 +143,12 @@ clean:
 	rm -f macsio tstopts tsttiming tstlog probe
 	$(MAKE) -C ../plugins $@
 
-dataclean: clean
-	rm -f *.json *.silo *.log
+# should use plugin's extensions from their individual .make files here
+dataclean:
+	rm -f *.silo *.h5 *.exoII *.log
+	ls *.json | grep -v macsio_json_object.json | xargs rm -f
 
-allclean: dataclean
+allclean: clean dataclean
 	rm -rf ../json-c/{install,build}
 
 dox:	$(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
