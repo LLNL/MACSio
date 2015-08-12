@@ -25,6 +25,7 @@
 #
 # Find a config-site file or use one specified by CONFIG_SITE_FILE
 #
+VERSION = 0.9
 HOSTNAME := $(shell hostname -f)
 CONFIG_SITE_FILE ?= config-site/$(HOSTNAME)
 CONFIG_SITE_FILE_STATUS := $(shell test -e $(CONFIG_SITE_FILE) && echo "not here")
@@ -148,16 +149,30 @@ dataclean:
 	rm -f *.silo *.h5 *.exoII *.log
 	ls *.json | grep -v macsio_json_object.json | xargs rm -f
 
-allclean: clean dataclean
+allclean: clean dataclean doxclean
 	rm -rf ../json-c/{install,build}
+
+# Standard GNU target
+html:	dox
 
 dox:	$(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
 	@echo $(DOX_IN_PATH)
 	@echo $(DOXCMD)
 	$(MAKE) DOXCMD=$(DOXCMD) -C ../doc $@
 
-# Standard GNU target
-html:	dox
+doxclean:
+	rm -rf ../doc/doxyout
+
+dist:	macsio-$(VERSION).tar.gz
+	cp -r .. /tmp/macsio-$(VERSION)
+	pushd /tmp/macsio-$(VERSION)
+	make allclean
+	rm -rf .git src-stuff
+	cd ..
+	tar cvf - macsio-$(VERSION) | gzip --best > macsio-$(VERSION).tar.gz
+	popd
+	mv /tmp/macsio-$(VERSION).tar.gz .
+	rm -rf /tmp/macsio-$(VERSION)
 
 #srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo
 check: macsio
