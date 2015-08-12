@@ -164,14 +164,16 @@ doxclean:
 	rm -rf ../doc/doxyout
 
 dist:	macsio-$(VERSION).tar.gz
+
+macsio-$(VERSION).tar.gz:
 	cp -r .. /tmp/macsio-$(VERSION)
-	pushd /tmp/macsio-$(VERSION)
-	make allclean
-	rm -rf .git src-stuff
-	cd ..
-	tar cvf - macsio-$(VERSION) | gzip --best > macsio-$(VERSION).tar.gz
-	popd
-	mv /tmp/macsio-$(VERSION).tar.gz .
+	pushd /tmp/macsio-$(VERSION); \
+	make allclean; \
+	rm -rf .git src-stuff; \
+	cd ..; \
+	tar cvf - macsio-$(VERSION) | gzip --best > macsio-$(VERSION).tar.gz; \
+	popd; \
+	mv /tmp/macsio-$(VERSION).tar.gz .; \
 	rm -rf /tmp/macsio-$(VERSION)
 
 #srun -n2048 -p pdebug macsio --interface silo --parallel_file_mode MIF 16 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio --fileext silo

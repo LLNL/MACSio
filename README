@@ -32,6 +32,7 @@
         DOXCMD=doxygen
 
 4. Go into the macsio directory and type 'make all'. That should
-   produce the 'macsio' executable
+   produce the 'macsio' executable. Make 'help' will give you
+   some instructions on other useful make targets
 
 5. type './macsio --help' to get command-line arguments to use/run MACSio.
