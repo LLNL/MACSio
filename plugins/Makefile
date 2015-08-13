@@ -1,3 +1,27 @@
+# Copyright (c) 2015, Lawrence Livermore National Security, LLC.
+# Produced at the Lawrence Livermore National Laboratory.
+# Written by Mark C. Miller
+# 
+# LLNL-CODE-676051. All rights reserved. 
+# 
+# This file is part of MACSio
+# 
+# Please also read the LICENSE file at the top of the source code directory or
+# folder hierarchy.
+# 
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License (as published by the Free Software
+# Foundation) version 2, dated June 1991.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT 
+# ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the terms and conditions of the GNU General
+# Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA 02111-1307 USA
+
 #
 # Find a config-site file or use one specified by CONFIG_SITE_FILE
 #
@@ -10,11 +34,20 @@ else
 include $(CONFIG_SITE_FILE)
 endif
 
+# Set the download command so that '$(DLCMD) file url' works
+ifeq ($(OSTYPE),darwin)
+DLCMD = curl -o
+else
+DLCMD = wget -O
+endif
+
 help: list
 	@echo "Usage:"
 	@echo "    Default will attempt to build all available plugins"
 	@echo "    Target 'plugins' also builds all available plugins"
 	@echo "    Target 'list' lists all available plugins"
+	@echo "    Target 'list-tpls-X' lists all TPL(s) needed for plugin X"
+	@echo "    Target 'download-tpls-X' downloads all TPL(s) needed for plugin X"
 	@echo "    Target 'notes' list to do notes"
 
 list: notes

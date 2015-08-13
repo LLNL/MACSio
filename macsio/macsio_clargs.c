@@ -1,3 +1,29 @@
+/*
+Copyright (c) 2015, Lawrence Livermore National Security, LLC.
+Produced at the Lawrence Livermore National Laboratory.
+Written by Mark C. Miller
+
+LLNL-CODE-676051. All rights reserved.
+
+This file is part of MACSio
+
+Please also read the LICENSE file at the top of the source code directory or
+folder hierarchy.
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License (as published by the Free Software
+Foundation) version 2, dated June 1991.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the terms and conditions of the GNU General
+Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA 02111-1307 USA
+*/
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -153,9 +179,12 @@ MACSIO_CLARGS_ProcessCmdline(
    int invalidArgTypeFound = 0;
    int firstArg;
    int terminalWidth = 120 - 10;
+   int haveSeenSeparatorArg = 0;
    MACSIO_KnownArgInfo_t *knownArgs;
    va_list ap;
    json_object *ret_json_obj = 0;
+   int depth;
+   int isgroup = 0;
 
 #ifdef HAVE_MPI
    {  int result;
@@ -196,19 +225,34 @@ MACSIO_CLARGS_ProcessCmdline(
 
    knownArgs = NULL;
    firstArg = 1;
+   depth = 1;
    while (1)
    {
       int n, paramCount, argNameLength;
       char *fmtStr, *defStr, *helpStr, *p, *paramTypes, *paramFlags;
       void **paramPtrs;
       MACSIO_KnownArgInfo_t *newArg, *oldArg;
+      int isgroup_begin, isgroup_end;
 
       /* get this arg's format specifier string */
       fmtStr = va_arg(ap, char *);
 
       /* check to see if we're done */
-      if (!strcmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS))
+      if (!strncmp(fmtStr, MACSIO_CLARGS_END_OF_ARGS, strlen(MACSIO_CLARGS_END_OF_ARGS)))
 	 break;
+
+      /* check to see if this is a grouping item */
+      isgroup_begin = isgroup_end = 0;
+      if (!strncmp(fmtStr, MACSIO_CLARGS_GRP_BEG, strlen(MACSIO_CLARGS_GRP_BEG)))
+      {
+          isgroup_begin = 1;
+          depth++;
+      }
+      else if (!strncmp(fmtStr, MACSIO_CLARGS_GRP_END, strlen(MACSIO_CLARGS_GRP_END)))
+      {
+          isgroup_end = 1;
+          depth--;
+      }
 
       /* get this arg's default string */
       defStr = va_arg(ap, char *);
@@ -223,6 +267,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	 char helpFmtStr[32];
 	 FILE *outFILE = (isatty(2) ? stderr : stdout);
          int has_embedded_newlines = strchr(helpStr, '\n') != 0;
+         int help_str_len = strlen(helpStr);
 
 	 if (first)
 	 {
@@ -232,23 +277,28 @@ MACSIO_CLARGS_ProcessCmdline(
 	 }
 
 	 /* this arguments format string */
-	 fprintf(outFILE, "   %-s [%s]\n", fmtStr, defStr?defStr:"");
+         if (isgroup_begin)
+	     fprintf(outFILE, "\n%*s%s\n", 2*(depth-1), " ", &fmtStr[strlen(MACSIO_CLARGS_GRP_BEG)]);
+         else if (isgroup_end)
+	     fprintf(outFILE, "\n");
+         else
+	     fprintf(outFILE, "%*s%s [%s]\n", 2*depth, " ", fmtStr, defStr?defStr:"");
 
-         if (has_embedded_newlines)
+         if (has_embedded_newlines || help_str_len < terminalWidth)
          {
 	     p = helpStr;
              while (p)
              {
                  char *pnext = strchr(p, '\n');
                  int len = pnext ? pnext - p : strlen(p);
-	         fprintf(outFILE, "      %*.*s\n", len, len, p);
+	         fprintf(outFILE, "%*s%*.*s\n", 2*(depth+1), " ", len, len, p);
                  p = pnext ? pnext+1 : 0;
              }
          }
          else
          {
 	     /* this arguments help-line format string */
-	     sprintf(helpFmtStr, "      %%-%d.%ds", terminalWidth, terminalWidth);
+	     sprintf(helpFmtStr, "%%*s%%-%d.%ds", terminalWidth, terminalWidth);
 
 	     /* this arguments help string */
 	     p = helpStr;
@@ -256,7 +306,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	     i = 0;
 	     while (i < n)
 	     {
-	        fprintf(outFILE, helpFmtStr, p);
+	        fprintf(outFILE, helpFmtStr, 2*(depth+1), " ", p);
 	        p += terminalWidth;
 	        i += terminalWidth;
 	        if ((i < n) && (*p != ' '))
@@ -436,7 +486,7 @@ MACSIO_CLARGS_ProcessCmdline(
    if (flags.route_mode == MACSIO_CLARGS_TOJSON)
        ret_json_obj = json_object_new_object();
    i = argi;
-   while (i < argc)
+   while (i < argc && !haveSeenSeparatorArg)
    {
       int foundArg;
       MACSIO_KnownArgInfo_t *p;
@@ -527,6 +577,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	          }
 	          case 'n': /* special case to return arg index */
 	          {
+                     haveSeenSeparatorArg = 1;
                      if (flags.route_mode == MACSIO_CLARGS_TOMEM)
                      {
 		         int *pInt = (int *) (p->paramPtrs[j]);

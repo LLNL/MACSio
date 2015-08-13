@@ -1,4 +1,29 @@
-#warning ADD COPYRIGHT INFORMATION TO ALL FILES
+/*
+Copyright (c) 2015, Lawrence Livermore National Security, LLC.
+Produced at the Lawrence Livermore National Laboratory.
+Written by Mark C. Miller
+
+LLNL-CODE-676051. All rights reserved.
+
+This file is part of MACSio
+
+Please also read the LICENSE file at the top of the source code directory or
+folder hierarchy.
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License (as published by the Free Software
+Foundation) version 2, dated June 1991.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the terms and conditions of the GNU General
+Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA 02111-1307 USA
+*/
+
 #include <errno.h>
 #include <float.h>
 #include <math.h>
@@ -36,6 +61,8 @@ extern "C" {
 
 /*!
  * \mainpage
+ *
+ * \tableofcontents
  *
  * MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
  *
@@ -86,13 +113,161 @@ extern "C" {
  * assigning pieces to MPI ranks, in piece number order, until all MPI ranks have been assigned pieces.
  * The algorithm runs indentically on all ranks. When the algorithm reaches the part assignment for the
  * rank on which its executing, it then generates the K or K+1 mesh pieces for that rank. Although the
- * algorithm is essentially a sequential algorithm with asymptotic behavior O(#total pieces), it is primarily
+ * algorithm is essentially a sequential algorithm with asymptotic behavior O(\#total pieces), it is primarily
  * a simple book-keeping loop which completes in a fraction of a second even for more than one million
  * pieces.
  *
  * Each piece of the mesh is a simple rectangular region of space. The spatial bounds of that region are
  * easily determined. Any variables to be placed on the mesh can be easily handled as long as the variable's
  * spatial variation can be described in the global goemetric space.
+ *
+ * \section sec_building Building MACSio
+ *
+ * MACSio uses GNU Makefiles with conditionally constructed variables and shell functions.
+ *
+ * MACSio source code is divided into two key directories; the main MACSio functionality is in the
+ * \c macsio directory while all plugins are in the \c plugins directory.
+ *
+ * \subsection sec_building_main Building MACSio Main
+ *
+ * The main bootstrap for building MACSio is the \em config-site file. This file contains variable
+ * definitions for all the key Make variables necessary to control the build of MACSio and any of
+ * its plugins. Here is an example config-site file...
+ *
+ * \code
+SILO_HOME = /Users/miller86/visit/visit/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
+HDF5_HOME = /Users/miller86/visit/visit/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
+ZFP_HOME  = $(HDF5_HOME)
+EXODUS_HOME = /Users/miller86/Downloads/exodus-6.09/exodus/myinstall
+NETCDF_HOME = /Users/miller86/visit/thirdparty_shared/2.8/netcdf/4.3.2/i386-apple-darwin12_gcc-4.2
+CXX = /Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicxx
+CC  = /Users/miller86/installs/openmpi/1.6.4/i386-apple-darwin12_gcc-4.2/bin/mpicc
+CFLAGS = -DHAVE_MPI -g
+LINK = $(CXX)
+ * \endcode
+ *
+ * Note that all package \c FOO_HOME make variables are treated as specifying a top-level
+ * package directory underneath which lives \c include and \c lib directories for the
+ * package header files and library files respectively. If you have a package that does not
+ * install or is not installed in this industry standard way, a work-around is to use symlinks
+ * or explicit copies to create some \em proxy home directory for the package that is
+ * structured in the way MACSio's Makefiles expect it.
+ *
+ * Ordinarily, we maintain separate config-site files for various hosts upon which MACSio is
+ * built. The files are named according to the build host they are associated with. However,
+ * it is also perfectly fine to maintain, for example, a config-site file for a generic host
+ * such as \em ubuntu and then just explicitly reference that config-site file when building
+ * MACSio on ubuntu systems.
+ *
+ * Although MACSio is C Language, at a minimum it must be linked using a C++ linker due to
+ * its use of non-constant expressions in static initializers to affect the static plugin
+ * behavior. However, its conceivable that some C++'isms have crept into the code causing
+ * warnings or outright errors with some C compilers.
+ *
+ * In addition, MACSio sources currently include a large number of \c \#warning statements
+ * to help remind developers (namely me) of minor issues to be fixed. When compiling, these
+ * produce a lot of sprurios output in stderr but are otherwise harmless.
+ *
+ * From within the \c macsio sub-directory, these make targets are defined...
+ *   - <tt>make all</tt>: will build all of MACSio main + all plugins that have been enabled
+ *     via setting non-null values for their respective TPL(s) \c FOO_HOME variables in the
+ *     config-site file.
+ *   - <tt>make CONFIG_SITE_FILE=config-site/foo all</tt>: will build all of MACSio main + plugins
+ *     using the specified config-site file, \c config-site/foo.
+ *   - <tt>make clean</tt>: will clean away main and plugin object files.
+ *   - <tt>make dataclean</tt>: will clean away data files MACSio has produced.
+ *   - <tt>make allclean</tt>: will clean away all test data files, main and plugin object files,
+ *     and the macsio executable.
+ *
+ * Note that part of building MACSio's main includes building the \ref jsonclib. The JSON-C
+ * library is configured and installed from the Makefile in the \c macsio sub-directory but
+ * it is actually installed one directory level up in \c ../json-c/install.
+ * Whenever the JSON-C library is modified, it is necessary to re-install it and in that case
+ * requires one to manually cd to the \c ../json-c/build directory and
+ * issue the command <tt>make install</tt> there.
+ *
+ * \subsection sec_building_plugins Building MACSio Plugins
+ *
+ * By default, the only plugin(s) MACSio builds with automatically are those that depend upon
+ * ubiquitous system libraries such as stdio. In the initial release of MACSio, the only plugin
+ * that operates directly on system I/O interfaces is the raw-posix (miftmpl) plugin.
+ *
+ * Other plugins require associated third party libraries (TPLs). Consequently, before building
+ * MACSio, one must have installed the associated TPLs for the desired plugins.
+ *
+ * Here are some useful make targets defined for the \c plugins directory to help with plugin
+ * TPL(s).
+ *   - <tt>make list</tt>: lists all plugins for which source code exists in
+ *     the \c plugins directory.
+ *   - <tt>make list-tpls-X</tt>: lists all TPL(s) required for plugin X as well as
+ *     their last known URLs.
+ *   - <tt>make download-tpls-X</tt>: downloads (using either wget or curl) all TPL(s)
+ *     tarballs needed for plugin X.
+ *   - <tt>make install-tpls-X</tt>: will attempt to build and install all TPL(s)
+ *     for a given plugin to path specified in \c MACSIO_TPLS_PREFIX. (note: this
+ *     is currently an unreliable option).
+ *
+ * All essential make bootstraps can be set in a hostname-specific config-site file
+ * or by explicitly specifing a config-site file to be used using the \c CONFIG_SITE_FILE
+ * make variable (e.g. <tt>make CONFIG_SITE_FILE=config-site/foo</tt> will build using
+ * the contents of the file \c foo in the \c config-site directory.
+ *
+ * A given plugin is built only when installations of its needed TPL(s) are specified
+ * via its associated \c FOO_HOME variable. For example, to build the HDF5 plugin, the
+ * variable \c HDF5_HOME must specify a path to an installation of HDF5 where the 
+ * \c include and \c lib sub-directories for HDF5 can be found.
+ *
+ * Sometimes it is desireable to build only some of the available plugins. This can be
+ * achieved using the make variable \c ENABLE_PLUGINS setting it to a space separated
+ * string of the names of the plugins to include when linking the MACSio main executable.
+ * For example, the command <tt>make ENABLE_PLUGINS="miftmpl silo" all</tt> will build the
+ * MACSio executable so that only the miftmpl and Silo plugins are included.
+ *
+ * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
+ * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
+ * foo plugin. \c macsio_foo.make is a makefile fragment, that gets included in the
+ * main Makefile in the \c plugins directory, to manage the creation of \c macsio_foo.o 
+ * object file. 
+ *
+ * Given the high likelihood that different plugins may depend on common TPL(s), there is
+ * a plugin-specific make variable, \c FOO_BUILD_ORDER (for a fictitious foo plugin) that
+ * informs MACSio's make system of the order in which to build the plugin relative to other
+ * plugins. The \c FOO_BUILD_ORDER variable is a floating point number that is used to sort
+ * the order in which plugin's object files appear on the link line when linking MACSio. A higher
+ * numerical value for the \c FOO_BUILD_ORDER variable will result in the \c foo plugin
+ * and its dependent libraries occuring later on the link command-line.
+ *
+ * MACSio does not use \c dlopen() to manage plugins. Instead, MACSio uses a \em static approach
+ * to managing plugins. The set of plugins available in a \c macsio executable is determined at
+ * the time the executable is linked simply by listing all the plugin object files to be linked
+ * into the executable (along with their associated TPL(s)). MACSio exploits a feature in C++
+ * which permits initialization of static variables via non-constant expressions. All symbols in
+ * a plugin are defined with \c static scope. Every plugin defines an <tt>int registration(void)</tt>
+ * function and initializes a static dummy integer to the result of \c registration() like so...
+ *
+ * \code
+   static int register_this_interface(void)
+   {
+     MACSIO_IFACE_Handle_t iface;
+
+     strcpy(iface.name, iface_name);
+     strcpy(iface.ext, iface_ext);
+
+     if (!MACSIO_IFACE_Register(&iface))
+         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface.name));
+   }
+   static int dummy = register_this_interface();
+ * \endcode
+ *
+ * At the time the executable loads, the \c register_this_interface() method is called. Note that
+ * this is called long before even \c main() is called. The
+ * call to \c MACSIO_IFACE_Register() from within \c register_this_interface() winds up
+ * adding the plugin to MACSio's global list of plugins. This happens for each plugin. The order
+ * in which they are added to MACSio doesn't matter because plugins are identified by their
+ * (unique) names. If MACSio encounters a case where two different plugins have the same
+ * name, then it will abort and inform the user of the problem. The remedy is to
+ * adjust the name of one of the two plugins. MACSio is able to call \c static methods 
+ * defined within the plugin via function callback pointers registered with the interface.
  *
  */
 
@@ -169,6 +344,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 
 #warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
 #warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
+#warning OPTION TO CONTROL TOTAL BUFFER SIZE IN LOWER-LAYERS
+#warning OPTION TO SET OUTPUT PRECISION TO FLOAT
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
         "--units_prefix_system %s", "binary",
@@ -291,12 +468,19 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
+        MACSIO_CLARGS_ARG_GROUP_BEG(Log File Options),
+            "Options to control size and shape of log file",
         "--log_file_name %s", "macsio-log.log",
             "The name of the log file.",
-        "--log_line_cnt %d", "64",
-            "Set number of lines per rank in the log file.",
+        "--log_line_cnt %d %d", "64 0",
+            "Set number of lines per rank in the log file and number of extra lines\n"
+            "for rank 0.",
         "--log_line_length %d", "128",
             "Set log file line length.",
+        "--timings_file_name %s", "macsio-timings.log",
+            "Specify the name of the timings file. Passing an empty string, \"\"\n"
+            "will disable the creation of a timings file.",
+        MACSIO_CLARGS_ARG_GROUP_END(Log File Options),
         "--alignment %d", MACSIO_CLARGS_NODEFAULT,
             "Not currently documented",
         "--filebase %s", "macsio",
@@ -321,15 +505,14 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 #if 0
         MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
 #endif
-        "--plugin-args %n", MACSIO_CLARGS_NODEFAULT,
+        "--plugin_args %n", MACSIO_CLARGS_NODEFAULT,
             "All arguments after this sentinel are passed to the I/O plugin\n"
             "plugin. The '%n' is a special designator for the builtin 'argi'\n"
             "value.",
     MACSIO_CLARGS_END_OF_ARGS);
 
-#warning FIXME
     plugin_args_start = json_object_path_get_int(mainJargs, "argi");
-    plugin_args_start = argc;
+    if (plugin_args_start == 0) plugin_args_start = -1;
 
     /* if we discovered help was requested, then print each plugin's help too */
     if (cl_result == MACSIO_CLARGS_HELP)
@@ -346,6 +529,52 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
         *plugin_argi = plugin_args_start>-1?plugin_args_start+1:argc;
 
     return mainJargs;
+}
+
+static int
+write_timings_file(char const *filename)
+{
+    char **timer_strs = 0, **rtimer_strs = 0;
+    int i, ntimers, maxlen, rntimers = 0, rmaxlen = 0, rdata[3], rdata_out[3];
+    MACSIO_LOG_LogHandle_t *timing_log;
+        
+    MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
+    MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
+    if (MACSIO_MAIN_Rank == 0)
+        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &rtimer_strs, &rntimers, &rmaxlen);
+    rdata[0] = maxlen > rmaxlen ? maxlen : rmaxlen;
+    rdata[1] = ntimers;
+    rdata[2] = rntimers;
+#ifdef HAVE_MPI
+    MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
+#endif
+
+    timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, filename, rdata_out[0], rdata_out[1], rdata_out[2]+1);
+
+    /* dump this processor's timers */
+    for (i = 0; i < ntimers; i++)
+    {
+        if (!timer_strs[i] || !strlen(timer_strs[i])) continue;
+        MACSIO_LOG_MSGL(timing_log, Info, (timer_strs[i]));
+        free(timer_strs[i]);
+    }
+    free(timer_strs);
+
+    /* dump MPI reduced timers */
+    if (MACSIO_MAIN_Rank == 0)
+    {
+        MACSIO_LOG_LogMsg(timing_log, "Reduced Timers...");
+
+        for (i = 0; i < rntimers; i++)
+        {
+            if (!rtimer_strs[i] || !strlen(rtimer_strs[i])) continue;
+            MACSIO_LOG_MSGL(timing_log, Info, (rtimer_strs[i]));
+            free(rtimer_strs[i]);
+        }
+        free(rtimer_strs);
+    }
+
+    MACSIO_LOG_LogFinalize(timing_log);
 }
 
 static int
@@ -371,21 +600,24 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     json_object_object_add(main_obj, "problem", problem_obj);
 
     /* Just here for debugging for the moment */
-    if (MACSIO_LOG_DebugLevel >= 3)
+    if (MACSIO_LOG_DebugLevel >= 2)
     {
         char outfName[256];
         FILE *outf;
+        int json_c_print_flags = JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED;
 
-#warning ADD JSON PRINTING OPTIONS: sort extarrs at end, dont dump large data, html output, dump large data at end
-#warning LEVEL 1 AND LEVEL 2 DEBUGGING SHOULD GENERATE JSON FILES BUT WITHOUT RAW DATA
+        if (MACSIO_LOG_DebugLevel < 3)
+            json_c_print_flags |= JSON_C_TO_STRING_NO_EXTARR_VALS;
+
         snprintf(outfName, sizeof(outfName), "main_obj_write_%03d.json", MACSIO_MAIN_Rank);
         outf = fopen(outfName, "w");
-        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
+        fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, json_c_print_flags));
         fclose(outf);
     }
 
 #warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
+#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
@@ -555,7 +787,7 @@ main(int argc, char *argv[])
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
@@ -567,7 +799,8 @@ main(int argc, char *argv[])
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
         JsonGetStr(clargs_obj, "log_file_name"),
         JsonGetInt(clargs_obj, "log_line_length"),
-        JsonGetInt(clargs_obj, "log_line_cnt"));
+        JsonGetInt(clargs_obj, "log_line_cnt/0"),
+        JsonGetInt(clargs_obj, "log_line_cnt/1"));
 
 #warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
@@ -590,23 +823,9 @@ main(int argc, char *argv[])
     /* stop total timer */
     MT_StopTimer(main_tid);
 
-    MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
-
-    if (!rank)
-    {
-        char **timer_strs;
-        int i, ntimers, maxlen;
-
-        MACSIO_TIMING_DumpReducedTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
-        for (i = 0; i < ntimers; i++)
-        {
-            /* For now, just log to stderr */
-#warning NEED A LOG FILE FOR SPECIFIC SET OF PROCESSORS, OR JUST ONE
-            MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Info, (timer_strs[i]));
-            free(timer_strs[i]);
-        }
-        free(timer_strs);
-    }
+    /* Write timings data file if requested */
+    if (strlen(JsonGetStr(clargs_obj, "timings_file_name")))
+        write_timings_file(JsonGetStr(clargs_obj, "timings_file_name"));
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
@@ -618,8 +837,12 @@ main(int argc, char *argv[])
     if (exercise_scr)
         SCR_Finalize();
 #endif
+
 #ifdef HAVE_MPI
-    MPI_Finalize();
+    {   int result;
+        if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
+            MPI_Finalize();
+    }
 #endif
 
     return (0);

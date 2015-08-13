@@ -4,7 +4,7 @@ The initial version was obtained from here,
 https://github.com/json-c/json-c/releases,
 numbered 0.12-20140410.
 
-It has been modified to support
+Among other things, it has been modified to support
      * Optimized, homogenously typed, multi-dimensional arrays.
        That is, arrays whose members are NOT json objects but
        the individual array elements in a larger buffer. These
@@ -23,3 +23,5 @@ This is primarily because many of these enhancements kinda sorta fall
 outside the original design scope (IMHO) of JSON in general and JSON-C
 in particular. In fact, the extarr and enum types break the JSON-C
 ascii string syntax.
+
+For licensing of JSON-C, please read json-c-0.12-20140410b/COPYING

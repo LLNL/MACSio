@@ -59,6 +59,8 @@ extern "C" {
 #define JSON_C_TO_STRING_NOZERO     (1<<2)
 #define JSON_C_TO_STRING_UNQUOTED   (1<<3)
 
+#define JSON_C_TO_STRING_NO_EXTARR_VALS (1<<4)
+
 #define JSON_C_FALSE ((json_bool)0)
 #define JSON_C_TRUE ((json_bool)1)
 

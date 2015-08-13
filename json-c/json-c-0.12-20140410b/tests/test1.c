@@ -167,6 +167,9 @@ int main(int argc, char **argv)
         {
             json_object *filobj = json_object_from_file("foo.json");
             json_object *tmpobj;
+	    printf("filobj (without extarr vals) =%s\n",
+                json_object_to_json_string_ext(filobj,
+                   JSON_C_TO_STRING_NO_EXTARR_VALS|JSON_C_TO_STRING_SPACED));
 	    printf("filobj=%s, nbytes=%d\n", json_object_to_json_string(filobj),
                 json_object_object_nbytes(filobj));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",

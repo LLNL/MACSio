@@ -1,3 +1,27 @@
+# Copyright (c) 2015, Lawrence Livermore National Security, LLC.
+# Produced at the Lawrence Livermore National Laboratory.
+# Written by Mark C. Miller
+#
+# LLNL-CODE-676051. All rights reserved.
+#
+# This file is part of MACSio
+# 
+# Please also read the LICENSE file at the top of the source code directory or
+# folder hierarchy.
+# 
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License (as published by the Free Software
+# Foundation) version 2, dated June 1991.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT 
+# ANY WARRANTY; without even the IMPLIED WARRANTY OF MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the terms and conditions of the GNU General
+# Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA 02111-1307 USA
+
 # This floating point variable is used to order plugin objects during
 # the main link for MACSio to allow dependent libraries that are common
 # to multiple plugins to be placed later on the link line. Larger 
@@ -32,4 +56,4 @@ PLUGIN_LIST += miftmpl
 
 # Rules to build the object file(s) for this plugin
 macsio_miftmpl.o: ../plugins/macsio_miftmpl.c
-	$(CXX) -c $(MIFTMPL_CFLAGS) $(MACSIO_CFLAGS) $(CLFAGS) ../plugins/macsio_miftmpl.c
+	$(CXX) -c $(MIFTMPL_CFLAGS) $(MACSIO_CFLAGS) $(CFLAGS) ../plugins/macsio_miftmpl.c
