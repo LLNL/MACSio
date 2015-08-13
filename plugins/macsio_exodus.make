@@ -13,7 +13,7 @@ PLUGIN_LIST += exodus
 EXODUS_CFLAGS = -I$(EXODUS_HOME)/include -I$(NETCDF_HOME)/include
 EXODUS_LDFLAGS = -L$(EXODUS_HOME)/lib -lexodus -L$(NETCDF_HOME)/lib -lnetcdf
 
-NETCDF_USES_HDF5 = $(shell nm $(NETCDF_HOME)/lib/libnetcdf.{a,so,dylib} | grep -i h5fopen)
+NETCDF_USES_HDF5 = $(shell nm $(NETCDF_HOME)/lib/libnetcdf.{a,so,dylib} 2>/dev/null | grep -i h5fopen)
 
 ifneq ($(NETCDF_USES_HDF5),)
 EXODUS_LDFLAGS += $(HDF5_LDFLAGS)
