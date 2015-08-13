@@ -24,6 +24,42 @@ this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+/*
+This example demonstrates the use of mmap to MPI send/recv whole files
+between MPI ranks all of which are aggregated at processor 0 into a real
+file on disk. If the sender files are handled via a memory-based filesystem
+such as tmpfs or ramfs, then no disk I/O is actually involved at the senders.
+
+In addition, we use a trick in MPI (which I was unaware of until developing
+this code) where an MPI_recv need not know, apriori, the size of the sent 
+message. As long as it knows a maximum size, it can post a recv for a message
+of the maximum size. The send will match with it and then an additional MPI
+call, MPI_Get_count is used to determine the true size of the matching send.
+
+At the aggregator, we mmap a single file/buffer (also best if the file is in
+a memory-based filesystem) and then iterate over senders receiving their whole
+HDF5 files as messages (as bufs of chars) into this buffer. Each time, we then
+H5Fopen the mmapped buffer and H5Ocopy its contents in the aggregator file,
+which is the only real file on disk.
+
+For this test to work, it is non-essential that the sender's or reciever's
+mmapped files actually be in a memory-based filesystem. The code works either
+way. However, then a memory-based filesystem is used, then no actual disk I/O
+is generated for the associated "files".
+
+Finally, to be fair in comparison with a real two-phase I/O strategy, we are
+not yet demonstrating here the aggregation of individual objects into larger
+objects (and subsequent larger I/O requests) in the aggregator file. But that
+is easily added by simply taking individual dataset contents, catentating them
+into a larger buffer and then writing out that larger buffer to the aggregator
+file as an aggregated dataset.
+
+To apply this as a general mechanism within MACSio's MIF module, a little care
+is needed to ensure the mesh parts that are indeed next to each other arrive
+at the same aggregator so that a larger datasets involving multiple mesh parts
+still forms a coherent part of the whole.
+*/
+
 #include <hdf5.h>
 #include <mpi.h>
 
