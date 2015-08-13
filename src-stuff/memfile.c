@@ -45,10 +45,9 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #if 0
             case ARG_DBL:                                 \
-                ARGNM = (TYPE) strtod(&argv[i][n+1],&tmp);\
+                ARGNM = (TYPE) strtod(&argv[i][n],&tmp);  \
                 had_error = (ARGNM==0 && errno != 0);     \
-                break;                                    \
-
+                break;                                    
 #endif
 
 #define HANDLE_ARG(ARGNM,TYPE,HELP)                       \
@@ -67,11 +66,11 @@ Place, Suite 330, Boston, MA 02111-1307 USA
         switch(typecode(#TYPE))                           \
         {                                                 \
             case ARG_INT:                                 \
-                ARGNM = (TYPE) strtol(&argv[i][n],0,10);\
+                ARGNM = (TYPE) strtol(&argv[i][n],0,10);  \
                 had_error = (ARGNM==0 && errno != 0);     \
                 break;                                    \
             case ARG_STR:                                 \
-                ARGNM = (TYPE) strdup(&argv[i][n]);     \
+                ARGNM = (TYPE) strdup(&argv[i][n]);       \
                 had_error = errno!=0;                     \
                 break;                                    \
             default: had_error = 1;                       \
@@ -146,41 +145,33 @@ int main(int argc, char **argv)
         {
             int real_len;
             hid_t tmpfid, src_grpid, src_dsid, dsid, sid, tid;
-            char grpname[256];
             hsize_t dims[3];
             MPI_Status status;
+            char grpname[256];
 
             /* blocking recieve from any of whole file contents */
+            /* note that the recv will complete possibly with fewer than max_len bytes */
             MPI_Recv(recvbuf, max_len, MPI_CHAR, MPI_ANY_SOURCE, FILE_TAG, MPI_COMM_WORLD, &status);
             MPI_Get_count(&status, MPI_CHAR, &real_len);
             msync(recvbuf, real_len, MS_SYNC);
             sync();
-printf("recieved %d bytes from rank %d\n", real_len, status.MPI_SOURCE);
 
-            /* create group in aggregator file for this processor's contributions */
+            /* setup name of group in aggregator file for this processor's contributions */
             snprintf(grpname, sizeof(grpname), "group-%03d", (int) status.MPI_SOURCE);
-            src_grpid = H5Gcreate1(fid, grpname, 0);
 
-            /* ok, should be safe to 'open' the file as an HDF5 file */
+            /* ok, should be safe to 'open' the file as an HDF5 file and copy contents
+               to aggregator file */
             tmpfid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
-
-            /* copy contents from this tmpfid to the aggregator file */
-            src_dsid = H5Dopen(tmpfid, "foo", H5P_DEFAULT);
-            tid = H5Dget_type(src_dsid);
-            sid = H5Dget_space(src_dsid);
-            dsid = H5Dcreate1(src_grpid, "foo", tid, sid, H5P_DEFAULT);
-            H5Dread(src_dsid, tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-            H5Dwrite(dsid, tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-            H5Dclose(dsid);
-            H5Dclose(src_dsid);
-            H5Tclose(tid);
-            H5Sclose(sid);
+            H5Ocopy(tmpfid, "/", fid, grpname, H5P_DEFAULT, H5P_DEFAULT);
             H5Fclose(tmpfid);
         }
 
         assert(munmap(recvbuf, (size_t) max_len)==0);
         close(fd);
         unlink(filename);
+
+        /* close aggregator file */
+        H5Fclose(fid);
 
     }
     else
@@ -196,10 +187,11 @@ printf("recieved %d bytes from rank %d\n", real_len, status.MPI_SOURCE);
         int fd, nbytes;
         struct stat stat_buf;
 
-        /* other ranks will create a file in memfs, mmap it and send it to rank 0
-           to aggregate */
+        /* Other ranks create a file in memfs, mmap it and send it to rank 0 to aggregate */
 
-        /* Ordinarily, these wold be on different nodes of a parallel machine
+        /* This is essentially the MIF work block on each processor */
+
+        /* Ordinarily, these would be on different nodes of a parallel machine
            and so in different (e.g. local) filesystems and no need to fiddle with filenames
            to make sure they don't collide with other processor's filenames */
         snprintf(filename, sizeof(filename), "%s/memfile-test-%03d.h5", memfs_path, rank);
