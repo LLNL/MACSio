@@ -21,3 +21,8 @@ can then be marshaled using one or more I/O interfaces and parallel I/O
 paradigms, allowing for direct comparisons of software interfaces,
 parallel I/O paradigms, and file system technologies with the same set
 of customizable data objects.
+
+We hope MACSio helps the HPC community to identify ways of maximizing
+I/O performance at scale.
+
+The name "MACSio" is pronounced max-eee-oh.
