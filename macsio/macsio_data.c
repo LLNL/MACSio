@@ -672,19 +672,32 @@ make_subset_var(int ndims, int const *dims, double const *bounds)
 }
 
 static json_object *
-make_mesh_vars(int ndims, int const *dims, double const *bounds)
+make_mesh_vars(int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *vars_array = json_object_new_array();
+    char const *centering_names[2] = {"zone", "node"};
+    char const *type_names[2] = {"double", "int"};
+    int const centerings[] = {0,0,0,1,1,1,1,0};
+    int const types[] = {0,0,0,0,0,0,0,1};
+    char const *var_names[] = {"constant","random","spherical","xramp","ysin","noise","noise_sum","xlayers"};
+    int i;
 
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "constant"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "random"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "double", "spherical"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "xramp"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "ysin"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "noise"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "node", "double", "noise_sum"));
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, "zone", "int", "xlayers"));
+    /* for now, just hack and cycle through possible combinations */
+    for (i = 0; i < nvars; i++)
+    {
+        int mod8 = i % 8;
+        char const *centering = centering_names[centerings[mod8]];
+        char const *type = type_names[types[mod8]];
+        char const *name = var_names[mod8];
+        char tmpname[32];
 
+        if (i < 8)
+            snprintf(tmpname, sizeof(tmpname), "%s", name);
+        else
+            snprintf(tmpname, sizeof(tmpname), "%s_%03d", name, (i-8)/8);
+
+        json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, tmpname));
+    }
     return vars_array;
 }
 
@@ -696,7 +709,7 @@ make_arb_mesh_topology(int ndims, int const *dims)
 
 #warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
 #warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
-static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
+static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *mesh_chunk = json_object_new_object();
     json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("uniform"));
@@ -711,7 +724,7 @@ static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *d
 }
 
 #warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
-static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
+static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *chunk_obj = json_object_new_object();
     json_object *mesh_obj = json_object_new_object();
@@ -725,7 +738,7 @@ static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims
     json_object_object_add(mesh_obj, "Topology", make_rect_mesh_topology(ndims, dims));
     json_object_object_add(chunk_obj, "Mesh", mesh_obj);
 #warning ADD NVARS AND VARMAPS ARGS HERE
-    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds));
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
     return chunk_obj;
 }
 
@@ -749,7 +762,7 @@ static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims
     return mesh_chunk;
 }
 
-static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
+static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *mesh_chunk = json_object_new_object();
     json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("ucdzoo"));
@@ -766,16 +779,16 @@ static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *di
 /* dims are # nodes in x, y and z,
    bounds are xmin,ymin,zmin,xmax,ymax,zmax */
 static json_object *
-make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, char const *type)
+make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, char const *type, int nvars)
 {
          if (!strncasecmp(type, "uniform", sizeof("uniform")))
-        return make_uniform_mesh_chunk(chunkId, ndims, dims, bounds);
+        return make_uniform_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "rectilinear", sizeof("rectilinear")))
-        return make_rect_mesh_chunk(chunkId, ndims, dims, bounds);
+        return make_rect_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "curvilinear", sizeof("curvilinear")))
         return 0;
     else if (!strncasecmp(type, "unstructured", sizeof("unstructured")))
-        return make_ucdzoo_mesh_chunk(chunkId, ndims, dims, bounds);
+        return make_ucdzoo_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "arbitrary", sizeof("arbitrary")))
         return 0;
     return 0;
@@ -831,6 +844,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     int part_size = json_object_path_get_int(main_obj, "clargs/part_size") / sizeof(double);
     double avg_num_parts = json_object_path_get_double(main_obj, "clargs/avg_num_parts");
     int dim = json_object_path_get_int(main_obj, "clargs/part_dim");
+    int vars_per_part = json_object_path_get_int(main_obj, "clargs/vars_per_part");
     double total_num_parts_d = size * avg_num_parts;
     int total_num_parts = (int) lround(total_num_parts_d);
     int myrank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
@@ -897,7 +911,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                     MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
-                        json_object_path_get_string(main_obj, "clargs/part_type"));
+                        json_object_path_get_string(main_obj, "clargs/part_type"), vars_per_part);
                     MACSIO_UTILS_SetDims(global_indices, ipart, jpart, kpart);
 #warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
 #warning GlogalLogIndices MAY NOT BE NEEDED
