@@ -1,6 +1,6 @@
 1. Create a file in macsio/config-site directory whose name is whatever
-   string the hostname command returns. Example...
-        % hostname
+   string the command 'hostname -f' returns. Example...
+        % hostname -f
         scratlantis
         % touch macsio/config-site/scratlantis 
 
