@@ -1,6 +1,6 @@
 1. Create a file in macsio/config-site directory whose name is whatever
-   string the hostname command returns. Example...
-        % hostname
+   string the command 'hostname -f' returns. Example...
+        % hostname -f
         scratlantis
         % touch macsio/config-site/scratlantis 
 
@@ -35,4 +35,35 @@
    produce the 'macsio' executable. Make 'help' will give you
    some instructions on other useful make targets
 
-5. type './macsio --help' to get command-line arguments to use/run MACSio.
+5. MACSio has default values for all command-line arguments. So if you
+   just run the command './macsio', it will do something but probably
+   not what you want. Here are some example command-lines. . .
+
+   To run with Multiple Independent File (MIF) mode to 8 HDF5 files. . .
+       mpirun -np 93 macsio --interface hdf5 --parallel_file_mode MIF 8
+
+   Same thing to but a Single Shared File (SIF) mode to 1 HDF5 file. . .
+       mpirun -np 93 macsio --interface hdf5 --parallel_file_mode SIF 1
+
+   Default per-proc request size is 80,0000 bytes (10K doubles). To use
+   a different request size, use --part_size . . .
+       mpirun -np 128 macsio --interface hdf5 --parallel_file_mode MIF 8 --part_size 10M
+    . . . 'M' means either decimal Megabytes (Mb) or binary Mibibytes (Mi)
+    depending on setting for --units_prefix_system. Default is binary.
+
+   Default #parts/proc is 2, which is common for applications that support
+   'domain overload' workflows. Change with --avg_num_parts <float> arg
+       mpirun -np 128 macsio --interface hdf5 --parallel_file_mode MIF 8 --avg_num_parts 2.5
+   means that 50% of procs have 2 parts and 50 % of procs have 3 parts.
+
+   Default number of dumps is 10, change with --num_dumps argument. . .
+       mpirun -np 128 macsio --interface hdf5 --parallel_file_mode MIF 8 --num_dumps 2
+
+   Set various debugging levels (1,2 or 3, more info in logs with higher numbers)
+       mpirun -np 128 macsio --interface hdf5 --parallel_file_mode MIF 8 --debug_level 2
+   Note: debugging can degrade performance and skew timing results
+
+   Getting more help. . .
+       ./macsio --help
+   Will produce a lot of help output including MACSio's main arguments as well as arguments
+   specific to any enabled plugins.

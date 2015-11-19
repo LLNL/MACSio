@@ -40,6 +40,9 @@ char MACSIO_UTILS_UnitsPrefixSystem[32];
 
   Programmer: By Bob Jenkins, 1996.  bob_jenkins@burtleburtle.net.
 
+  This is the hash that Bob Jenkins described in the 1997 Dr. Dobb's
+  article, http://www.burtleburtle.net/bob/hash/doobs.html
+
   You may use this code any way you wish, private, educational, or
   commercial.  It's free. However, do NOT use for cryptographic purposes.
 

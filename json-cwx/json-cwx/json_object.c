@@ -26,6 +26,7 @@
 #include "printbuf.h"
 #include "linkhash.h"
 #include "arraylist.h"
+#include "json_crc.h"
 #include "json_inttypes.h"
 #include "json_object.h"
 #include "json_object_private.h"
@@ -1180,11 +1181,8 @@ int64_t json_object_extarr_nbytes(struct json_object* obj)
 {
     if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
 
-    /* We include the space necessary to store the type, #dims and
-       size of each dim */
     return json_object_extarr_nvals(obj) *
-           json_object_extarr_valsize(obj) +
-          (json_object_extarr_ndims(obj)+2) * sizeof(int);
+           json_object_extarr_valsize(obj);
 }
 
 int json_object_extarr_ndims(struct json_object* jso)
@@ -1259,6 +1257,14 @@ JSON_OBJECT_EXTARR_DATA_AS(int,int)
 JSON_OBJECT_EXTARR_DATA_AS(int64_t,int64_t)
 JSON_OBJECT_EXTARR_DATA_AS(float,float)
 JSON_OBJECT_EXTARR_DATA_AS(double,double)
+
+int64_t json_object_extarr_crc(struct json_object* obj)
+{
+    if (!obj || !json_object_is_type(obj, json_type_extarr)) return 0;
+
+    return (int64_t) json_crcFast(json_object_extarr_data(obj),
+                                  json_object_extarr_nbytes(obj));
+}
 
 /**@} External Arrays */
 
@@ -1363,6 +1369,16 @@ int json_object_enum_length(struct json_object* jso)
 {
   if (!jso || !json_object_is_type(jso, json_type_enum)) return -1;
   return lh_table_length(jso->o.c_enum.choices);
+}
+
+int64_t json_object_enum_nbytes(struct json_object *jso)
+{
+  int i;
+  int64_t retval = 0;
+  if (!jso || !json_object_is_type(jso, json_type_enum)) return 0;
+  for (i = 0; i < json_object_enum_length(jso); i++)
+      retval += strlen(json_object_enum_get_idx_name(jso, i)) + sizeof(int64_t);
+  return retval;
 }
 
 /**
@@ -2292,33 +2308,49 @@ void json_object_free_printbuf(struct json_object* jso)
 }
 /**@} Serialization */
 
-int64_t json_object_object_nbytes(struct json_object* obj)
+int64_t json_object_object_nbytes(struct json_object* obj, json_bool mode)
 {
+    static int const objhdr = (int) sizeof(struct json_object);
+    int addhdr = mode ? objhdr : 0;
+
     if (!obj) return 0;
     switch (json_object_get_type(obj))
     {
-        case json_type_null:    return 0;
-        case json_type_boolean: return sizeof(json_bool);
-        case json_type_int:     return sizeof(int64_t);
-        case json_type_double:  return sizeof(double);
-        case json_type_string:  return json_object_get_string_len(obj);
-        case json_type_extarr:  return json_object_extarr_nbytes(obj);
-        case json_type_enum:    return json_object_enum_length(obj) * sizeof(int);
+        case json_type_null:    return 0 + addhdr;
+        case json_type_boolean: return sizeof(json_bool) + addhdr;
+        case json_type_int:     return sizeof(int64_t) + addhdr;
+        case json_type_double:  return sizeof(double) + addhdr;
+        case json_type_string:  return json_object_get_string_len(obj) + addhdr;
+        case json_type_extarr:
+        {
+            int64_t retval = json_object_extarr_nbytes(obj) + addhdr;
+            if (mode) /* include the space for extarr header */
+                retval += (json_object_extarr_ndims(obj)+2) * sizeof(int);
+            return retval;
+        }
+        case json_type_enum:
+        {
+            if (mode) return json_object_enum_nbytes(obj) + addhdr;
+            return sizeof(int64_t);
+        }
         case json_type_array:
         {
             int i;
             int64_t retval = 0;
             for (i = 0; i < json_object_array_length(obj); i++)
-                retval += json_object_object_nbytes(json_object_array_get_idx(obj, i));
-            return retval;
+                retval += json_object_object_nbytes(json_object_array_get_idx(obj, i), mode);
+            return retval + addhdr;
         }
         case json_type_object:
         {
             int64_t retval = 0;
             struct json_object_iter iter;
             json_object_object_foreachC(obj, iter)
-                retval += json_object_object_nbytes(iter.val);
-            return retval;
+            {
+                retval += json_object_object_nbytes(iter.val, mode);
+                if (mode) retval += strlen(iter.key);
+            }
+            return retval + addhdr;
         }
     }
     return 0;

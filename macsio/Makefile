@@ -45,9 +45,9 @@ DOXCMD=$(shell which doxygen)
 endif
 endif
 
-JSON_C_INC=../json-c/install/include
-JSON_C_LIB=../json-c/install/lib
-JSON_C_LDFLAGS=-ljson-c
+JSON_C_INC=../json-cwx/install/include
+JSON_C_LIB=../json-cwx/install/lib
+JSON_C_LDFLAGS=-ljson-cwx
 DRIVER_INCS += -I$(JSON_C_INC)
 DRIVER_LIBS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
 DRIVER_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
@@ -99,10 +99,10 @@ help:
 	@echo "    Use target 'tstlog' to build test for MACSIO_LOG."
 	@echo "    Use target 'tsttiming' to build test for MACSIO_TIMING."
 	@echo "    Use target 'probe' to build a test for installed memory size."
-	@echo "    Use target 'json-c' to re-build/re-install JSON-C lib."
+	@echo "    Use target 'json-cwx' to re-build/re-install JSON-C lib."
 	@echo "    Use target 'clean' to clean up objects and executables."
 	@echo "    Use target 'dataclean' to remove various data files."
-	@echo "    Use target 'allclean' to clean + dataclean + remove json-c install."
+	@echo "    Use target 'allclean' to clean + dataclean + remove json-cwx install."
 	@echo "    Use target 'dist' generate a distribution tarball"
 	@echo "    Use target 'dox' to generate Doxygen documentation in ../docs dir."
 	@echo "    You will need a file in config-site dir with variables"
@@ -111,20 +111,20 @@ help:
 	@echo "    If there is already a file in the config-site dir"
 	@echo "        for the host you are on, make should find it automatically."
 
-all: json-c tsttiming tstlog macsio probe
+all: json-cwx tsttiming tstlog macsio probe
 
-json-c: ../json-c/build/timestamp
+json-cwx: ../json-cwx/build/timestamp
 
-../json-c/build/timestamp: ../json-c/build ../json-c/json-c-0.12-20140410b/*.h
-	cd ../json-c/build; \
+../json-cwx/build/timestamp: ../json-cwx/build ../json-cwx/json-cwx/*.h
+	cd ../json-cwx/build; \
         make install; \
         touch timestamp
 
-../json-c/build:
-	cd ../json-c; \
+../json-cwx/build:
+	cd ../json-cwx; \
 	mkdir build install; \
 	cd build; \
-	../json-c-0.12-20140410b/configure CC="$(CC)" --prefix=`pwd`/../install
+	../json-cwx/configure CC="$(CC)" --prefix=`pwd`/../install
 	
 macsio_timing.o: macsio_timing.h
 
@@ -151,7 +151,7 @@ dataclean:
 	ls *.json | grep -v macsio_json_object.json | xargs rm -f
 
 allclean: clean dataclean doxclean
-	rm -rf ../json-c/{install,build}
+	rm -rf ../json-cwx/{install,build}
 
 # Standard GNU target
 html:	dox

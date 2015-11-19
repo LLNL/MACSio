@@ -9,8 +9,8 @@
 /config.status
 /doc
 /json.pc
-/json-c.pc
-/json-c-uninstalled.pc
+/json-cwx.pc
+/json-cwx-uninstalled.pc
 /Makefile
 /stamp-h1
 /stamp-h2
@@ -38,5 +38,5 @@
 /Release
 *.lo
 *.o
-/libjson-c.la
+/libjson-cwx.la
 /libjson.la

@@ -1,5 +1,7 @@
 This is a modified version of the JSON-C library.
 
+Its moniker is json-cwx (json-c with extensions)
+
 The initial version was obtained from here,
 https://github.com/json-c/json-c/releases,
 numbered 0.12-20140410.

@@ -77,7 +77,7 @@ ldflags:
 PLUGIN_INCLUDES = $(shell grep -H '^.*_BUILD_ORDER' ./*.make | sort -n -k 3 | cut -d':' -f1)
 include $(PLUGIN_INCLUDES)
 
-MACSIO_CFLAGS = -I../macsio -I../json-c/install/include -DHAVE_MPI
+MACSIO_CFLAGS = -I../macsio -I../json-cwx/install/include -DHAVE_MPI
 
 plugins: notes $(PLUGIN_OBJECTS)
 

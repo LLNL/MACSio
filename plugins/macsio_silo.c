@@ -35,6 +35,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
   #include <windows.h>
 #endif
 
+#include <json-cwx/json.h>
+
 #include <macsio_clargs.h>
 #include <macsio_data.h>
 #include <macsio_iface.h>

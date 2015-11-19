@@ -12,6 +12,8 @@
 #ifndef _json_object_private_h_
 #define _json_object_private_h_
 
+#include <json_crc.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

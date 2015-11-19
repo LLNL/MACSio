@@ -53,7 +53,7 @@ extern "C" {
 #include <macsio_timing.h>
 #include <macsio_utils.h>
 
-#include <json-c/json.h>
+#include <json-cwx/json.h>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -181,9 +181,9 @@ LINK = $(CXX)
  *
  * Note that part of building MACSio's main includes building the \ref jsonclib. The JSON-C
  * library is configured and installed from the Makefile in the \c macsio sub-directory but
- * it is actually installed one directory level up in \c ../json-c/install.
+ * it is actually installed one directory level up in \c ../json-cwx/install.
  * Whenever the JSON-C library is modified, it is necessary to re-install it and in that case
- * requires one to manually cd to the \c ../json-c/build directory and
+ * requires one to manually cd to the \c ../json-cwx/build directory and
  * issue the command <tt>make install</tt> there.
  *
  * \subsection sec_building_plugins Building MACSio Plugins
@@ -594,7 +594,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
     /* Generate a static problem object to dump on each dump */
     json_object *problem_obj = MACSIO_DATA_GenerateTimeZeroDumpObject(main_obj,0);
-    problem_nbytes = (unsigned long long) json_object_object_nbytes(problem_obj);
+    problem_nbytes = (unsigned long long) json_object_object_nbytes(problem_obj, JSON_C_FALSE);
 
 #warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);

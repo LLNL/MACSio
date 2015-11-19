@@ -143,6 +143,45 @@ int main(int argc, char **argv)
             *p = (double) i/2.0;
           }
 	  printf("extarr.to_string()=%s\n", json_object_to_json_string(extarr));
+          printf("extarr_crc() = %lx\n", json_object_extarr_crc(extarr));
+          {
+            struct _bits {
+                unsigned int bit00:1;
+                unsigned int bit01:1;
+                unsigned int bit02:1;
+                unsigned int bit03:1;
+                unsigned int bit04:1;
+                unsigned int bit05:1;
+                unsigned int bit06:1;
+                unsigned int bit07:1;
+                unsigned int bit08:1;
+                unsigned int bit09:1;
+                unsigned int bit10:1;
+                unsigned int bit11:1;
+                unsigned int bit12:1;
+                unsigned int bit13:1;
+                unsigned int bit14:1;
+                unsigned int bit15:1;
+                unsigned int bit16:1;
+                unsigned int bit17:1;
+                unsigned int bit18:1;
+                unsigned int bit19:1;
+                unsigned int bit20:1;
+                unsigned int bit21:1;
+                unsigned int bit22:1;
+                unsigned int bit23:1;
+                unsigned int bit24:1;
+                unsigned int bit25:1;
+                unsigned int bit26:1;
+                unsigned int bit27:1;
+                unsigned int bit28:1;
+                unsigned int bit29:1;
+                unsigned int bit30:1;
+                unsigned int bit31:1;
+            } *pbits = (struct _bits*) json_object_extarr_data(extarr)+17;
+            pbits->bit16 = ~pbits->bit16;
+          }
+          printf("extarr_crc() = %lx\n", json_object_extarr_crc(extarr));
 
           json_object_extarr_data_as_float(extarr, &fbuf);
           for (i = 0; i < nvals; i++)
@@ -171,7 +210,7 @@ int main(int argc, char **argv)
                 json_object_to_json_string_ext(filobj,
                    JSON_C_TO_STRING_NO_EXTARR_VALS|JSON_C_TO_STRING_SPACED));
 	    printf("filobj=%s, nbytes=%d\n", json_object_to_json_string(filobj),
-                json_object_object_nbytes(filobj));
+                json_object_object_nbytes(filobj,0));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_path_get_int(filobj, "steve/cameron/b"),
                 json_object_path_get_int(filobj, "abc"));

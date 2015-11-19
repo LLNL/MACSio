@@ -39,7 +39,7 @@ host_triplet = @host@
 DIST_COMMON = README $(am__configure_deps) $(libjson_cinclude_HEADERS) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.am.inc \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(srcdir)/json-c-uninstalled.pc.in $(srcdir)/json-c.pc.in \
+	$(srcdir)/json-cwx-uninstalled.pc.in $(srcdir)/json-cwx.pc.in \
 	$(srcdir)/json_config.h.in $(top_srcdir)/configure AUTHORS \
 	COPYING ChangeLog INSTALL NEWS compile config.guess config.sub \
 	depcomp install-sh ltmain.sh missing
@@ -52,7 +52,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h json_config.h
-CONFIG_CLEAN_FILES = json-c.pc json-c-uninstalled.pc
+CONFIG_CLEAN_FILES = json-cwx.pc json-cwx-uninstalled.pc
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -79,7 +79,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" \
 	"$(DESTDIR)$(libjson_cincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libjson_c_la_LIBADD =
-am_libjson_c_la_OBJECTS = arraylist.lo debug.lo json_c_version.lo \
+am_libjson_c_la_OBJECTS = arraylist.lo debug.lo json_crc.lo json_c_version.lo \
 	json_object.lo json_object_iterator.lo json_tokener.lo \
 	json_util.lo linkhash.lo printbuf.lo random_seed.lo
 libjson_c_la_OBJECTS = $(am_libjson_c_la_OBJECTS)
@@ -266,12 +266,12 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = -Wall -Wno-error=deprecated-declarations -Wextra -Wwrite-strings -Wno-unused-parameter -std=gnu99 -D_GNU_SOURCE -D_REENTRANT
-EXTRA_DIST = README.html README-WIN32.html config.h.win32 doc json-c.vcproj
+EXTRA_DIST = README.html README-WIN32.html config.h.win32 doc json-cwx.vcproj
 SUBDIRS = . tests
-lib_LTLIBRARIES = libjson-c.la 
+lib_LTLIBRARIES = libjson-cwx.la 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = json-c.pc
-libjson_cincludedir = $(includedir)/json-c
+pkgconfig_DATA = json-cwx.pc
+libjson_cincludedir = $(includedir)/json-cwx
 libjson_cinclude_HEADERS = \
 	arraylist.h \
 	bits.h \
@@ -279,6 +279,7 @@ libjson_cinclude_HEADERS = \
 	json.h \
 	json_config.h \
 	json_c_version.h \
+        json_crc.h \
 	json_inttypes.h \
 	json_object.h \
 	json_object_iterator.h \
@@ -290,7 +291,7 @@ libjson_cinclude_HEADERS = \
 	random_seed.h
 
 
-#libjsonx_includedir = $(libdir)/json-c-@VERSION@
+#libjsonx_includedir = $(libdir)/json-cwx-@VERSION@
 #
 #libjsonx_include_HEADERS = \
 #	json_config.h
@@ -299,6 +300,7 @@ libjson_c_la_SOURCES = \
 	arraylist.c \
 	debug.c \
 	json_c_version.c \
+        json_crc.c \
 	json_object.c \
 	json_object_iterator.c \
 	json_tokener.c \
@@ -374,9 +376,9 @@ stamp-h2: $(srcdir)/json_config.h.in $(top_builddir)/config.status
 
 distclean-hdr:
 	-rm -f config.h stamp-h1 json_config.h stamp-h2
-json-c.pc: $(top_builddir)/config.status $(srcdir)/json-c.pc.in
+json-cwx.pc: $(top_builddir)/config.status $(srcdir)/json-cwx.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-json-c-uninstalled.pc: $(top_builddir)/config.status $(srcdir)/json-c-uninstalled.pc.in
+json-cwx-uninstalled.pc: $(top_builddir)/config.status $(srcdir)/json-cwx-uninstalled.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -409,7 +411,7 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libjson-c.la: $(libjson_c_la_OBJECTS) $(libjson_c_la_DEPENDENCIES) 
+libjson-cwx.la: $(libjson_c_la_OBJECTS) $(libjson_c_la_DEPENDENCIES) 
 	$(libjson_c_la_LINK) -rpath $(libdir) $(libjson_c_la_OBJECTS) $(libjson_c_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
@@ -421,6 +423,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/arraylist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json_c_version.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json_crc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json_object.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json_object_iterator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json_tokener.Plo@am__quote@
@@ -954,18 +957,18 @@ maintainer-clean-local:
 	-rm -rf configure
 
 uninstall-local:
-	rm -rf "$(DESTDIR)@includedir@/json-c"
+	rm -rf "$(DESTDIR)@includedir@/json-cwx"
 	rm -f "$(DESTDIR)@includedir@/json"
 
 Android.mk: Makefile.am
-	androgenizer -:PROJECT json-c \
-		-:SHARED libjson-c \
+	androgenizer -:PROJECT json-cwx \
+		-:SHARED libjson-cwx \
 		-:TAGS eng debug \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
 		-:SOURCES $(libjson_c_la_SOURCES) $(nodist_libjson_c_la_SOURCES) \
 		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_c_la_CFLAGS) \
 		-:LDFLAGS $(libjson_c_la_LDFLAGS) $(libjson_c_la_LIBADD) \
-		-:HEADER_TARGET json-c \
+		-:HEADER_TARGET json-cwx \
 		-:HEADERS $(libjson_cinclude_HEADERS) \
 		-:PASSTHROUGH LOCAL_ARM_MODE:=arm \
 	> $@
