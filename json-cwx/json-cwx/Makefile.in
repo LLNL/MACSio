@@ -36,13 +36,14 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-DIST_COMMON = README $(am__configure_deps) $(libjson_cinclude_HEADERS) \
-	$(srcdir)/Makefile.am $(srcdir)/Makefile.am.inc \
-	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(srcdir)/json-cwx-uninstalled.pc.in $(srcdir)/json-cwx.pc.in \
-	$(srcdir)/json_config.h.in $(top_srcdir)/configure AUTHORS \
-	COPYING ChangeLog INSTALL NEWS compile config.guess config.sub \
-	depcomp install-sh ltmain.sh missing
+DIST_COMMON = README $(am__configure_deps) \
+	$(libjson_cwxinclude_HEADERS) $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.am.inc $(srcdir)/Makefile.in \
+	$(srcdir)/config.h.in $(srcdir)/json-cwx-uninstalled.pc.in \
+	$(srcdir)/json-cwx.pc.in $(srcdir)/json_config.h.in \
+	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
+	compile config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -76,16 +77,17 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" \
-	"$(DESTDIR)$(libjson_cincludedir)"
+	"$(DESTDIR)$(libjson_cwxincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
-libjson_c_la_LIBADD =
-am_libjson_c_la_OBJECTS = arraylist.lo debug.lo json_crc.lo json_c_version.lo \
-	json_object.lo json_object_iterator.lo json_tokener.lo \
-	json_util.lo linkhash.lo printbuf.lo random_seed.lo
-libjson_c_la_OBJECTS = $(am_libjson_c_la_OBJECTS)
-libjson_c_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+libjson_cwx_la_LIBADD =
+am_libjson_cwx_la_OBJECTS = arraylist.lo debug.lo json_c_version.lo \
+	json_crc.lo json_object.lo json_object_iterator.lo \
+	json_tokener.lo json_util.lo linkhash.lo printbuf.lo \
+	random_seed.lo
+libjson_cwx_la_OBJECTS = $(am_libjson_cwx_la_OBJECTS)
+libjson_cwx_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(libjson_c_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(libjson_cwx_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -99,8 +101,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libjson_c_la_SOURCES)
-DIST_SOURCES = $(libjson_c_la_SOURCES)
+SOURCES = $(libjson_cwx_la_SOURCES)
+DIST_SOURCES = $(libjson_cwx_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -109,7 +111,7 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
 DATA = $(pkgconfig_DATA)
-HEADERS = $(libjson_cinclude_HEADERS)
+HEADERS = $(libjson_cwxinclude_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -271,8 +273,8 @@ SUBDIRS = . tests
 lib_LTLIBRARIES = libjson-cwx.la 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = json-cwx.pc
-libjson_cincludedir = $(includedir)/json-cwx
-libjson_cinclude_HEADERS = \
+libjson_cwxincludedir = $(includedir)/json-cwx
+libjson_cwxinclude_HEADERS = \
 	arraylist.h \
 	bits.h \
 	debug.h \
@@ -295,8 +297,8 @@ libjson_cinclude_HEADERS = \
 #
 #libjsonx_include_HEADERS = \
 #	json_config.h
-libjson_c_la_LDFLAGS = -version-info 2:1:0 -no-undefined @JSON_BSYMBOLIC_LDFLAGS@
-libjson_c_la_SOURCES = \
+libjson_cwx_la_LDFLAGS = -version-info 2:1:0 -no-undefined @JSON_BSYMBOLIC_LDFLAGS@
+libjson_cwx_la_SOURCES = \
 	arraylist.c \
 	debug.c \
 	json_c_version.c \
@@ -411,8 +413,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libjson-cwx.la: $(libjson_c_la_OBJECTS) $(libjson_c_la_DEPENDENCIES) 
-	$(libjson_c_la_LINK) -rpath $(libdir) $(libjson_c_la_OBJECTS) $(libjson_c_la_LIBADD) $(LIBS)
+libjson-cwx.la: $(libjson_cwx_la_OBJECTS) $(libjson_cwx_la_DEPENDENCIES) 
+	$(libjson_cwx_la_LINK) -rpath $(libdir) $(libjson_cwx_la_OBJECTS) $(libjson_cwx_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -481,26 +483,26 @@ uninstall-pkgconfigDATA:
 	test -n "$$files" || exit 0; \
 	echo " ( cd '$(DESTDIR)$(pkgconfigdir)' && rm -f" $$files ")"; \
 	cd "$(DESTDIR)$(pkgconfigdir)" && rm -f $$files
-install-libjson_cincludeHEADERS: $(libjson_cinclude_HEADERS)
+install-libjson_cwxincludeHEADERS: $(libjson_cwxinclude_HEADERS)
 	@$(NORMAL_INSTALL)
-	test -z "$(libjson_cincludedir)" || $(MKDIR_P) "$(DESTDIR)$(libjson_cincludedir)"
-	@list='$(libjson_cinclude_HEADERS)'; test -n "$(libjson_cincludedir)" || list=; \
+	test -z "$(libjson_cwxincludedir)" || $(MKDIR_P) "$(DESTDIR)$(libjson_cwxincludedir)"
+	@list='$(libjson_cwxinclude_HEADERS)'; test -n "$(libjson_cwxincludedir)" || list=; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(libjson_cincludedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(libjson_cincludedir)" || exit $$?; \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(libjson_cwxincludedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(libjson_cwxincludedir)" || exit $$?; \
 	done
 
-uninstall-libjson_cincludeHEADERS:
+uninstall-libjson_cwxincludeHEADERS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(libjson_cinclude_HEADERS)'; test -n "$(libjson_cincludedir)" || list=; \
+	@list='$(libjson_cwxinclude_HEADERS)'; test -n "$(libjson_cwxincludedir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(libjson_cincludedir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(libjson_cincludedir)" && rm -f $$files
+	echo " ( cd '$(DESTDIR)$(libjson_cwxincludedir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(libjson_cwxincludedir)" && rm -f $$files
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -818,7 +820,7 @@ all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS) config.h \
 		json_config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(libjson_cincludedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(libjson_cwxincludedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -870,7 +872,8 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-libjson_cincludeHEADERS install-pkgconfigDATA
+install-data-am: install-libjson_cwxincludeHEADERS \
+	install-pkgconfigDATA
 
 install-dvi: install-dvi-recursive
 
@@ -920,7 +923,7 @@ ps: ps-recursive
 ps-am:
 
 uninstall-am: uninstall-libLTLIBRARIES \
-	uninstall-libjson_cincludeHEADERS uninstall-local \
+	uninstall-libjson_cwxincludeHEADERS uninstall-local \
 	uninstall-pkgconfigDATA
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all \
@@ -937,14 +940,14 @@ uninstall-am: uninstall-libLTLIBRARIES \
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am \
-	install-libLTLIBRARIES install-libjson_cincludeHEADERS \
+	install-libLTLIBRARIES install-libjson_cwxincludeHEADERS \
 	install-man install-pdf install-pdf-am install-pkgconfigDATA \
 	install-ps install-ps-am install-strip installcheck \
 	installcheck-am installdirs installdirs-am maintainer-clean \
 	maintainer-clean-generic maintainer-clean-local mostlyclean \
 	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
 	pdf pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
-	uninstall-libLTLIBRARIES uninstall-libjson_cincludeHEADERS \
+	uninstall-libLTLIBRARIES uninstall-libjson_cwxincludeHEADERS \
 	uninstall-local uninstall-pkgconfigDATA
 
 
@@ -965,11 +968,11 @@ Android.mk: Makefile.am
 		-:SHARED libjson-cwx \
 		-:TAGS eng debug \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
-		-:SOURCES $(libjson_c_la_SOURCES) $(nodist_libjson_c_la_SOURCES) \
-		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_c_la_CFLAGS) \
-		-:LDFLAGS $(libjson_c_la_LDFLAGS) $(libjson_c_la_LIBADD) \
+		-:SOURCES $(libjson_cwx_la_SOURCES) $(nodist_libjson_cwx_la_SOURCES) \
+		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_cwx_la_CFLAGS) \
+		-:LDFLAGS $(libjson_cwx_la_LDFLAGS) $(libjson_cwx_la_LIBADD) \
 		-:HEADER_TARGET json-cwx \
-		-:HEADERS $(libjson_cinclude_HEADERS) \
+		-:HEADERS $(libjson_cwxinclude_HEADERS) \
 		-:PASSTHROUGH LOCAL_ARM_MODE:=arm \
 	> $@
 

@@ -8,8 +8,8 @@ lib_LTLIBRARIES = libjson-cwx.la
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = json-cwx.pc
 
-libjson_cincludedir = $(includedir)/json-cwx
-libjson_cinclude_HEADERS = \
+libjson_cwxincludedir = $(includedir)/json-cwx
+libjson_cwxinclude_HEADERS = \
 	arraylist.h \
 	bits.h \
 	debug.h \
@@ -32,9 +32,9 @@ libjson_cinclude_HEADERS = \
 #libjsonx_include_HEADERS = \
 #	json_config.h
 
-libjson_c_la_LDFLAGS = -version-info 2:1:0 -no-undefined @JSON_BSYMBOLIC_LDFLAGS@
+libjson_cwx_la_LDFLAGS = -version-info 2:1:0 -no-undefined @JSON_BSYMBOLIC_LDFLAGS@
 
-libjson_c_la_SOURCES = \
+libjson_cwx_la_SOURCES = \
 	arraylist.c \
 	debug.c \
 	json_c_version.c \
@@ -67,10 +67,10 @@ Android.mk: Makefile.am
 		-:SHARED libjson-cwx \
 		-:TAGS eng debug \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
-		-:SOURCES $(libjson_c_la_SOURCES) $(nodist_libjson_c_la_SOURCES) \
-		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_c_la_CFLAGS) \
-		-:LDFLAGS $(libjson_c_la_LDFLAGS) $(libjson_c_la_LIBADD) \
+		-:SOURCES $(libjson_cwx_la_SOURCES) $(nodist_libjson_cwx_la_SOURCES) \
+		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_cwx_la_CFLAGS) \
+		-:LDFLAGS $(libjson_cwx_la_LDFLAGS) $(libjson_cwx_la_LIBADD) \
 		-:HEADER_TARGET json-cwx \
-		-:HEADERS $(libjson_cinclude_HEADERS) \
+		-:HEADERS $(libjson_cwxinclude_HEADERS) \
 		-:PASSTHROUGH LOCAL_ARM_MODE:=arm \
 	> $@
