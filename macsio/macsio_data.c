@@ -24,7 +24,7 @@ this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#include <json-c/json.h>
+#include <json-cwx/json.h>
 
 #include <macsio_data.h>
 #include <macsio_utils.h>
@@ -285,9 +285,17 @@ make_random_object_recurse(int nthings, int depth)
 }
 
 json_object *
-MACSIO_DATA_MakeRandomObject(int nthings)
+MACSIO_DATA_MakeRandomObject(int nbytes)
 {
-    return make_random_object_recurse(nthings, 0);
+    json_object *first_attempt = make_random_object_recurse(nbytes, 0);
+    /*nbytes = first_attempt->*/
+}
+
+json_object *
+MACSIO_DATA_MakeRandomTable(int nbytes)
+{
+    int divisor = random() % 10 + 1;
+    int nbytes_per_entry = random() % (nbytes / divisor) + 4;
 }
 
 #warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS

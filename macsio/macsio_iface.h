@@ -27,7 +27,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
 #warning ELIMINATE USE OF JSON HEADER FILE HERE
-#include <json-c/json.h>
+#include <json-cwx/json.h>
 
 #define MACSIO_IFACE_MAX_COUNT 128
 #define MACSIO_IFACE_MAX_NAME 64

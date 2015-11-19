@@ -27,7 +27,7 @@
 extern "C" {
 #endif
 
-/** \addtogroup jsonclib JSON-C Library
+/** \addtogroup jsonclib JSON-CWX Library
   @{ */
 
 #define JSON_OBJECT_DEF_HASH_ENTRIES 16
@@ -658,7 +658,7 @@ extern struct json_object* json_object_new_enum(void);
 extern void                json_object_enum_add(struct json_object* jso, char const *name,
                                int64_t val, json_bool selected);
 extern int                 json_object_enum_length(struct json_object* jso);
-extern int                 json_object_enum_nbytes(struct json_object* jso);
+extern int64_t             json_object_enum_nbytes(struct json_object* jso);
 extern char const *        json_object_enum_get_idx_name(struct json_object* jso, int idx);
 extern int64_t             json_object_enum_get_idx_val(struct json_object* jso, int idx);
 extern char const *        json_object_enum_get_name(struct json_object* jso, int64_t val);
@@ -675,6 +675,7 @@ extern struct json_object*   json_object_new_extarr(void const *data, enum json_
 extern struct json_object*   json_object_new_extarr_alloc(enum json_extarr_type etype,
                                  int ndims, int const *dims);
 extern enum json_extarr_type json_object_extarr_type(struct json_object* jso);
+extern int64_t               json_object_extarr_crc(struct json_object* jso);
 extern int                   json_object_extarr_nvals(struct json_object* jso);
 extern int                   json_object_extarr_valsize(struct json_object* jso);
 extern int64_t               json_object_extarr_nbytes(struct json_object* jso);
@@ -708,7 +709,7 @@ extern struct json_object * json_object_apath_get_object(struct json_object *src
 extern struct json_object * json_object_apath_find_object(struct json_object *src, char const *key_path);
 extern char const *         json_paste_apath(char const *va_args_str, char const *first, ...);
 
-/** \addtogroup jsonclib JSON-C Library
+/** \addtogroup jsonclib JSON-CWX Library
   @{ */
 
 /** \addtogroup objquery Object Introspection and Query
@@ -791,9 +792,9 @@ extern json_bool json_object_path_set_int64(struct json_object *obj, char const 
 extern json_bool json_object_path_set_double(struct json_object *obj, char const *key_path, double val);
 extern json_bool json_object_path_set_string(struct json_object *obj, char const *key_path, char const *val);
 
-extern int64_t json_object_object_nbytes(struct json_object *const obj);
+extern int64_t json_object_object_nbytes(struct json_object *const obj, json_bool mode);
 
-/**@} JSON-C Library */
+/**@} JSON-CWX Library */
 
 #ifdef __cplusplus
 }

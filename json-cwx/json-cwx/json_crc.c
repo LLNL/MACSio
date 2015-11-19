@@ -15,16 +15,15 @@
  * expressed or implied by its publication or distribution.
  **********************************************************************/
  
-#include "crc.h"
-
+#include "json_crc.h"
 
 /*
  * Derive parameters from the standard-specific parameters in crc.h.
  */
-#define WIDTH    (8 * sizeof(crc))
+#define WIDTH    (8 * sizeof(json_crc))
 #define TOPBIT   (1 << (WIDTH - 1))
 
-#if (JSON_C_REFLECT_DATA == TRUE)
+#if (JSON_C_REFLECT_DATA == JSON_C_TRUE)
 #undef  JSON_C_REFLECT_DATA
 #define JSON_C_REFLECT_DATA(X)			((unsigned char) reflect((X), 8))
 #else
@@ -32,9 +31,9 @@
 #define JSON_C_REFLECT_DATA(X)			(X)
 #endif
 
-#if (JSON_C_REFLECT_REMAINDER == TRUE)
+#if (JSON_C_REFLECT_REMAINDER == JSON_C_TRUE)
 #undef  JSON_C_REFLECT_REMAINDER
-#define JSON_C_REFLECT_REMAINDER(X)	((crc) reflect((X), WIDTH))
+#define JSON_C_REFLECT_REMAINDER(X)	((json_crc) reflect((X), WIDTH))
 #else
 #undef  JSON_C_REFLECT_REMAINDER
 #define JSON_C_REFLECT_REMAINDER(X)	(X)
@@ -53,10 +52,10 @@
  * Returns:	The reflection of the original data.
  *
  *********************************************************************/
-static unsigned long
-reflect(unsigned long data, unsigned char nBits)
+static unsigned
+reflect(unsigned data, unsigned char nBits)
 {
-	unsigned long  reflection = 0x00000000;
+	unsigned reflection = 0x00000000;
 	unsigned char  bit;
 
 	/*
@@ -97,7 +96,7 @@ json_crc  crcTable[256];
  *
  *********************************************************************/
 void
-crcInit(void)
+json_crcInit(void)
 {
     json_crc	  remainder;
     int		  dividend;
@@ -122,7 +121,7 @@ crcInit(void)
             /*
              * Try to divide the current data bit.
              */			
-            if (remainder & JSON_C_TOPBIT)
+            if (remainder & TOPBIT)
             {
                 remainder = (remainder << 1) ^ JSON_C_POLYNOMIAL;
             }
@@ -153,12 +152,18 @@ crcInit(void)
  *
  *********************************************************************/
 json_crc
-crcFast(unsigned char const message[], int nBytes)
+json_crcFast(unsigned char const message[], int nBytes)
 {
     json_crc	  remainder = JSON_C_INITIAL_REMAINDER;
     unsigned char data;
     int           byte;
+    static int first = 1;
 
+    if (first)
+    {
+        first = 0;
+        json_crcInit();
+    }
 
     /*
      * Divide the message by the polynomial, a byte at a time.
@@ -166,7 +171,7 @@ crcFast(unsigned char const message[], int nBytes)
     for (byte = 0; byte < nBytes; ++byte)
     {
         data = JSON_C_REFLECT_DATA(message[byte]) ^ (remainder >> (WIDTH - 8));
-  		remainder = crcTable[data] ^ (remainder << 8);
+        remainder = crcTable[data] ^ (remainder << 8);
     }
 
     /*

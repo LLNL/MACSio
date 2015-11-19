@@ -7,5 +7,5 @@ Name: json
 Description: JSON implementation in C
 Version: @VERSION@
 Requires:
-Libs:  -L@abs_top_builddir@ -ljson-c
+Libs:  -L@abs_top_builddir@ -ljson-cwx
 Cflags: -I@abs_top_srcdir@

@@ -3,9 +3,9 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: json-c
+Name: json-cwx
 Description: JSON implementation in C
 Version: @VERSION@
 Requires: 
-Libs:  -L${libdir} -ljson-c
-Cflags: -I${includedir}/json-c
+Libs:  -L${libdir} -ljson-cwx
+Cflags: -I${includedir}/json-cwx

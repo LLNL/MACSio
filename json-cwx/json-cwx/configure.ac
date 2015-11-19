@@ -1,7 +1,7 @@
 AC_PREREQ(2.52)
 
 # Process this file with autoconf to produce a configure script.
-AC_INIT([json-c], 0.12, [json-c@googlegroups.com])
+AC_INIT([json-cwx], 0.12, [miller86@llnl.gov])
 
 AM_INIT_AUTOMAKE
 
@@ -56,7 +56,7 @@ AC_LANG_PUSH([C])
 AC_MSG_CHECKING([if .gnu.warning accepts long strings])
 AC_LINK_IFELSE([AC_LANG_SOURCE([[
 extern void json_object_get();
-__asm__(".section .gnu.json_object_get,\n\t.ascii \"Please link against libjson-c instead of libjson\"\n\t.text");
+__asm__(".section .gnu.json_object_get,\n\t.ascii \"Please link against libjson-cwx instead of libjson\"\n\t.text");
 
 int main(int c,char* v) {return 0;}
 ]])], [
@@ -98,9 +98,9 @@ AC_SUBST(JSON_BSYMBOLIC_LDFLAGS)
 
 AC_CONFIG_FILES([
 Makefile
-json-c.pc
+json-cwx.pc
 tests/Makefile
-json-c-uninstalled.pc
+json-cwx-uninstalled.pc
 ])
 
 AC_OUTPUT

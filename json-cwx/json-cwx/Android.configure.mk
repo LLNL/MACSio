@@ -9,8 +9,8 @@ JSON_C_BUILT_SOURCES := Android.mk
 
 JSON_C_BUILT_SOURCES := $(patsubst %, $(abspath $(json_c_TOP))/%, $(JSON_C_BUILT_SOURCES))
 
-.PHONY: json-c-configure json-c-configure-real
-json-c-configure-real:
+.PHONY: json-cwx-configure json-cwx-configure-real
+json-cwx-configure-real:
 	echo $(JSON_C_BUILT_SOURCES)
 	cd $(json_c_TOP) ; \
 	$(abspath $(json_c_TOP))/autogen.sh && \
@@ -32,8 +32,8 @@ json-c-configure-real:
 		make -C $$(dirname $$file) $$(basename $$file) ; \
 	done
 
-json-c-configure: json-c-configure-real
+json-cwx-configure: json-cwx-configure-real
 
-PA_CONFIGURE_TARGETS += json-c-configure
+PA_CONFIGURE_TARGETS += json-cwx-configure
 
 -include $(json_c_TOP)/Android.mk

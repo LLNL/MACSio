@@ -250,7 +250,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = -Wall -Wno-error=deprecated-declarations -Wextra -Wwrite-strings -Wno-unused-parameter -std=gnu99 -D_GNU_SOURCE -D_REENTRANT
 LDADD = $(LIBJSON_LA)
-LIBJSON_LA = $(top_builddir)/libjson-c.la
+LIBJSON_LA = $(top_builddir)/libjson-cwx.la
 TESTS = test1.test test2.test test4.test testReplaceExisting.test \
 	test_parse_int64.test test_null.test test_cast.test \
 	test_parse.test test_locale.test test_charcase.test \

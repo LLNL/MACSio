@@ -1,14 +1,14 @@
 include Makefile.am.inc
 
-EXTRA_DIST = README.html README-WIN32.html config.h.win32 doc json-c.vcproj
+EXTRA_DIST = README.html README-WIN32.html config.h.win32 doc json-cwx.vcproj
 SUBDIRS = . tests
 
-lib_LTLIBRARIES = libjson-c.la 
+lib_LTLIBRARIES = libjson-cwx.la 
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = json-c.pc
+pkgconfig_DATA = json-cwx.pc
 
-libjson_cincludedir = $(includedir)/json-c
+libjson_cincludedir = $(includedir)/json-cwx
 libjson_cinclude_HEADERS = \
 	arraylist.h \
 	bits.h \
@@ -16,6 +16,7 @@ libjson_cinclude_HEADERS = \
 	json.h \
 	json_config.h \
 	json_c_version.h \
+        json_crc.h \
 	json_inttypes.h \
 	json_object.h \
 	json_object_iterator.h \
@@ -26,7 +27,7 @@ libjson_cinclude_HEADERS = \
 	printbuf.h \
 	random_seed.h
 
-#libjsonx_includedir = $(libdir)/json-c-@VERSION@
+#libjsonx_includedir = $(libdir)/json-cwx-@VERSION@
 #
 #libjsonx_include_HEADERS = \
 #	json_config.h
@@ -37,6 +38,7 @@ libjson_c_la_SOURCES = \
 	arraylist.c \
 	debug.c \
 	json_c_version.c \
+        json_crc.c \
 	json_object.c \
 	json_object_iterator.c \
 	json_tokener.c \
@@ -55,20 +57,20 @@ maintainer-clean-local:
 	-rm -rf configure
 
 uninstall-local:
-	rm -rf "$(DESTDIR)@includedir@/json-c"
+	rm -rf "$(DESTDIR)@includedir@/json-cwx"
 	rm -f "$(DESTDIR)@includedir@/json"
 
 ANDROID_CFLAGS = -I$(top_srcdir) -DHAVE_CONFIG_H
 
 Android.mk: Makefile.am
-	androgenizer -:PROJECT json-c \
-		-:SHARED libjson-c \
+	androgenizer -:PROJECT json-cwx \
+		-:SHARED libjson-cwx \
 		-:TAGS eng debug \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
 		-:SOURCES $(libjson_c_la_SOURCES) $(nodist_libjson_c_la_SOURCES) \
 		-:CFLAGS $(DEFS) $(ANDROID_CFLAGS) $(libjson_c_la_CFLAGS) \
 		-:LDFLAGS $(libjson_c_la_LDFLAGS) $(libjson_c_la_LIBADD) \
-		-:HEADER_TARGET json-c \
+		-:HEADER_TARGET json-cwx \
 		-:HEADERS $(libjson_cinclude_HEADERS) \
 		-:PASSTHROUGH LOCAL_ARM_MODE:=arm \
 	> $@
