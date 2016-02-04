@@ -493,12 +493,18 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     int numChunks = JsonGetInt(main_obj, "problem/global/TotalParts");
     char **blockNames = (char **) malloc(numChunks * sizeof(char*));
     int *blockTypes = (int *) malloc(numChunks * sizeof(int));
-    int blockType;
+    int mblockType, vblockType;
 
     if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "rectilinear"))
-        blockType = DB_QUADMESH;
+    {
+        mblockType = DB_QUADMESH;
+        vblockType = DB_QUADVAR;
+    }
     else if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "ucdzoo"))
-        blockType = DB_UCDMESH;
+    {
+        mblockType = DB_UCDMESH;
+        vblockType = DB_UCDVAR;
+    }
 
     /* Go to root directory in the silo file */
     DBSetDir(siloFile, "/");
@@ -523,7 +529,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
                 JsonGetStr(main_obj, "clargs/fileext"),
                 i);
         }
-        blockTypes[i] = blockType ;
+        blockTypes[i] = mblockType ;
     }
 
     /* Write the multi-block objects */
@@ -555,7 +561,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
                     i,
                     JsonGetStr(vars_array, "", j, "name"));
             }
-            blockTypes[i] = DB_QUADVAR;
+            blockTypes[i] = vblockType;
         }
 
         /* Write the multi-block objects */
