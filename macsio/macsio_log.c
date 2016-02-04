@@ -227,6 +227,7 @@ MACSIO_LOG_LogMsg(
     if (is_stderr)
     {
         write(log->logfile, buf, sizeof(char) * strlen(buf));
+        fflush(stderr); /* can never be sure stderr is UNbuffered */
     }
     else
     {

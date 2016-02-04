@@ -654,6 +654,11 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 #warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
             /* do the dump */
             (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+#ifdef HAVE_MPI
+            mpi_errno = 0;
+#endif
+            errno = 0;
+ 
 
             dt = MT_StopTimer(heavy_dump_tid);
 
