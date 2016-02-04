@@ -350,7 +350,7 @@ static void CloseSiloFile(void *file, void *userData)
         DBClose(siloFile);
 }
 
-static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
+static void write_quad_mesh_part(DBfile *dbfile, json_object *part, int silo_mesh_type)
 {
     json_object *coordobj;
     char const *coordnames[] = {"X","Y","Z"};
@@ -359,13 +359,20 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     int dims[3] = {1,1,1};
     int dimsz[3] = {1,1,1};
 
-    coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
+#warning SHOULD REALLY MAKE COORD MEMBER NAMES FOR ALL CASES INSTEAD OF XAXISCOORDS AND XCOORDS
+    if (silo_mesh_type == DB_COLLINEAR)	
+        coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
+    else
+        coordobj = JsonGetObj(part, "Mesh/Coords/XCoords");
     coords[0] = json_object_extarr_data(coordobj);
     dims[0] = JsonGetInt(part, "Mesh/LogDims", 0);
     dimsz[0] = dims[0]-1;
     if (ndims > 1)
     {
-        coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
+        if (silo_mesh_type == DB_COLLINEAR)	
+            coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
+        else
+            coordobj = JsonGetObj(part, "Mesh/Coords/YCoords");
         coords[1] = json_object_extarr_data(coordobj);
         dims[1] = JsonGetInt(part, "Mesh/LogDims", 1);
         dimsz[1] = dims[1]-1;
@@ -373,14 +380,17 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     }
     if (ndims > 2)
     {
-        coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
+        if (silo_mesh_type == DB_COLLINEAR)	
+            coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
+        else
+            coordobj = JsonGetObj(part, "Mesh/Coords/ZCoords");
         coords[2] = json_object_extarr_data(coordobj);
         dims[2] = JsonGetInt(part, "Mesh/LogDims", 2);
         dimsz[2] = dims[2]-1;
     }
 
     DBPutQuadmesh(dbfile, "mesh", (char**) coordnames, coords,
-        dims, ndims, DB_DOUBLE, DB_COLLINEAR, 0);
+        dims, ndims, DB_DOUBLE, silo_mesh_type, 0);
 
     json_object *vars_array = JsonGetObj(part, "Vars");
     for (int i = 0; i < json_object_array_length(vars_array); i++)
@@ -480,8 +490,10 @@ static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part)
 static void write_mesh_part(DBfile *dbfile, json_object *part)
 {
     if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "rectilinear"))
-        write_rect_mesh_part(dbfile, part);
-    if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
+        write_quad_mesh_part(dbfile, part, DB_COLLINEAR);
+    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "curvilinear"))
+        write_quad_mesh_part(dbfile, part, DB_NONCOLLINEAR);
+    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
         write_ucdzoo_mesh_part(dbfile, part);
 }
 
@@ -496,6 +508,11 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     int mblockType, vblockType;
 
     if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "rectilinear"))
+    {
+        mblockType = DB_QUADMESH;
+        vblockType = DB_QUADVAR;
+    }
+    else if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "curvilinear"))
     {
         mblockType = DB_QUADMESH;
         vblockType = DB_QUADVAR;
