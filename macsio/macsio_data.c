@@ -528,9 +528,9 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
     }
     else if (ndims == 2)
     {
-        for (i = 0; i < nx; i++)
+        for (j = 0; j < ny; j++)
         {
-            for (j = 0; j < ny; j++)
+            for (i = 0; i < nx; i++)
             {
                 nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
                 nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx+1);
@@ -542,11 +542,11 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
     }
     else if (ndims == 3)
     {
-        for (i = 0; i < nx; i++)
+        for (k = 0; k < nz; k++)
         {
             for (j = 0; j < ny; j++)
             {
-                for (k = 0; k < nz; k++)
+                for (i = 0; i < nx; i++)
                 {
                     nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
