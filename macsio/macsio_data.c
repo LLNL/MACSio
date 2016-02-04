@@ -437,8 +437,8 @@ make_structured_mesh_topology(int ndims, int const *dims)
 
         /* For domain entity (zone i), here are the nodal offsets in
            linear address space, left node followed by right node */
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(0)));
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(1)));
+        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(0))); /* i+0 */
+        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx1(1))); /* i+1 */
 
         json_object_object_add(topology, "ElemType", json_object_new_string("Beam2"));
         json_object_object_add(topology, "Template", topo_template);
@@ -449,7 +449,7 @@ make_structured_mesh_topology(int ndims, int const *dims)
 
         /* For domain entity (zone i,j), here are the nodal offsets in
            linear address space, right-hand-rule starting from lower-left corner */
-        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(0,0,nx)));
+        json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(0,0,nx))); 
         json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(1,0,nx)));
         json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(1,1,nx)));
         json_object_array_add(topo_template, json_object_new_int(MU_SeqIdx2(0,1,nx)));
@@ -502,13 +502,16 @@ make_curv_mesh_topology(int ndims, int const *dims)
 static json_object *
 make_ucdzoo_mesh_topology(int ndims, int const *dims)
 {
-    json_object *topology = json_object_new_object();
+    /* these are #ZONES in each dimension */
+    int nx = MACSIO_UTILS_XDim(dims)-1;
+    int ny = MU_MAX(MACSIO_UTILS_YDim(dims)-1,1);
+    int nz = MU_MAX(MACSIO_UTILS_ZDim(dims)-1,1);
     int i,j,k,n=0;
-    int nx = MACSIO_UTILS_XDim(dims), ny = MU_MAX(MACSIO_UTILS_YDim(dims),1), nz = MU_MAX(MACSIO_UTILS_ZDim(dims),1);
     int ncells = nx * ny * nz;
     int cellsize = 2 * ndims;
     int *nodelist = (int *) malloc(ncells * cellsize * sizeof(int));
     int nl_dims[2] = {ncells, cellsize};
+    json_object *topology = json_object_new_object();
 
     json_object_object_add(topology, "Type", json_object_new_string("Explicit"));
     json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
@@ -529,10 +532,10 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
         {
             for (j = 0; j < ny; j++)
             {
-                nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx);
-                nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx);
-                nodelist[n++] = MU_SeqIdx2(i+1,j+1,nx);
-                nodelist[n++] = MU_SeqIdx2(i+0,j+1,nx);
+                nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
+                nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx+1);
+                nodelist[n++] = MU_SeqIdx2(i+1,j+1,nx+1);
+                nodelist[n++] = MU_SeqIdx2(i+0,j+1,nx+1);
             }
         }
         json_object_object_add(topology, "ElemType", json_object_new_string("Quad4"));
@@ -545,14 +548,14 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
             {
                 for (k = 0; k < nz; k++)
                 {
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+1,nx,ny);
-                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+1,nx,ny);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+1,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+1,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+1,nx+1,ny+1);
                 }
             }
         }
@@ -567,6 +570,7 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
 #warning WE SHOULD ENABLE ABILITY TO CHANGE TOPOLOGY WITH TIME
 
 #warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
+#warning WE NEED TO GENERALIZE THIS VAR METHOD TO ALLOW FOR NON-RECT NODE/ZONE CONFIGURATIONS
 static json_object *
 make_scalar_var(int ndims, int const *dims, double const *bounds,
     char const *centering, char const *dtype, char const *kind)
@@ -719,16 +723,19 @@ make_arb_mesh_topology(int ndims, int const *dims)
 #warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
 static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("uniform"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_uniform_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_uniform_mesh_topology(ndims, dims));
-    return mesh_chunk;
+    json_object *chunk_obj = json_object_new_object();
+    json_object *mesh_obj = json_object_new_object();
+    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("uniform"));
+    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
+    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
+    json_object_object_add(mesh_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
+    json_object_object_add(mesh_obj, "Coords", make_uniform_mesh_coords(ndims, dims, bounds));
+    json_object_object_add(mesh_obj, "Topology", make_uniform_mesh_topology(ndims, dims));
+    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
+    return chunk_obj;
 }
 
 #warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
@@ -750,38 +757,39 @@ static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims
     return chunk_obj;
 }
 
-json_object *MACSIO_DATA_BuildRectMeshChunk(int chunkId, int ndims, int const *dims, void const **coords,
-    json_extarr_type dtype)
+static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
-    
-}
-
-static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds)
-{
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("curvilinear"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_curv_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_curv_mesh_topology(ndims, dims));
-    return mesh_chunk;
+    json_object *chunk_obj = json_object_new_object();
+    json_object *mesh_obj = json_object_new_object();
+    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("curvilinear"));
+    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
+    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
+    json_object_object_add(mesh_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
+    json_object_object_add(mesh_obj, "Coords", make_curv_mesh_coords(ndims, dims, bounds));
+    json_object_object_add(mesh_obj, "Topology", make_curv_mesh_topology(ndims, dims));
+    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
+#warning ADD NVARS AND VARMAPS ARGS HERE
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
+    return chunk_obj;
 }
 
 static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
-    json_object *mesh_chunk = json_object_new_object();
-    json_object_object_add(mesh_chunk, "MeshType", json_object_new_string("ucdzoo"));
-    json_object_object_add(mesh_chunk, "ChunkID", json_object_new_int(chunkId));
-    json_object_object_add(mesh_chunk, "GeomDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "TopoDim", json_object_new_int(ndims));
-    json_object_object_add(mesh_chunk, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
-    json_object_object_add(mesh_chunk, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
-    json_object_object_add(mesh_chunk, "Coords", make_ucdzoo_mesh_coords(ndims, dims, bounds));
-    json_object_object_add(mesh_chunk, "Topology", make_ucdzoo_mesh_topology(ndims, dims));
-    return mesh_chunk;
+    json_object *chunk_obj = json_object_new_object();
+    json_object *mesh_obj = json_object_new_object();
+    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("ucdzoo"));
+    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
+    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
+    json_object_object_add(mesh_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
+    json_object_object_add(mesh_obj, "Coords", make_ucdzoo_mesh_coords(ndims, dims, bounds));
+    json_object_object_add(mesh_obj, "Topology", make_ucdzoo_mesh_topology(ndims, dims));
+    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
+    return chunk_obj;
 }
 
 /* dims are # nodes in x, y and z,
@@ -794,7 +802,7 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     else if (!strncasecmp(type, "rectilinear", sizeof("rectilinear")))
         return make_rect_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "curvilinear", sizeof("curvilinear")))
-        return 0;
+        return make_curv_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "unstructured", sizeof("unstructured")))
         return make_ucdzoo_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "arbitrary", sizeof("arbitrary")))

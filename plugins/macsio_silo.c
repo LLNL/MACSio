@@ -396,10 +396,93 @@ static void write_rect_mesh_part(DBfile *dbfile, json_object *part)
     }
 }
 
+static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part)
+{
+    json_object *coordobj, *topoobj;
+    char const *coordnames[] = {"X","Y","Z"};
+    void const *coords[3];
+    int ndims = JsonGetInt(part, "Mesh/GeomDim");
+    int nnodes = 1, nzones = 1;
+    int dims[3] = {1,1,1};
+    int dimsz[3] = {1,1,1};
+
+    coordobj = JsonGetObj(part, "Mesh/Coords/XCoords");
+    coords[0] = json_object_extarr_data(coordobj);
+    dims[0] = JsonGetInt(part, "Mesh/LogDims", 0);
+    dimsz[0] = dims[0]-1;
+    nnodes *= dims[0];
+    nzones *= dimsz[0];
+    if (ndims > 1)
+    {
+        coordobj = JsonGetObj(part, "Mesh/Coords/YCoords");
+        coords[1] = json_object_extarr_data(coordobj);
+        dims[1] = JsonGetInt(part, "Mesh/LogDims", 1);
+        dimsz[1] = dims[1]-1;
+        nnodes *= dims[1];
+        nzones *= dimsz[1];
+    }
+    if (ndims > 2)
+    {
+        coordobj = JsonGetObj(part, "Mesh/Coords/ZCoords");
+        coords[2] = json_object_extarr_data(coordobj);
+        dims[2] = JsonGetInt(part, "Mesh/LogDims", 2);
+        dimsz[2] = dims[2]-1;
+        nnodes *= dims[2];
+        nzones *= dimsz[2];
+    }
+
+    DBPutUcdmesh(dbfile, "mesh", ndims, (DBCAS_t) coordnames,
+        coords, nnodes, nzones, "zl", NULL, DB_DOUBLE, NULL);
+
+    /* Write out explicit topology */
+    {
+        json_object *topoobj = JsonGetObj(part, "Mesh/Topology");
+        json_object *nlobj = JsonGetObj(topoobj, "Nodelist");
+        int const *nodelist = (int const *) json_object_extarr_data(nlobj);
+        int lnodelist = json_object_extarr_nvals(nlobj);
+        int shapetype, shapesize, shapecnt = nzones;
+
+        if (!strcmp(JsonGetStr(topoobj, "ElemType"), "Beam2"))
+        {
+            shapesize = 2;
+            shapetype = DB_ZONETYPE_BEAM;
+        }
+        else if (!strcmp(JsonGetStr(topoobj, "ElemType"), "Quad4"))
+        {
+            shapesize = 4;
+            shapetype = DB_ZONETYPE_QUAD;
+        }
+        else if (!strcmp(JsonGetStr(topoobj, "ElemType"), "Hex8"))
+        {
+            shapesize = 8;
+            shapetype = DB_ZONETYPE_HEX;
+        }
+
+        DBPutZonelist2(dbfile, "zl", nzones, ndims, nodelist, lnodelist, 0, 0, 0,
+            &shapetype, &shapesize, &shapecnt, 1,NULL);
+    }
+
+    json_object *vars_array = JsonGetObj(part, "Vars");
+    for (int i = 0; i < json_object_array_length(vars_array); i++)
+    {
+        json_object *varobj = json_object_array_get_idx(vars_array, i);
+        int cent = strcmp(JsonGetStr(varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
+        int cnt = cent==DB_NODECENT?nnodes:nzones;
+        json_object *dataobj = JsonGetObj(varobj, "data");
+        int dtype = json_object_extarr_type(dataobj)==json_extarr_type_flt64?DB_DOUBLE:DB_INT;
+        
+        DBPutUcdvar1(dbfile, JsonGetStr(varobj, "name"), "mesh",
+            (void*)json_object_extarr_data(dataobj), cnt, NULL, 0, dtype, cent, NULL);
+
+    }
+}
+
 static void write_mesh_part(DBfile *dbfile, json_object *part)
 {
     if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "rectilinear"))
         write_rect_mesh_part(dbfile, part);
+    if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
+        write_ucdzoo_mesh_part(dbfile, part);
 }
 
 static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int dumpn, MACSIO_MIF_baton_t *bat)
@@ -410,6 +493,12 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
     int numChunks = JsonGetInt(main_obj, "problem/global/TotalParts");
     char **blockNames = (char **) malloc(numChunks * sizeof(char*));
     int *blockTypes = (int *) malloc(numChunks * sizeof(int));
+    int blockType;
+
+    if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "rectilinear"))
+        blockType = DB_QUADMESH;
+    else if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "ucdzoo"))
+        blockType = DB_UCDMESH;
 
     /* Go to root directory in the silo file */
     DBSetDir(siloFile, "/");
@@ -434,7 +523,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
                 JsonGetStr(main_obj, "clargs/fileext"),
                 i);
         }
-        blockTypes[i] = DB_QUADMESH;
+        blockTypes[i] = blockType ;
     }
 
     /* Write the multi-block objects */
