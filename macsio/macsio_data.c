@@ -720,16 +720,16 @@ make_arb_mesh_topology(int ndims, int const *dims)
                 for (i = 0; i < nx; i++)
                 {
                     /* x-perp faces */
-                    facelist[f++] =   xfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+2,ny+1);
-                    facelist[f++] = -(xfaces_offset + MU_SeqIdx3(i+1,j+0,k+0,nx+2,ny+1));
+                    facelist[f++] = ~(xfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny));
+                    facelist[f++] =  (xfaces_offset + MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny));
 
                     /* y-perp faces */
-                    facelist[f++] = -(yfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+2));
-                    facelist[f++] =   yfaces_offset + MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+2);
+                    facelist[f++] = ~(yfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx,ny+1));
+                    facelist[f++] =   yfaces_offset + MU_SeqIdx3(i+0,j+1,k+0,nx,ny+1);
 
                     /* z-perp faces */
-                    facelist[f++] =   zfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
-                    facelist[f++] = -(zfaces_offset + MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1));
+                    facelist[f++] =   zfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx,ny);
+                    facelist[f++] = ~(zfaces_offset + MU_SeqIdx3(i+0,j+0,k+1,nx,ny));
                 }
             }
         }
