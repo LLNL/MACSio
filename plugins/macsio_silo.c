@@ -489,27 +489,20 @@ static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part, char const
         json_object *nlobj = JsonGetObj(topoobj, "Nodelist");
         int const *nodelist = (int const *) json_object_extarr_data(nlobj);
         int lnodelist = json_object_extarr_nvals(nlobj);
-        int nfaces = lnodelist/(ndims==3?4:2);
-        int *nodecnt = (int *) malloc(nfaces * sizeof(int));
+        json_object *ncobj = JsonGetObj(topoobj, "NodeCounts");
+        int const *nodecnt = (int const *) json_object_extarr_data(ncobj);
+        int nfaces = json_object_extarr_nvals(ncobj);
         json_object *flobj = JsonGetObj(topoobj, "Facelist");
         int const *facelist = (int const *) json_object_extarr_data(flobj);
         int lfacelist = json_object_extarr_nvals(flobj);
-        int *facecnt = (int *) malloc(nzones * sizeof(int));
+        json_object *fcobj = JsonGetObj(topoobj, "FaceCounts");
+        int const *facecnt = (int const *) json_object_extarr_data(fcobj);
         int i;
-
-#warning THIS IS ASSUMING ALL ZONES ARE ND SIMPLEXES. WE NEED TO FIX DATA MODEL
-        for (i = 0; i < nzones; i++)
-            facecnt[i] = ndims==3?6:4;
-        for (i = 0; i < nfaces; i++)
-            nodecnt[i] = ndims==3?4:2;
 
         DBPutPHZonelist(dbfile, "phzl",
             nfaces, nodecnt, lnodelist, nodelist, NULL,
             nzones, facecnt, lfacelist, facelist,
             0, 0, nzones-1, NULL);
-
-        free(nodecnt);
-        free(facecnt);
     }
 
     json_object *vars_array = JsonGetObj(part, "Vars");

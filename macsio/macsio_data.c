@@ -580,25 +580,27 @@ static json_object *
 make_arb_mesh_topology(int ndims, int const *dims)
 {
     /* these are #ZONES (not #NODES) in each dimension */
+    int i,j,k,n,f,z;
     int nx =        MACSIO_UTILS_XDim(dims)-1;
     int ny = MU_MAX(MACSIO_UTILS_YDim(dims)-1,1);
     int nz = MU_MAX(MACSIO_UTILS_ZDim(dims)-1,1);
-    int i,j,k,n=0,f=0;
     int ncells = nx * ny * nz;
     int cellsize = 2 * ndims;
     int *facelist = (int *) malloc(ncells * cellsize * sizeof(int));
+    int *facecnts = (int *) malloc(ncells * sizeof(int));
     int fl_dims[2] = {ncells, cellsize};
 
     /* Here, we represent the facelist as a union of 3 logical arrays.
        The x-perpendicular faces, followed by the y-perp. faces
        followed by the z-perp. faces. */
-    int nxfaces = (nx+1) *       ny * nz;
-    int nyfaces =     nx * (ny + 1) * nz;
-    int nzfaces =     nx *       ny * (nz + 1);
-    int nfaces = nxfaces + (ndims>1?nyfaces:0) + (ndims>2?nzfaces:0);
     int xfaces_offset, yfaces_offset, zfaces_offset;
     int facesize = 1 << (ndims-1);
+    int nxfaces = (nx+1) *     ny * nz;
+    int nyfaces =     nx * (ny+1) * nz;
+    int nzfaces =     nx *     ny * (nz+1);
+    int nfaces = nxfaces + (ndims>1?nyfaces:0) + (ndims>2?nzfaces:0);
     int *nodelist = (int *) malloc(nfaces * facesize * sizeof(int));
+    int *nodecnts = (int *) malloc(nfaces * sizeof(int));
     int nl_dims[2] = {nfaces, facesize};
 
     json_object *topology = json_object_new_object();
@@ -612,6 +614,7 @@ make_arb_mesh_topology(int ndims, int const *dims)
     json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
     json_object_object_add(topology, "ElemType", json_object_new_string("Arbitrary"));
 
+    n = f = z = 0;
     if (ndims == 1)
     {
         /* same as ucdzoo case but no elem type */
@@ -633,32 +636,37 @@ make_arb_mesh_topology(int ndims, int const *dims)
             {
                 nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
                 nodelist[n++] = MU_SeqIdx2(i+0,j+1,nx+1);
+                nodecnts[f++] = 2;
             }
         }
 
         /* Now, y-perp faces */
-        yfaces_offset = n / 2;
+        yfaces_offset = f;
         for (j = 0; j < ny+1; j++)
         {
             for (i = 0; i < nx; i++)
             {
                 nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
                 nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx+1);
+                nodecnts[f++] = 2;
             }
         }
 
         /* Now add the zones as reference to 4 edges */
+        f = 0;
         for (j = 0; j < ny; j++)
         {
             for (i = 0; i < nx; i++)
             {
                     /* x-perp faces */
-                    facelist[f++] = xfaces_offset + MU_SeqIdx2(i+0,j+0,nx+1);
-                    facelist[f++] = xfaces_offset + MU_SeqIdx2(i+1,j+0,nx+1);
+                    facelist[z++] = xfaces_offset + MU_SeqIdx2(i+0,j+0,nx+1);
+                    facelist[z++] = xfaces_offset + MU_SeqIdx2(i+1,j+0,nx+1);
 
                     /* y-perp faces */
-                    facelist[f++] = yfaces_offset + MU_SeqIdx2(i+0,j+0,nx);
-                    facelist[f++] = yfaces_offset + MU_SeqIdx2(i+0,j+1,nx);
+                    facelist[z++] = yfaces_offset + MU_SeqIdx2(i+0,j+0,nx);
+                    facelist[z++] = yfaces_offset + MU_SeqIdx2(i+0,j+1,nx);
+
+                    facecnts[f++] = 4;
             }
         }
     }
@@ -676,12 +684,13 @@ make_arb_mesh_topology(int ndims, int const *dims)
                     nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+1,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1);
+                    nodecnts[f++] = 4;
                 }
             }
         }
 
         /* Now, y-perp faces */
-        yfaces_offset = n / 4;
+        yfaces_offset = f;
         for (k = 0; k < nz; k++)
         {
             for (j = 0; j < ny+1; j++)
@@ -692,12 +701,13 @@ make_arb_mesh_topology(int ndims, int const *dims)
                     nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+1,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1);
+                    nodecnts[f++] = 4;
                 }
             }
         }
 
         /* Now, z-perp faces */
-        zfaces_offset = n / 4;
+        zfaces_offset = f;
         for (k = 0; k < nz+1; k++)
         {
             for (j = 0; j < ny; j++)
@@ -708,11 +718,13 @@ make_arb_mesh_topology(int ndims, int const *dims)
                     nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+0,nx+1,ny+1);
                     nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+1);
+                    nodecnts[f++] = 4;
                 }
             }
         }
 
         /* Now add the zones as reference to 6 faces */
+        f = 0;
         for (k = 0; k < nz; k++)
         {
             for (j = 0; j < ny; j++)
@@ -730,14 +742,20 @@ make_arb_mesh_topology(int ndims, int const *dims)
                     /* z-perp faces */
                     facelist[f++] =   zfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx,ny);
                     facelist[f++] = ~(zfaces_offset + MU_SeqIdx3(i+0,j+0,k+1,nx,ny));
+
+                    facecnts[z++] = 6;
                 }
             }
         }
     }
 
     json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims));
+    json_object_object_add(topology, "NodeCounts", json_object_new_extarr(nodecnts, json_extarr_type_int32, 1, &nfaces));
     if (ndims > 1)
+    {
         json_object_object_add(topology, "Facelist", json_object_new_extarr(facelist, json_extarr_type_int32, 2, fl_dims));
+        json_object_object_add(topology, "FaceCounts", json_object_new_extarr(facecnts, json_extarr_type_int32, 1, &ncells));
+    }
 
     return topology;
 }
