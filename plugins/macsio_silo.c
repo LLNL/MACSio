@@ -406,7 +406,7 @@ static void write_quad_mesh_part(DBfile *dbfile, json_object *part, int silo_mes
     }
 }
 
-static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part)
+static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part, char const *topo_name)
 {
     json_object *coordobj, *topoobj;
     char const *coordnames[] = {"X","Y","Z"};
@@ -441,10 +441,22 @@ static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part)
         nzones *= dimsz[2];
     }
 
-    DBPutUcdmesh(dbfile, "mesh", ndims, (DBCAS_t) coordnames,
-        coords, nnodes, nzones, "zl", NULL, DB_DOUBLE, NULL);
+    if (ndims == 1 || !strcmp(topo_name, "ucdzoo"))
+    {
+        DBPutUcdmesh(dbfile, "mesh", ndims, (DBCAS_t) coordnames,
+            coords, nnodes, nzones, "zl", NULL, DB_DOUBLE, NULL);
+    }
+    else if (!strcmp(topo_name, "arbitrary"))
+    {
+        DBoptlist *ol = DBMakeOptlist(1);
+        DBAddOption(ol, DBOPT_PHZONELIST, (char *) "phzl");
+        DBPutUcdmesh(dbfile, "mesh", ndims, (DBCAS_t) coordnames,
+            coords, nnodes, nzones, NULL, NULL, DB_DOUBLE, ol);
+        DBFreeOptlist(ol);
+    }
 
     /* Write out explicit topology */
+    if (ndims == 1 || !strcmp(topo_name, "ucdzoo"))
     {
         json_object *topoobj = JsonGetObj(part, "Mesh/Topology");
         json_object *nlobj = JsonGetObj(topoobj, "Nodelist");
@@ -471,6 +483,34 @@ static void write_ucdzoo_mesh_part(DBfile *dbfile, json_object *part)
         DBPutZonelist2(dbfile, "zl", nzones, ndims, nodelist, lnodelist, 0, 0, 0,
             &shapetype, &shapesize, &shapecnt, 1,NULL);
     }
+    else if (!strcmp(topo_name, "arbitrary"))
+    {
+        json_object *topoobj = JsonGetObj(part, "Mesh/Topology");
+        json_object *nlobj = JsonGetObj(topoobj, "Nodelist");
+        int const *nodelist = (int const *) json_object_extarr_data(nlobj);
+        int lnodelist = json_object_extarr_nvals(nlobj);
+        int nfaces = lnodelist/(ndims==3?4:2);
+        int *nodecnt = (int *) malloc(nfaces * sizeof(int));
+        json_object *flobj = JsonGetObj(topoobj, "Facelist");
+        int const *facelist = (int const *) json_object_extarr_data(flobj);
+        int lfacelist = json_object_extarr_nvals(flobj);
+        int *facecnt = (int *) malloc(nzones * sizeof(int));
+        int i;
+
+#warning THIS IS ASSUMING ALL ZONES ARE ND SIMPLEXES. WE NEED TO FIX DATA MODEL
+        for (i = 0; i < nzones; i++)
+            facecnt[i] = ndims==3?6:4;
+        for (i = 0; i < nfaces; i++)
+            nodecnt[i] = ndims==3?4:2;
+
+        DBPutPHZonelist(dbfile, "phzl",
+            nfaces, nodecnt, lnodelist, nodelist, NULL,
+            nzones, facecnt, lfacelist, facelist,
+            0, 0, nzones-1, NULL);
+
+        free(nodecnt);
+        free(facecnt);
+    }
 
     json_object *vars_array = JsonGetObj(part, "Vars");
     for (int i = 0; i < json_object_array_length(vars_array); i++)
@@ -494,7 +534,9 @@ static void write_mesh_part(DBfile *dbfile, json_object *part)
     else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "curvilinear"))
         write_quad_mesh_part(dbfile, part, DB_NONCOLLINEAR);
     else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
-        write_ucdzoo_mesh_part(dbfile, part);
+        write_ucdzoo_mesh_part(dbfile, part, "ucdzoo");
+    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "arbitrary"))
+        write_ucdzoo_mesh_part(dbfile, part, "arbitrary");
 }
 
 static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int dumpn, MACSIO_MIF_baton_t *bat)
@@ -518,6 +560,11 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
         vblockType = DB_QUADVAR;
     }
     else if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "ucdzoo"))
+    {
+        mblockType = DB_UCDMESH;
+        vblockType = DB_UCDVAR;
+    }
+    else if (!strcmp(JsonGetStr(main_obj, "problem/parts",0,"Mesh/MeshType"), "arbitrary"))
     {
         mblockType = DB_UCDMESH;
         vblockType = DB_UCDVAR;

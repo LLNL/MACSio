@@ -358,6 +358,8 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2]));
     }
 
+#warning ADD GLOBAL IDS
+
     return coords;
 }
 
@@ -379,11 +381,12 @@ make_curv_mesh_coords(int ndims, int const *dims, double const *bounds)
         y = (double *) malloc(nx * ny * nz * sizeof(double));
     if (ndims > 2)
         z = (double *) malloc(nx * ny * nz * sizeof(double));
-    for (i = 0; i < nx; i++)
+#warning X IS VARYING SLOWEST HERE. SEEMS BACKWARDS FROM NORMAL
+    for (k = 0; k < nz; k++)
     {
         for (j = 0; j < ny; j++)
         {
-            for (k = 0; k < nz; k++)
+            for (i = 0; i < nx; i++)
             {
                 int idx = k * ny * nx  + j * nx + i;
                        x[idx] = MACSIO_UTILS_XMin(bounds) + i * dx;
@@ -502,18 +505,24 @@ make_curv_mesh_topology(int ndims, int const *dims)
 static json_object *
 make_ucdzoo_mesh_topology(int ndims, int const *dims)
 {
-    /* these are #ZONES in each dimension */
+    /* these are #ZONES (not #NODES) in each dimension */
     int nx = MACSIO_UTILS_XDim(dims)-1;
     int ny = MU_MAX(MACSIO_UTILS_YDim(dims)-1,1);
     int nz = MU_MAX(MACSIO_UTILS_ZDim(dims)-1,1);
     int i,j,k,n=0;
     int ncells = nx * ny * nz;
-    int cellsize = 2 * ndims;
+    int cellsize = 1 << ndims;
     int *nodelist = (int *) malloc(ncells * cellsize * sizeof(int));
     int nl_dims[2] = {ncells, cellsize};
     json_object *topology = json_object_new_object();
 
     json_object_object_add(topology, "Type", json_object_new_string("Explicit"));
+
+    /* Specifies the topological dimensionality of the entities in the
+       domain and range of the map (nodelist). The domain is 'over all mesh zones',
+       so the domain entities are the mesh zones and they have topological dimension
+       equal to ndims. Each zone references all its nodes which are zero-dimensional
+       entities. So, the range dimension of the map is zero. */
     json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
     json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
 
@@ -567,10 +576,177 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
     return topology;
 }
 
+static json_object *
+make_arb_mesh_topology(int ndims, int const *dims)
+{
+    /* these are #ZONES (not #NODES) in each dimension */
+    int nx =        MACSIO_UTILS_XDim(dims)-1;
+    int ny = MU_MAX(MACSIO_UTILS_YDim(dims)-1,1);
+    int nz = MU_MAX(MACSIO_UTILS_ZDim(dims)-1,1);
+    int i,j,k,n=0,f=0;
+    int ncells = nx * ny * nz;
+    int cellsize = 2 * ndims;
+    int *facelist = (int *) malloc(ncells * cellsize * sizeof(int));
+    int fl_dims[2] = {ncells, cellsize};
+
+    /* Here, we represent the facelist as a union of 3 logical arrays.
+       The x-perpendicular faces, followed by the y-perp. faces
+       followed by the z-perp. faces. */
+    int nxfaces = (nx+1) *       ny * nz;
+    int nyfaces =     nx * (ny + 1) * nz;
+    int nzfaces =     nx *       ny * (nz + 1);
+    int nfaces = nxfaces + (ndims>1?nyfaces:0) + (ndims>2?nzfaces:0);
+    int xfaces_offset, yfaces_offset, zfaces_offset;
+    int facesize = 1 << (ndims-1);
+    int *nodelist = (int *) malloc(nfaces * facesize * sizeof(int));
+    int nl_dims[2] = {nfaces, facesize};
+
+    json_object *topology = json_object_new_object();
+
+#warning WE NEED TO DOCUMENT THE MACSIO DATA MODEL
+#warning WE REALLY HAVE MULTIPLE MAPS HERE ONE FROM ZONES TO FACES AND ONE FROM FACES TO NODES
+#warning EACH MAP HAS A DOMAIN AND RANGE TYPE
+#warning WE COULD EVEN DO FULL DIMENSIONAL CASCADE TOO
+    json_object_object_add(topology, "Type", json_object_new_string("Explicit"));
+    json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
+    json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
+    json_object_object_add(topology, "ElemType", json_object_new_string("Arbitrary"));
+
+    if (ndims == 1)
+    {
+        /* same as ucdzoo case but no elem type */
+        for (i = 0; i < nx; i++) 
+        {
+            nodelist[n++] = MU_SeqIdx1(i+0);
+            nodelist[n++] = MU_SeqIdx1(i+1);
+        }
+        free(facelist);
+    }
+    else if (ndims == 2) /* here a 'face' is really an edge */
+    {
+
+        /* x-perp faces go in first */
+        xfaces_offset = 0;
+        for (j = 0; j < ny; j++)
+        {
+            for (i = 0; i < nx+1; i++)
+            {
+                nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
+                nodelist[n++] = MU_SeqIdx2(i+0,j+1,nx+1);
+            }
+        }
+
+        /* Now, y-perp faces */
+        yfaces_offset = n / 2;
+        for (j = 0; j < ny+1; j++)
+        {
+            for (i = 0; i < nx; i++)
+            {
+                nodelist[n++] = MU_SeqIdx2(i+0,j+0,nx+1);
+                nodelist[n++] = MU_SeqIdx2(i+1,j+0,nx+1);
+            }
+        }
+
+        /* Now add the zones as reference to 4 edges */
+        for (j = 0; j < ny; j++)
+        {
+            for (i = 0; i < nx; i++)
+            {
+                    /* x-perp faces */
+                    facelist[f++] = xfaces_offset + MU_SeqIdx2(i+0,j+0,nx+1);
+                    facelist[f++] = xfaces_offset + MU_SeqIdx2(i+1,j+0,nx+1);
+
+                    /* y-perp faces */
+                    facelist[f++] = yfaces_offset + MU_SeqIdx2(i+0,j+0,nx);
+                    facelist[f++] = yfaces_offset + MU_SeqIdx2(i+0,j+1,nx);
+            }
+        }
+    }
+    else if (ndims == 3)
+    {
+        /* x-perp faces go in first */
+        xfaces_offset = 0;
+        for (k = 0; k < nz; k++)
+        {
+            for (j = 0; j < ny; j++)
+            {
+                for (i = 0; i < nx+1; i++)
+                {
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+1,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1);
+                }
+            }
+        }
+
+        /* Now, y-perp faces */
+        yfaces_offset = n / 4;
+        for (k = 0; k < nz; k++)
+        {
+            for (j = 0; j < ny+1; j++)
+            {
+                for (i = 0; i < nx; i++)
+                {
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+1,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1);
+                }
+            }
+        }
+
+        /* Now, z-perp faces */
+        zfaces_offset = n / 4;
+        for (k = 0; k < nz+1; k++)
+        {
+            for (j = 0; j < ny; j++)
+            {
+                for (i = 0; i < nx; i++)
+                {
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+0,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+1,j+1,k+0,nx+1,ny+1);
+                    nodelist[n++] = MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+1);
+                }
+            }
+        }
+
+        /* Now add the zones as reference to 6 faces */
+        for (k = 0; k < nz; k++)
+        {
+            for (j = 0; j < ny; j++)
+            {
+                for (i = 0; i < nx; i++)
+                {
+                    /* x-perp faces */
+                    facelist[f++] =   xfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+2,ny+1);
+                    facelist[f++] = -(xfaces_offset + MU_SeqIdx3(i+1,j+0,k+0,nx+2,ny+1));
+
+                    /* y-perp faces */
+                    facelist[f++] = -(yfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+2));
+                    facelist[f++] =   yfaces_offset + MU_SeqIdx3(i+0,j+1,k+0,nx+1,ny+2);
+
+                    /* z-perp faces */
+                    facelist[f++] =   zfaces_offset + MU_SeqIdx3(i+0,j+0,k+0,nx+1,ny+1);
+                    facelist[f++] = -(zfaces_offset + MU_SeqIdx3(i+0,j+0,k+1,nx+1,ny+1));
+                }
+            }
+        }
+    }
+
+    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims));
+    if (ndims > 1)
+        json_object_object_add(topology, "Facelist", json_object_new_extarr(facelist, json_extarr_type_int32, 2, fl_dims));
+
+    return topology;
+}
+
 #warning WE SHOULD ENABLE ABILITY TO CHANGE TOPOLOGY WITH TIME
 
 #warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
 #warning WE NEED TO GENERALIZE THIS VAR METHOD TO ALLOW FOR NON-RECT NODE/ZONE CONFIGURATIONS
+#warning SUPPORT FACE AND EDGE CENTERINGS TOO
 static json_object *
 make_scalar_var(int ndims, int const *dims, double const *bounds,
     char const *centering, char const *dtype, char const *kind)
@@ -713,12 +889,6 @@ make_mesh_vars(int ndims, int const *dims, double const *bounds, int nvars)
     return vars_array;
 }
 
-static json_object *
-make_arb_mesh_topology(int ndims, int const *dims)
-{
-    return 0;
-}
-
 #warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
 #warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
 static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
@@ -792,6 +962,23 @@ static json_object *make_ucdzoo_mesh_chunk(int chunkId, int ndims, int const *di
     return chunk_obj;
 }
 
+static json_object *make_arb_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
+{
+    json_object *chunk_obj = json_object_new_object();
+    json_object *mesh_obj = json_object_new_object();
+    json_object_object_add(mesh_obj, "MeshType", json_object_new_string("arbitrary"));
+    json_object_object_add(mesh_obj, "ChunkID", json_object_new_int(chunkId));
+    json_object_object_add(mesh_obj, "GeomDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "TopoDim", json_object_new_int(ndims));
+    json_object_object_add(mesh_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(ndims, dims));
+    json_object_object_add(mesh_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(bounds));
+    json_object_object_add(mesh_obj, "Coords", make_arb_mesh_coords(ndims, dims, bounds));
+    json_object_object_add(mesh_obj, "Topology", make_arb_mesh_topology(ndims, dims));
+    json_object_object_add(chunk_obj, "Mesh", mesh_obj);
+    json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
+    return chunk_obj;
+}
+
 /* dims are # nodes in x, y and z,
    bounds are xmin,ymin,zmin,xmax,ymax,zmax */
 static json_object *
@@ -806,7 +993,7 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     else if (!strncasecmp(type, "unstructured", sizeof("unstructured")))
         return make_ucdzoo_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     else if (!strncasecmp(type, "arbitrary", sizeof("arbitrary")))
-        return 0;
+        return make_arb_mesh_chunk(chunkId, ndims, dims, bounds, nvars);
     return 0;
 }
 
@@ -892,6 +1079,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     {
         MACSIO_UTILS_Best3DFactors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
         MACSIO_UTILS_Best3DFactors(part_size, &nx, &ny, &nz);
+        jpart_width = 1;
         kpart_width = 1;
     }
     MACSIO_UTILS_SetDims(part_dims, nx, ny, nz);
