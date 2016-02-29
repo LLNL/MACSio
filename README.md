@@ -25,3 +25,10 @@ of customizable data objects.
 We hope MACSio helps to put the MAX in scalable I/O performance ;)
 
 The name "MACSio" is pronounced max-eee-oh.
+
+## Release
+
+MACSio is released under the terms of the GPL license. For full details
+see the [LICENSE](/LICENSE) file.
+
+LLNL-CODE-676051
