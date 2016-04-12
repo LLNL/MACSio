@@ -134,8 +134,8 @@ int main(int argc, char **argv)
           int i;
           int dims[3] = {2, 7, 3}; 
           int nvals = dims[0]*dims[1]*dims[2];
-          struct json_object *extarr = json_object_new_extarr_alloc(json_extarr_type_flt64, 3, dims);
-          float *fbuf = 0;
+          struct json_object *extarr = json_object_new_extarr_alloc(json_extarr_type_flt64, 3, dims, 0);
+          float *fbuf;
           int *ibuf;
           for (i = 0; i < nvals; i++)
           {
@@ -183,6 +183,7 @@ int main(int argc, char **argv)
           }
           printf("extarr_crc() = %lx\n", json_object_extarr_crc(extarr));
 
+          fbuf = 0; /* force json-c lib to alloc */
           json_object_extarr_data_as_float(extarr, &fbuf);
           for (i = 0; i < nvals; i++)
               printf("fbuf[%d]=%f\n",i,fbuf[i]);
@@ -201,6 +202,7 @@ int main(int argc, char **argv)
           struct json_object *parse_result = json_tokener_parse((char*)input);
           const char *unjson = json_object_get_string(parse_result);
 	  printf("parse_result=%s\n", unjson);
+          json_object_put(parse_result);
         }
 
         {
@@ -210,7 +212,7 @@ int main(int argc, char **argv)
                 json_object_to_json_string_ext(filobj,
                    JSON_C_TO_STRING_NO_EXTARR_VALS|JSON_C_TO_STRING_SPACED));
 	    printf("filobj=%s, nbytes=%d\n", json_object_to_json_string(filobj),
-                json_object_object_nbytes(filobj,0));
+                (int) json_object_object_nbytes(filobj,0));
             printf("\"steve/cameron/b\" = %d, \"abc\" = %d\n",
                 json_object_path_get_int(filobj, "steve/cameron/b"),
                 json_object_path_get_int(filobj, "abc"));
@@ -237,6 +239,8 @@ int main(int argc, char **argv)
                 json_object_apath_get_string(filobj, "array2/2"));
             printf("Finding \"cameron/a\" from root = %d\n",
                 json_object_get_int(JsonFindObj(filobj, "cameron/a")));
+            json_object_put(filobj);
+            json_object_apath_get_string(0,0); /* clear circ buffer */
         }
         {
             struct json_object *eobj = json_object_new_enum();
@@ -244,6 +248,7 @@ int main(int argc, char **argv)
             json_object_enum_add(eobj, "val276", 276, JSON_C_FALSE);
             json_object_enum_add(eobj, "val17", 17, JSON_C_TRUE);
 	    printf("eobj=%s\n", json_object_to_json_string(eobj));
+            json_object_put(eobj);
         }
 
 	return 0;

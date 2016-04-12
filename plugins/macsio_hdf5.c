@@ -722,6 +722,23 @@ static hid_t make_fapl()
     }
 #endif
 
+    {
+        H5AC_cache_config_t config;
+
+        /* Acquire a default mdc config struct */
+        config.version = H5AC__CURR_CACHE_CONFIG_VERSION;
+        H5Pget_mdc_config(fapl_id, &config);
+#define MAINZER_PARAMS 1
+#if MAINZER_PARAMS
+        config.set_initial_size = (hbool_t) 1;
+        config.initial_size = 16 * 1024;
+        config.min_size = 8 * 1024;
+        config.epoch_length = 3000;
+        config.lower_hr_threshold = 0.95;
+#endif
+        H5Pset_mdc_config(fapl_id, &config);
+    }
+
     if (h5status < 0)
     {
         if (fapl_id >= 0)

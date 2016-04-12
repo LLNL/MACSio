@@ -62,6 +62,9 @@ static int process_args(int argi, int argc, char *argv[])
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
+    MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
+    MACSIO_CLARGS_END_OF_ARGS);
+
     return 0;
 }
 

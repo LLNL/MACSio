@@ -50,7 +50,6 @@ JSON_C_LIB=../json-cwx/install/lib
 JSON_C_LDFLAGS=-ljson-cwx
 DRIVER_INCS += -I$(JSON_C_INC)
 DRIVER_LIBS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
-DRIVER_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
 
 CFLAGS += -g -DPARALLEL -DHAVE_MPI
 CXX ?= mpicxx
@@ -60,6 +59,7 @@ LINK ?= mpicxx
 COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_iface.c macsio_timing.c macsio_utils.c macsio_log.c macsio_data.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
+COMMON_RPATHS += -Wl,-rpath,$(JSON_C_LIB)
 
 BASIC_SRC = macsio_main.c
 BASIC_HDR=$(BASIC_SRC:.c=.h)
@@ -78,7 +78,7 @@ SCR_INCS = $(SCR_HOME)/include
 SCR_LIBS = $(SCR_HOME)/lib
 DRIVER_INCS += -I$(SCR_INCS)
 LDFLAGS += -L$(SCR_LIBS) -lscr
-DRIVER_RPATHS += -Wl,-rpath,$(SCR_LIBS)
+COMMON_RPATHS += -Wl,-rpath,$(SCR_LIBS)
 endif
 
 LDFLAGS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)
@@ -138,7 +138,7 @@ endif
 PLUGIN_OBJ2=$(foreach obj, $(PLUGIN_OBJ), ../plugins/$(obj))
 PLUGIN_LDFLAGS=$(shell make --no-print-directory -C ../plugins ldflags)
 macsio: $(BASIC_OBJ) $(COMMON_OBJ) plugins $(PLUGIN_OBJ2)
-	$(LINK) $< -o $@ $(PLUGIN_OBJ2) $(COMMON_OBJ) $(DRIVER_LIBS) $(DRIVER_RPATHS) $(PLUGIN_LDFLAGS) $(LDFLAGS)
+	$(LINK) $< -o $@ $(PLUGIN_OBJ2) $(COMMON_OBJ) $(COMMON_RPATHS) $(DRIVER_LIBS) $(PLUGIN_LDFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(DRIVER_OBJ) $(BASIC_OBJ) $(COMMON_OBJ) $(TEST_OBJ) $(TOOL_OBJ)
@@ -201,9 +201,9 @@ probe: probe.o
 
 tsttiming.o: tsttiming.c $(COMMON_HDR)
 tsttiming: tsttiming.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(COMMON_RPATHS) $(LDFLAGS)
 
 tstlog.o: tstlog.c $(COMMON_HDR)
 tstlog: tstlog.o $(COMMON_OBJ)
-	$(LINK) $< -o $@ $(COMMON_OBJ) $(LDFLAGS)
+	$(LINK) $< -o $@ $(COMMON_OBJ) $(COMMON_RPATHS) $(LDFLAGS)
 

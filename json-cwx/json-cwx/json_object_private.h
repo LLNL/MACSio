@@ -34,7 +34,7 @@ struct json_object
     struct lh_table *c_object;
     struct array_list *c_array;
     struct { char *str; int len; } c_string;
-    struct { enum json_extarr_type type; struct array_list *dims; void const *data; } c_extarr;
+    struct { enum json_extarr_type type; struct array_list *dims; void const *data; unsigned flags;} c_extarr;
     struct { struct lh_table *choices; int64_t choice; } c_enum;
   } o;
   json_object_delete_fn *_user_delete;

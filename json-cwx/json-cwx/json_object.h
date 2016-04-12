@@ -127,6 +127,8 @@ typedef enum json_extarr_type {
   json_extarr_type_flt64
 } json_extarr_type;
 
+#define JSON_C_EXTARR_DONT_FREE 0x00000001
+
 /** \addtogroup refcount Reference Counting
   @{ */
 
@@ -671,9 +673,9 @@ extern int64_t             json_object_enum_get_choice_val(struct json_object* j
 extern void json_object_free_printbuf(struct json_object *obj);
 
 extern struct json_object*   json_object_new_extarr(void const *data, enum json_extarr_type type,
-                                 int ndims, int const *dims);
+                                 int ndims, int const *dims, unsigned flags);
 extern struct json_object*   json_object_new_extarr_alloc(enum json_extarr_type etype,
-                                 int ndims, int const *dims);
+                                 int ndims, int const *dims, unsigned flags);
 extern enum json_extarr_type json_object_extarr_type(struct json_object* jso);
 extern int64_t               json_object_extarr_crc(struct json_object* jso);
 extern int                   json_object_extarr_nvals(struct json_object* jso);

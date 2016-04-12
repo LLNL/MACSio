@@ -155,6 +155,7 @@ MACSIO_LOG_LogInit(
             else
                 write(filefd, linbuf, sizeof(char) * line_len * lines_per_proc);
         }
+        free(linbuf);
         close(filefd);
     }
 

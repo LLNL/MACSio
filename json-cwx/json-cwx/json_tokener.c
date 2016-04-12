@@ -883,7 +883,8 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
                   dims[i] = json_object_get_int(dimobj);
               }
               json_object_put(current);
-              current = json_object_new_extarr_alloc(etype, ndims, dims);
+              current = json_object_new_extarr_alloc(etype, ndims, dims, 0);
+              free(dims);
               extarr_idx = 0;
               put_extarr_val(current, obj, extarr_idx);
               extarr_idx++;
@@ -1030,6 +1031,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
           if (json_object_enum_length(current) == 0)
               selected = JSON_C_TRUE;
           json_object_enum_add(current, obj_field_name, json_object_get_int(obj), selected);
+          json_object_put(obj);
       }
       else
       {

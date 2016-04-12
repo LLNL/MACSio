@@ -981,6 +981,8 @@ static void json_object_extarr_delete(struct json_object* jso)
 {
   assert(jso && json_object_is_type(jso, json_type_extarr));
   array_list_free(jso->o.c_extarr.dims);
+  if (!(jso->o.c_extarr.flags & JSON_C_EXTARR_DONT_FREE))
+      free((void*)jso->o.c_extarr.data);
   json_object_generic_delete(jso);
 }
 
@@ -1088,8 +1090,9 @@ json_object_new_extarr(
     void const *data,           /**< [in] The array buffer pointer */
     enum json_extarr_type type, /**< [in] The type of data in the array */
     int ndims,                  /**< [in] The number of dimensions in the array */
-    int const *dims             /**< [in] Array of length \c ndims of integer values holding the size
+    int const *dims,            /**< [in] Array of length \c ndims of integer values holding the size
                                      in each dimension */
+    unsigned flags              /**< [in] Flags controlling behavior. */
 )
 {
   int i;
@@ -1098,6 +1101,7 @@ json_object_new_extarr(
   jso->_delete = &json_object_extarr_delete;
   jso->_to_json_string = &json_object_extarr_to_json_string;
   jso->o.c_extarr.data = data;
+  jso->o.c_extarr.flags = flags;
   jso->o.c_extarr.type = type;
   jso->o.c_extarr.dims = array_list_new(&json_object_array_entry_free);
   for (i = 0; i < ndims; i++)
@@ -1116,8 +1120,9 @@ struct json_object*
 json_object_new_extarr_alloc(
     enum json_extarr_type etype, /**< [in] The type of data to be put into the buffer */
     int ndims,                   /**< [in] The number of dimensions in the array */
-    int const *dims              /**< [in] Array of length \c ndims of integer values holding the
+    int const *dims,             /**< [in] Array of length \c ndims of integer values holding the
                                       [in] in each dimension */
+    unsigned flags              /**< [in] Flags controlling behavior. */
 )
 {
   int i, nvals;
@@ -1125,6 +1130,7 @@ json_object_new_extarr_alloc(
   if(!jso) return NULL;
   jso->_delete = &json_object_extarr_delete;
   jso->_to_json_string = &json_object_extarr_to_json_string;
+  jso->o.c_extarr.flags = flags;
   jso->o.c_extarr.type = etype;
   jso->o.c_extarr.dims = array_list_new(&json_object_array_entry_free);
   for (i = 0, nvals = 1; i < ndims; i++)
@@ -1848,36 +1854,63 @@ double json_object_apath_get_double(struct json_object *obj, char const *key_pat
 }
 
 #define CIRCBUF_SIZE 1024 
-static int circbuf_idx = 0;
-static char *circbuf_retval[CIRCBUF_SIZE];
-#define CIRCBUF_RET(STR)                       \
-{                                              \
-    if (circbuf_retval[circbuf_idx] != 0)      \
-        free(circbuf_retval[circbuf_idx]);     \
-    circbuf_retval[circbuf_idx] = strdup(STR); \
-    retval = circbuf_retval[circbuf_idx];      \
-    circbuf_idx = (circbuf_idx+1) % CIRCBUF_SIZE;  \
-    return retval;                             \
+#define CIRCBUF_CLEAR "__json_c_clear_circbuf__"
+static char const *circbuf_return(char const *str)
+{
+    int i;
+    static int first = 1;
+    static int circbuf_idx = 0;
+    static char *circbuf_retval[CIRCBUF_SIZE];
+    char *retval;
+
+    if (first)
+    {
+        first = 0;
+        circbuf_idx = 0;
+        for (i = 0; i < CIRCBUF_SIZE; i++)
+            circbuf_retval[i] = 0;
+    }
+
+    if (!strcmp(str, CIRCBUF_CLEAR))
+    {
+        for (i = 0; i < CIRCBUF_SIZE; i++)
+        {
+            if (circbuf_retval[i])
+                free(circbuf_retval[i]);
+            circbuf_retval[i] = 0;
+        }
+        return 0;
+    }
+
+    if (circbuf_retval[circbuf_idx] != 0)
+        free(circbuf_retval[circbuf_idx]);
+    circbuf_retval[circbuf_idx] = strdup(str);
+    retval = circbuf_retval[circbuf_idx];
+    circbuf_idx = (circbuf_idx+1) % CIRCBUF_SIZE;
+    return retval;
 }
 
 /**
  * \brief Query string value at specified path
  *
  * For return and type corecion, see json_object_path_get_string().
+ *
+ * Uses a circular cache of returned strings. To clear memory associated with this
+ * cache, call this method with (0,0) as the arguments.
  */
 char const *json_object_apath_get_string(struct json_object *obj, char const *key_path)
 {
     char *retval;
+    struct json_object *leafobj;
 
-    struct json_object *leafobj = json_object_apath_get_leafobj(obj, key_path);
+    if (obj == 0 && key_path == 0)
+        return circbuf_return(CIRCBUF_CLEAR);
+
+    leafobj = json_object_apath_get_leafobj(obj, key_path);
     if (leafobj)
-    {
-        CIRCBUF_RET(json_object_to_json_string_ext(leafobj, JSON_C_TO_STRING_UNQUOTED));
-    }
+        return circbuf_return(json_object_to_json_string_ext(leafobj, JSON_C_TO_STRING_UNQUOTED));
     else
-    {
-        CIRCBUF_RET("null");
-    }
+        return circbuf_return("null");
 }
 
 /**
