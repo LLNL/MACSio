@@ -834,13 +834,11 @@ main(int argc, char *argv[])
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
+#warning ATEXIT THESE
     if (json_object_put(main_obj) != 1)
     {
         MACSIO_LOG_MSG(Info, ("Unable to free main JSON object"));
-#warning FIX RETVAL OF MAIN TO BE NON-ZERO WHEN ERRORS OCCUR
     }
-
-#warning ATEXIT THESE
     MACSIO_TIMING_GroupMask(0);
     MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, -1);
     json_object_apath_get_string(0,0); /* free circ cache */
@@ -859,5 +857,6 @@ main(int argc, char *argv[])
     }
 #endif
 
+#warning FIX RETVAL OF MAIN TO BE NON-ZERO WHEN ERRORS OCCUR
     return (0);
 }

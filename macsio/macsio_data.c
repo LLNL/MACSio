@@ -211,7 +211,7 @@ make_random_extarr(int nthings)
         data = vals;
     }
 
-    return json_object_new_extarr(data, dtype, ndims, dims);
+    return json_object_new_extarr(data, dtype, ndims, dims, 0);
 }
 
 static json_object *
@@ -336,7 +336,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
     vals = (double *) malloc(MACSIO_UTILS_XDim(dims) * sizeof(double));
     for (i = 0; i < MACSIO_UTILS_XDim(dims); i++)
         vals[i] = MACSIO_UTILS_XMin(bounds) + i * delta;
-    json_object_object_add(coords, "XAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[0]));
+    json_object_object_add(coords, "XAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[0], 0));
 
     if (ndims > 1)
     {
@@ -345,7 +345,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         vals = (double *) malloc(MACSIO_UTILS_YDim(dims) * sizeof(double));
         for (i = 0; i < MACSIO_UTILS_YDim(dims); i++)
             vals[i] = MACSIO_UTILS_YMin(bounds) + i * delta;
-        json_object_object_add(coords, "YAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[1]));
+        json_object_object_add(coords, "YAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[1], 0));
     }
 
     if (ndims > 2)
@@ -355,7 +355,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         vals = (double *) malloc(MACSIO_UTILS_ZDim(dims) * sizeof(double));
         for (i = 0; i < MACSIO_UTILS_ZDim(dims); i++)
             vals[i] = MACSIO_UTILS_ZMin(bounds) + i * delta;
-        json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2]));
+        json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2], 0));
     }
 
 #warning ADD GLOBAL IDS
@@ -395,11 +395,11 @@ make_curv_mesh_coords(int ndims, int const *dims, double const *bounds)
             }
         }
     }
-    json_object_object_add(coords, "XCoords", json_object_new_extarr(x, json_extarr_type_flt64, ndims, dims));
+    json_object_object_add(coords, "XCoords", json_object_new_extarr(x, json_extarr_type_flt64, ndims, dims, 0));
     if (ndims > 1)
-        json_object_object_add(coords, "YCoords", json_object_new_extarr(y, json_extarr_type_flt64, ndims, dims));
+        json_object_object_add(coords, "YCoords", json_object_new_extarr(y, json_extarr_type_flt64, ndims, dims, 0));
     if (ndims > 2)
-        json_object_object_add(coords, "ZCoords", json_object_new_extarr(z, json_extarr_type_flt64, ndims, dims));
+        json_object_object_add(coords, "ZCoords", json_object_new_extarr(z, json_extarr_type_flt64, ndims, dims, 0));
 
     return coords;
 }
@@ -571,7 +571,7 @@ make_ucdzoo_mesh_topology(int ndims, int const *dims)
         json_object_object_add(topology, "ElemType", json_object_new_string("Hex8"));
     }
     json_object_object_add(topology, "ElemSize", json_object_new_int(cellsize));
-    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims));
+    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims, 0));
 
     return topology;
 }
@@ -749,12 +749,12 @@ make_arb_mesh_topology(int ndims, int const *dims)
         }
     }
 
-    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims));
-    json_object_object_add(topology, "NodeCounts", json_object_new_extarr(nodecnts, json_extarr_type_int32, 1, &nfaces));
+    json_object_object_add(topology, "Nodelist", json_object_new_extarr(nodelist, json_extarr_type_int32, 2, nl_dims, 0));
+    json_object_object_add(topology, "NodeCounts", json_object_new_extarr(nodecnts, json_extarr_type_int32, 1, &nfaces, 0));
     if (ndims > 1)
     {
-        json_object_object_add(topology, "Facelist", json_object_new_extarr(facelist, json_extarr_type_int32, 2, fl_dims));
-        json_object_object_add(topology, "FaceCounts", json_object_new_extarr(facecnts, json_extarr_type_int32, 1, &ncells));
+        json_object_object_add(topology, "Facelist", json_object_new_extarr(facelist, json_extarr_type_int32, 2, fl_dims, 0));
+        json_object_object_add(topology, "FaceCounts", json_object_new_extarr(facecnts, json_extarr_type_int32, 1, &ncells, 0));
     }
 
     return topology;
@@ -788,9 +788,9 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     json_object_object_add(var_obj, "name", json_object_new_string(kind));
     json_object_object_add(var_obj, "centering", json_object_new_string(centering));
     if (!strcmp(dtype, "double"))
-        data_obj = json_object_new_extarr_alloc(json_extarr_type_flt64, ndims, dims2);
+        data_obj = json_object_new_extarr_alloc(json_extarr_type_flt64, ndims, dims2, 0);
     else if (!strcmp(dtype, "int"))
-        data_obj = json_object_new_extarr_alloc(json_extarr_type_int32, ndims, dims2);
+        data_obj = json_object_new_extarr_alloc(json_extarr_type_int32, ndims, dims2, 0);
     json_object_object_add(var_obj, "data", data_obj);
     valdp = (double *) json_object_extarr_data(data_obj);
     valip = (int *) json_object_extarr_data(data_obj);
