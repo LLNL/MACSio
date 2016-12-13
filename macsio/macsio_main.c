@@ -73,12 +73,12 @@ extern "C" {
  *
  * For an overview of MACSio's design goals and outline of its design, please see
  * <A HREF="../../macsio_design_intro_final_html/macsio_design_intro_final.htm">this design document.</A>
- * 
+ *
  * MACSio is capable of generating a wide variety of mesh and variable data and of amorphous metadata
- * typical of HPC multi-physics applications. Currently, the only supported mesh type in MACSio is 
+ * typical of HPC multi-physics applications. Currently, the only supported mesh type in MACSio is
  * a rectilinear, multi-block type mesh in 2 or 3 dimensions. However, some of the functions to generate other
  * mesh types such as curvilinear, block-structured AMR, unstructured, unstructured-AMR and arbitrary
- * are already available. In addition, regardless of the particular type of mesh MACSio generates for 
+ * are already available. In addition, regardless of the particular type of mesh MACSio generates for
  * purposes of I/O performance testing, it stores and marshalls all of the resultant data in an uber
  * JSON-C object that is passed around witin MACSio and between MACSIO and its I/O plugins.
  *
@@ -214,7 +214,7 @@ LINK = $(CXX)
  *
  * A given plugin is built only when installations of its needed TPL(s) are specified
  * via its associated \c FOO_HOME variable. For example, to build the HDF5 plugin, the
- * variable \c HDF5_HOME must specify a path to an installation of HDF5 where the 
+ * variable \c HDF5_HOME must specify a path to an installation of HDF5 where the
  * \c include and \c lib sub-directories for HDF5 can be found.
  *
  * Sometimes it is desireable to build only some of the available plugins. This can be
@@ -226,8 +226,8 @@ LINK = $(CXX)
  * Each plugin is defined by two files named such as \c macsio_foo.make and \c macsio_foo.c
  * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
  * foo plugin. \c macsio_foo.make is a makefile fragment, that gets included in the
- * main Makefile in the \c plugins directory, to manage the creation of \c macsio_foo.o 
- * object file. 
+ * main Makefile in the \c plugins directory, to manage the creation of \c macsio_foo.o
+ * object file.
  *
  * Given the high likelihood that different plugins may depend on common TPL(s), there is
  * a plugin-specific make variable, \c FOO_BUILD_ORDER (for a fictitious foo plugin) that
@@ -266,7 +266,7 @@ LINK = $(CXX)
  * in which they are added to MACSio doesn't matter because plugins are identified by their
  * (unique) names. If MACSio encounters a case where two different plugins have the same
  * name, then it will abort and inform the user of the problem. The remedy is to
- * adjust the name of one of the two plugins. MACSio is able to call \c static methods 
+ * adjust the name of one of the two plugins. MACSio is able to call \c static methods
  * defined within the plugin via function callback pointers registered with the interface.
  *
  */
@@ -386,7 +386,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "representing powers of either 1000 or 1024 according to the selected\n"
             "units prefix system. With no size modifier character, 'B' is assumed.\n"
             "Mesh and variable data is then sized by MACSio to hit this target byte\n"
-            "count. However, due to contraints involved in creating valid mesh\n"
+            "count. However, due to constraints involved in creating valid mesh\n"
             "topology and variable data with realistic variation in features (e.g.\n"
             "zone- and node-centering), this target byte count is hit exactly for\n"
             "only the most frequently dumped objects and approximately for other objects.",
@@ -537,7 +537,7 @@ write_timings_file(char const *filename)
     char **timer_strs = 0, **rtimer_strs = 0;
     int i, ntimers, maxlen, rntimers = 0, rmaxlen = 0, rdata[3], rdata_out[3];
     MACSIO_LOG_LogHandle_t *timing_log;
-        
+
     MACSIO_TIMING_DumpTimersToStrings(MACSIO_TIMING_ALL_GROUPS, &timer_strs, &ntimers, &maxlen);
     MACSIO_TIMING_ReduceTimers(MACSIO_MAIN_Comm, 0);
     if (MACSIO_MAIN_Rank == 0)
@@ -658,7 +658,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             mpi_errno = 0;
 #endif
             errno = 0;
- 
+
 
             dt = MT_StopTimer(heavy_dump_tid);
 
