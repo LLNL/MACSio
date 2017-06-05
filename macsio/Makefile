@@ -124,7 +124,7 @@ json-cwx: ../json-cwx/build/timestamp
 	cd ../json-cwx; \
 	mkdir build install; \
 	cd json-cwx; \
-	./autgen.sh; \
+	./autogen.sh; \
 	cd ..; \
 	cd build; \
 	../json-cwx/configure CC="$(CC)" --prefix=`pwd`/../install
