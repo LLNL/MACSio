@@ -806,27 +806,27 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
             {
 #warning PUT THESE INTO A GENERATOR FUNCTION
 #warning ACCOUNT FOR HALF ZONE OFFSETS
-                if (!strcmp(kind, "constant"))
+                if (strstr(kind, "constant")!=NULL)
                     valdp[n++] = 1.0;
-                else if (!strcmp(kind, "random"))
+                else if (strstr(kind, "random")!=NULL)
                     valdp[n++] = (double) (random() % 1000) / 1000;
-                else if (!strcmp(kind, "xramp"))
+                else if (strstr(kind, "xramp")!=NULL)
                     valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
-                else if (!strcmp(kind, "spherical"))
+                else if (strstr(kind, "spherical")!=NULL)
                 {
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = sqrt(x*x+y*y+z*z);
                 }
-                else if (!strcmp(kind, "noise"))
+                else if (strstr(kind, "noise")!=NULL)
                 {
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = noise(x,y,z,bounds);
                 }
-                else if (!strcmp(kind, "noise_sum"))
+                else if (strstr(kind, "noise_sum")!=NULL)
                 {
 #warning SHOULD USE GLOBAL DIMS DIAMETER HERE
                     int q, nlevels = (int) log2(sqrt(dims_diameter2))+1;
@@ -841,12 +841,12 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                         mult *= 2;
                     }
                 }
-                else if (!strcmp(kind, "ysin"))
+                else if (strstr(kind, "ysin")!=NULL)
                 {
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     valdp[n++] = sin(y*3.1415266);
                 }
-                else if (!strcmp(kind, "xlayers"))
+                else if (strstr(kind, "xlayers")!=NULL)
                 {
                     valip[n++] = (i / 20) % 3;
                 }
