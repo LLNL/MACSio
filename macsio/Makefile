@@ -123,9 +123,12 @@ json-cwx: ../json-cwx/build/timestamp
 ../json-cwx/build:
 	cd ../json-cwx; \
 	mkdir build install; \
+	cd json-cwx; \
+	./autogen.sh; \
+	cd ..; \
 	cd build; \
 	../json-cwx/configure CC="$(CC)" --prefix=`pwd`/../install
-	
+
 macsio_timing.o: macsio_timing.h
 
 macsio_main.o: $(BASIC_SRC) $(BASIC_HDR) $(COMMON_HDR)
