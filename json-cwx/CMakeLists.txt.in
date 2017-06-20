@@ -1,0 +1,20 @@
+## This file is configured from cmake/BuildJSON-CWX.cmake
+## Which is called from the top-level
+
+PROJECT(libjson-cwx NONE)
+
+## CMake 3.0 is required for ExternalProject
+
+CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
+
+INCLUDE(ExternalProject)
+EXTERNALPROJECT_ADD(libjson-cwx
+  GIT_REPOSITORY    ""
+  SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/json-cwx/json-cwx"
+  BINARY_DIR        ""
+  CMAKE_ARGS        ""
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND     ""
+  INSTALL_COMMAND   ""
+  TEST_COMMAND      ""
+)
