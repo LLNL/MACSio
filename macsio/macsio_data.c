@@ -1089,14 +1089,27 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     }
     else if (dim == 2)
     {
-        MACSIO_UTILS_Best2DFactors(total_num_parts, &nx_parts, &ny_parts);
-        MACSIO_UTILS_Best2DFactors(part_size, &nx, &ny);
-        jpart_width = 1;
+	json_object *mesh_bounds = json_object_path_get_array(main_obj, "clargs/part_mesh_dims");
+	MACSIO_UTILS_Best2DFactors(total_num_parts, &nx_parts, &ny_parts);
+	if (!mesh_bounds){
+	    MACSIO_UTILS_Best2DFactors(part_size, &nx, &ny);
+	} else { 
+	    nx = JsonGetInt(mesh_bounds,"", 0);
+	    ny = JsonGetInt(mesh_bounds, "", 1);
+	}
+	jpart_width = 1;
     }
     else if (dim == 3)
     {
+	json_object *mesh_bounds = json_object_path_get_array(main_obj, "clargs/part_mesh_dims");
         MACSIO_UTILS_Best3DFactors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
-        MACSIO_UTILS_Best3DFactors(part_size, &nx, &ny, &nz);
+	if (!mesh_bounds){
+	    MACSIO_UTILS_Best3DFactors(part_size, &nx, &ny, &nz);
+	} else {
+	    nx = JsonGetInt(mesh_bounds,"",0);
+	    ny = JsonGetInt(mesh_bounds,"",1);
+	    nz = JsonGetInt(mesh_bounds,"",2);
+	}
         jpart_width = 1;
         kpart_width = 1;
     }

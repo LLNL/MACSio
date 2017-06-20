@@ -353,7 +353,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "data and in interpreting sizing modifiers to arguments. The options are\n"
             "\"binary\" and \"decimal\". For \"binary\" unit prefixes, sizes are reported\n"
             "in powers of 1024 and unit symbols Ki, Mi, Gi, Ti, Pi are used. For \"decimal\",\n"
-            "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
+            
+	    "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
             "See http://en.wikipedia.org/wiki/Binary_prefix. for more information",
         "--interface %s", "miftmpl",
             "Specify the name of the interface to be tested. Use keyword 'list'\n"
@@ -390,7 +391,12 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "topology and variable data with realistic variation in features (e.g.\n"
             "zone- and node-centering), this target byte count is hit exactly for\n"
             "only the most frequently dumped objects and approximately for other objects.",
-        "--part_dim %d", "2",
+	"--part_mesh_dims %d %d %d", MACSIO_CLARGS_NODEFAULT,
+	    "Specify the number of elements in each dimension per mesh part.\n"
+	    "This overrides the part_size parameter and instead allows the size\n"
+	    "of the mesh to be determined by dimensions.\n"
+	    "e.g. 300 300 2, 300 300 0 (set final dimension to 0 for 2d",
+	"--part_dim %d", "2",
             "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s", "rectilinear",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
