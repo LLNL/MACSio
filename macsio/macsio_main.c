@@ -380,6 +380,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "number multiplied by the MPI communicator size. If the result of that\n"
             "product is non-integral, it will be rounded and a warning message will\n"
             "be generated.",
+	"--mesh_decomp %d %d %d", MACSIO_CLARGS_NODEFAULT,
+	    "The layout of parts in the mesh overriding the simple decomposition\n"
+	    "e.g. 4 8 1 will decompose into 32 parts in the stucture (x y z).",
         "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"

@@ -1090,7 +1090,13 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     else if (dim == 2)
     {
 	json_object *mesh_bounds = json_object_path_get_array(main_obj, "clargs/part_mesh_dims");
-	MACSIO_UTILS_Best2DFactors(total_num_parts, &nx_parts, &ny_parts);
+	json_object *mesh_decomp = json_object_path_get_array(main_obj, "clargs/mesh_decomp");
+	if (!mesh_decomp){
+		MACSIO_UTILS_Best2DFactors(total_num_parts, &nx_parts, &ny_parts);
+	} else {
+	    nx_parts = JsonGetInt(mesh_decomp,"", 0);
+	    ny_parts = JsonGetInt(mesh_decomp,"", 1);
+	}
 	if (!mesh_bounds){
 	    MACSIO_UTILS_Best2DFactors(part_size, &nx, &ny);
 	} else { 
@@ -1102,7 +1108,14 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     else if (dim == 3)
     {
 	json_object *mesh_bounds = json_object_path_get_array(main_obj, "clargs/part_mesh_dims");
-        MACSIO_UTILS_Best3DFactors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
+	json_object *mesh_decomp = json_object_path_get_array(main_obj, "clargs/mesh_decomp");
+	if (!mesh_decomp){
+        	MACSIO_UTILS_Best3DFactors(total_num_parts, &nx_parts, &ny_parts, &nz_parts);
+	} else {
+	    nx_parts = JsonGetInt(mesh_decomp,"", 0);
+	    ny_parts = JsonGetInt(mesh_decomp,"", 1);
+	    nz_parts = JsonGetInt(mesh_decomp,"", 2);
+	}
 	if (!mesh_bounds){
 	    MACSIO_UTILS_Best3DFactors(part_size, &nx, &ny, &nz);
 	} else {
