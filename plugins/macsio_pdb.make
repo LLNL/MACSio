@@ -37,7 +37,7 @@ PLUGIN_LDFLAGS += $(PDB_LDFLAGS)
 PLUGIN_LIST += pdb
 
 PDB_CFLAGS = -I$(SILO_HOME)/include -DHAVE_SILO
-PDB_LDFLAGS = -L$(SILO_HOME)/lib -lsilo
+PDB_LDFLAGS = -L$(SILO_HOME)/lib -lsiloh5
 
 endif
 
