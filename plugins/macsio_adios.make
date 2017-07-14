@@ -37,6 +37,10 @@ ifneq ($(ADIOS_HOME),)
 ADIOS_LDFLAGS = -L$(ADIOS_HOME)/lib -ladios -Wl,-rpath,$(ADIOS_HOME)/lib
 ADIOS_CFLAGS = -I$(ADIOS_HOME)/include
 
+#MXML_HOME =
+ADIOS_LDFLAGS += -L$(MXML_HOME)/lib -lmxml -Wl,-rpath,$(MXML_HOME)/lib
+MXML_CFLAGS += -I$(MXML_HOME)/include
+
 ADIOS_SOURCES = macsio_adios.c
 
 ADIOS_LDFLAGS += -lz -lm

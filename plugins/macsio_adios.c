@@ -39,6 +39,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <macsio_mif.h>
 #include <macsio_utils.h>
 
+#include <adios.h>
+
 #ifdef HAVE_MPI
 #include <mpi.h>
 #endif
@@ -87,175 +89,16 @@ static int process_args(int argi, int argc, char *argv[])
 
 static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 {
-#ifdef HAVE_MPI
-    int ndims;
-    int i, v, p;
-    char const *mesh_type = json_object_path_get_string(main_obj, "clargs/part_type");
-    char fileName[256];
-    int use_part_count;
 
-    hid_t h5file_id;
-    hid_t fapl_id = make_fapl();
-    hid_t dxpl_id = H5Pcreate(H5P_DATASET_XFER);
-    hid_t dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-    hid_t null_space_id = H5Screate(H5S_NULL);
-    hid_t fspace_nodal_id, fspace_zonal_id;
-    hsize_t global_log_dims_nodal[3];
-    hsize_t global_log_dims_zonal[3];
-
-    MPI_Info mpiInfo = MPI_INFO_NULL;
-
-#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
-#warning INCLUDE ARGS FOR ISTORE AND K_SYM
-#warning INCLUDE ARG PROCESS FOR HINTS
-#warning FAPL PROPS: ALIGNMENT 
-#if H5_HAVE_PARALLEL
-    H5Pset_fapl_mpio(fapl_id, MACSIO_MAIN_Comm, mpiInfo);
-#endif
-
-#warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
-    /* Construct name for the HDF5 file */
-    sprintf(fileName, "%s_hdf5_%03d.%s",
-        json_object_path_get_string(main_obj, "clargs/filebase"),
-        dumpn,
-        json_object_path_get_string(main_obj, "clargs/fileext"));
-
-    h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
-
-    /* Create an HDF5 Dataspace for the global whole of mesh and var objects in the file. */
-    ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
-    json_object *global_log_dims_array =
-        json_object_path_get_array(main_obj, "problem/global/LogDims");
-    json_object *global_parts_log_dims_array =
-        json_object_path_get_array(main_obj, "problem/global/PartsLogDims");
-    /* Note that global zonal array is smaller in each dimension by one *ON*EACH*BLOCK*
-       in the associated dimension. */
-    for (i = 0; i < ndims; i++)
-    {
-        int parts_log_dims_val = JsonGetInt(global_parts_log_dims_array, "", i);
-        global_log_dims_nodal[ndims-1-i] = (hsize_t) JsonGetInt(global_log_dims_array, "", i);
-        global_log_dims_zonal[ndims-1-i] = global_log_dims_nodal[ndims-1-i] -
-            JsonGetInt(global_parts_log_dims_array, "", i);
-    }
-    fspace_nodal_id = H5Screate_simple(ndims, global_log_dims_nodal, 0);
-    fspace_zonal_id = H5Screate_simple(ndims, global_log_dims_zonal, 0);
-
-    /* Get the list of vars on the first part as a guide to loop over vars */
-    json_object *part_array = json_object_path_get_array(main_obj, "problem/parts");
-    json_object *first_part_obj = json_object_array_get_idx(part_array, 0);
-    json_object *first_part_vars_array = json_object_path_get_array(first_part_obj, "Vars");
-
-    /* Dataset transfer property list used in all H5Dwrite calls */
-#if H5_HAVE_PARALLEL
-    if (no_collective)
-        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
-    else
-        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
-#endif
-
-
-    /* Loop over vars and then over parts */
-    /* currently assumes all vars exist on all ranks. but not all parts */
-    for (v = -1; v < json_object_array_length(first_part_vars_array); v++) /* -1 start is for Mesh */
-    {
-
-#warning SKIPPING MESH
-        if (v == -1) continue; /* All ranks skip mesh (coords) for now */
-
-        /* Inspect the first part's var object for name, datatype, etc. */
-        json_object *var_obj = json_object_array_get_idx(first_part_vars_array, v);
-        char const *varName = json_object_path_get_string(var_obj, "name");
-        char *centering = strdup(json_object_path_get_string(var_obj, "centering"));
-        json_object *dataobj = json_object_path_get_extarr(var_obj, "data");
-#warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
-        hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
-                H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
-        hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
-        hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
-
-        /* Create the file dataset (using old-style H5Dcreate API here) */
-#warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
-        
-        hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id); 
-        H5Sclose(fspace_id);
-        H5Pclose(dcpl_id);
-
-        /* Loop to make write calls for this var for each part on this rank */
-#warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
-        use_part_count = (int) ceil(json_object_path_get_double(main_obj, "clargs/avg_num_parts"));
-        for (p = 0; p < use_part_count; p++)
-        {
-            json_object *part_obj = json_object_array_get_idx(part_array, p);
-            json_object *var_obj = 0;
-            hid_t mspace_id = H5Scopy(null_space_id);
-            void const *buf = 0;
-
-            fspace_id = H5Scopy(null_space_id);
-
-            /* this rank actually has something to contribute to the H5Dwrite call */
-            if (part_obj)
-            {
-                int i;
-                hsize_t starts[3], counts[3];
-                json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
-                json_object *mesh_obj = json_object_path_get_object(part_obj, "Mesh");
-                json_object *var_obj = json_object_array_get_idx(vars_array, v);
-                json_object *extarr_obj = json_object_path_get_extarr(var_obj, "data");
-                json_object *global_log_origin_array =
-                    json_object_path_get_array(part_obj, "GlobalLogOrigin");
-                json_object *global_log_indices_array =
-                    json_object_path_get_array(part_obj, "GlobalLogIndices");
-                json_object *mesh_dims_array = json_object_path_get_array(mesh_obj, "LogDims");
-                for (i = 0; i < ndims; i++)
-                {
-                    starts[ndims-1-i] =
-                        json_object_get_int(json_object_array_get_idx(global_log_origin_array,i));
-                    counts[ndims-1-i] =
-                        json_object_get_int(json_object_array_get_idx(mesh_dims_array,i));
-                    if (!strcmp(centering, "zone"))
-                    {
-                        counts[ndims-1-i]--;
-                        starts[ndims-1-i] -=
-                            json_object_get_int(json_object_array_get_idx(global_log_indices_array,i));
-                    }
-                }
-
-                /* set selection of filespace */
-                fspace_id = H5Dget_space(ds_id);
-                H5Sselect_hyperslab(fspace_id, H5S_SELECT_SET, starts, 0, counts, 0);
-
-                /* set dataspace of data in memory */
-                mspace_id = H5Screate_simple(ndims, counts, 0);
-                buf = json_object_extarr_data(extarr_obj);
-            }
-
-            H5Dwrite(ds_id, dtype_id, mspace_id, fspace_id, dxpl_id, buf);
-            H5Sclose(fspace_id);
-            H5Sclose(mspace_id);
-
-        }
-
-        H5Dclose(ds_id);
-        free(centering);
-    }
-
-    H5Sclose(fspace_nodal_id);
-    H5Sclose(fspace_zonal_id);
-    H5Sclose(null_space_id);
-    H5Pclose(dxpl_id);
-    H5Pclose(fapl_id);
-    H5Fclose(h5file_id);
-
-#endif
 }
 
 typedef struct _user_data {
-    hid_t groupId;
+    int64_t groupId;
 } user_data_t;
 
 static void *CreateADIOSFile(const char *fname, const char *nsname, void *userData)
 {
-    int *retval = 0;
+    int64_t *retval = 0;
     int64_t adios_file;
     adios_open(&adios_file, nsname, fname, "w", MACSIO_MAIN_Comm);
         
@@ -265,10 +108,10 @@ static void *CreateADIOSFile(const char *fname, const char *nsname, void *userDa
     return (void *) retval;
 }
 
-static void *OpenHDF5File(const char *fname, const char *nsname,
+static void *OpenADIOSFile(const char *fname, const char *nsname,
                    MACSIO_MIF_ioFlags_t ioFlags, void *userData)
 {
-    int *retval = 0;
+    int64_t *retval = 0;
     int64_t adios_file;
     adios_open(&adios_file, nsname, fname, "u", MACSIO_MAIN_Comm);
         
@@ -278,105 +121,150 @@ static void *OpenHDF5File(const char *fname, const char *nsname,
     return (void *) retval;
 }
 
-static void CloseHDF5File(void *file, void *userData)
+static void CloseADIOSFile(void *file, void *userData)
 {
-    adios_close(*((int64_t) file));
+    adios_close(*((int64_t*)file));
     free(file);
 }
 
-static void write_mesh_part(hid_t h5loc, json_object *part_obj)
+static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *adios_mesh_type)
 {
-#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
-    int i;
-    json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
+    json_object *coordobj;
+    char const *coordnames[] = {"X","Y","Z"};
+    void const *coords[3];
+    int ndims = JsonGetInt(part, "Mesh/GeomDim");
+    int dims[3] = {1,1,1};
+    int dimsz[3] = {1,1,1};
 
-    for (i = 0; i < json_object_array_length(vars_array); i++)
+    if (strcmp(adios_mesh_type,"rectilinear"))	
+        coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
+    else
+        coordobj = JsonGetObj(part, "Mesh/Coords/XCoords");
+    coords[0] = json_object_extarr_data(coordobj);
+    dims[0] = JsonGetInt(part, "Mesh/LogDims", 0);
+    dimsz[0] = dims[0]-1;
+    if (ndims > 1)
     {
-        int j;
-        hsize_t var_dims[3];
-        hid_t fspace_id, ds_id, dcpl_id;
-        json_object *var_obj = json_object_array_get_idx(vars_array, i);
-        json_object *data_obj = json_object_path_get_extarr(var_obj, "data");
-        char const *varname = json_object_path_get_string(var_obj, "name");
-        int ndims = json_object_extarr_ndims(data_obj);
-        void const *buf = json_object_extarr_data(data_obj);
-        hid_t dtype_id = json_object_extarr_type(data_obj)==json_extarr_type_flt64? 
-                H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
-
-        for (j = 0; j < ndims; j++)
-            var_dims[j] = json_object_extarr_dim(data_obj, j);
-
-        fspace_id = H5Screate_simple(ndims, var_dims, 0);
-        dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
-        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, dcpl_id); 
-        H5Dwrite(ds_id, dtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
-        H5Dclose(ds_id);
-        H5Pclose(dcpl_id);
-        H5Sclose(fspace_id);
+        if (strcmp(adios_mesh_type,"rectilinear"))	
+            coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
+        else
+            coordobj = JsonGetObj(part, "Mesh/Coords/YCoords");
+        coords[1] = json_object_extarr_data(coordobj);
+        dims[1] = JsonGetInt(part, "Mesh/LogDims", 1);
+        dimsz[1] = dims[1]-1;
     }
+    if (ndims > 2)
+    {
+        if (strcmp(adios_mesh_type,"rectilinear"))	
+            coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
+        else
+            coordobj = JsonGetObj(part, "Mesh/Coords/ZCoords");
+        coords[2] = json_object_extarr_data(coordobj);
+        dims[2] = JsonGetInt(part, "Mesh/LogDims", 2);
+        dimsz[2] = dims[2]-1;
+    }
+
+    int64_t domain_group_id;
+    char * dimensions = "nx,ny";
+
+    adios_declare_group (&domain_group_id, "domain", "", adios_stat_default);
+    adios_select_method (domain_group_id, "MPI", "", "");
+
+    adios_define_var(domain_group_id, "X", "MESH" , adios_double, "nx", "G", "O");
+    adios_define_var(domain_group_id, "Y", "MESH", adios_double, "ny", "G", "O");
+    
+    adios_define_mesh_rectilinear (dimensions, "X,Y", "2", domain_group_id, "rectilinearmesh");
+    adios_define_mesh_timevarying("no", domain_group_id, "rectilinearmesh");
+    adios_define_var_mesh(domain_group_id, "data", "rectilinearmesh");
+    adios_define_var_centering(domain_group_id, "data", "point");
+
+    adios_write(*adiosfile, "X", coords[0]);
+
+    /*
+    json_object *vars_array = JsonGetObj(part, "Vars");
+    for (int i = 0; i < json_object_array_length(vars_array); i++)
+    {
+        json_object *varobj = json_object_array_get_idx(vars_array, i);
+        int cent = strcmp(JsonGetStr(varobj, "centering"),"zone")?DB_NODECENT:DB_ZONECENT;
+        int *d = cent==DB_NODECENT?dims:dimsz;
+        json_object *dataobj = JsonGetObj(varobj, "data");
+        int dtype = json_object_extarr_type(dataobj)==json_extarr_type_flt64?DB_DOUBLE:DB_INT;
+        
+        DBPutQuadvar1(dbfile, JsonGetStr(varobj, "name"), "mesh",
+            (void *)json_object_extarr_data(dataobj), d, ndims, 0, 0, dtype, cent, 0); 
+    }
+    */
+}
+
+static void write_mesh_part(int64_t adios_loc, json_object *part)
+{
+    if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "rectilinear"))
+        write_quad_mesh_part(&adios_loc, part, "rectilinear");
+    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "curvilinear"))
+        write_quad_mesh_part(&adios_loc, part, "curvilinear");
+//    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
+//        write_ucdzoo_mesh_part(adios_loc, part, "ucdzoo");
+//    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "arbitrary"))
+//        write_ucdzoo_mesh_part(adios_loc, part, "arbitrary");
 }
 
 static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
 {
     int size, rank;
-    hid_t *h5File_ptr;
-    hid_t h5File;
-    hid_t h5Group;
+    int64_t *adiosFile_ptr;
+    int64_t adiosFile;
     char fileName[256];
     int i, len;
     int *theData;
     user_data_t userData;
-    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
-        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
-#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
-#warning SET FILE AND DATASET PROPERTIES
-#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
+    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE};
+
     MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 3,
-        CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
+        CreateADIOSFile, OpenADIOSFile, CloseADIOSFile, &userData);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
 
     /* Construct name for the silo file */
-    sprintf(fileName, "%s_hdf5_%05d_%03d.%s",
+    sprintf(fileName, "%s_adios_%05d_%03d.%s",
         json_object_path_get_string(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
-    h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
-    h5File = *h5File_ptr;
-    h5Group = userData.groupId;
+    adiosFile_ptr = (int64_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
+    adiosFile = *adiosFile_ptr;
 
     json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
 
+    /* calculate a maximum buffer size based on the mesh part_size */
+
+    adios_set_max_buffer_size(json_object_path_get_int(main_obj, "clargs/part_size")/1048576 + 2);
+    
     for (int i = 0; i < json_object_array_length(parts); i++)
     {
         char domain_dir[256];
         json_object *this_part = json_object_array_get_idx(parts, i);
-        hid_t domain_group_id;
+        int64_t domain_group_id;
 
         snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
             json_object_path_get_int(this_part, "Mesh/ChunkID"));
- 
-        domain_group_id = H5Gcreate1(h5File, domain_dir, 0);
 
-        write_mesh_part(domain_group_id, this_part);
-
-        H5Gclose(domain_group_id);
+	write_mesh_part(domain_group_id, this_part);
     }
 
     /* If this is the 'root' processor, also write Silo's multi-XXX objects */
 #if 0
-    if (rank == 0)
+/*    if (rank == 0)
         WriteMultiXXXObjects(main_obj, siloFile, bat);
+*/
 #endif
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
      * of getting a consistent and up to date view of the file's contents. */
-    MACSIO_MIF_HandOffBaton(bat, h5File_ptr);
+    MACSIO_MIF_HandOffBaton(bat, adiosFile_ptr);
 
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
@@ -396,9 +284,11 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
-
+    
+    /* initialise adios using the global communicator */
     adios_init_noxml(MACSIO_MAIN_Comm);
-
+    
+    
     /* ensure we're in MIF mode and determine the file count */
     json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj){
