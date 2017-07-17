@@ -94,18 +94,17 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
 typedef struct _user_data {
     int64_t groupId;
+    const char *groupName;
 } user_data_t;
 
 static void *CreateADIOSFile(const char *fname, const char *nsname, void *userData)
 {
-    int64_t *retval = 0;
     int64_t adios_file;
-    adios_open(&adios_file, nsname, fname, "w", MACSIO_MAIN_Comm);
-        
-    retval = (int64_t *) malloc(sizeof(int64_t));
-    *retval = adios_file;
+    
+    user_data_t *ud = (user_data_t *) userData;
+    adios_open(&adios_file, "domain", fname, "w", MACSIO_MAIN_Comm);
 
-    return (void *) retval;
+    return (void *) &adios_file;
 }
 
 static void *OpenADIOSFile(const char *fname, const char *nsname,
@@ -113,7 +112,10 @@ static void *OpenADIOSFile(const char *fname, const char *nsname,
 {
     int64_t *retval = 0;
     int64_t adios_file;
-    adios_open(&adios_file, nsname, fname, "u", MACSIO_MAIN_Comm);
+    int64_t domain_group_id;
+   
+    user_data_t *ud = (user_data_t *) userData;
+    adios_open(&adios_file, "domain", fname, "u", MACSIO_MAIN_Comm);
         
     retval = (int64_t *) malloc(sizeof(int64_t));
     *retval = adios_file;
@@ -123,11 +125,42 @@ static void *OpenADIOSFile(const char *fname, const char *nsname,
 
 static void CloseADIOSFile(void *file, void *userData)
 {
-    adios_close(*((int64_t*)file));
-    free(file);
+    int64_t adiosFile = *((int64_t*)file);
+    adios_close(adiosFile);
 }
 
-static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *adios_mesh_type)
+/* To accomodate the no XML adios calls we need to define the adios file structure before opening.
+ * This messes with the way MACSio does baton passing for file control so we need somewhere else to do it
+ */
+static void declare_adios_structure(int64_t *domain_group_id, json_object *main_obj)
+{
+    /* calculate a maximum buffer size based on the mesh part_size */
+
+    adios_set_max_buffer_size(json_object_path_get_int(main_obj, "clargs/part_size")/1048576 + 2);
+    adios_declare_group (domain_group_id, "domain", "", adios_stat_default);
+    adios_select_method(*domain_group_id, "MPI", "", "");
+
+    char * dimensions = "nx,ny";
+    int nx = JsonGetInt(main_obj,"problem/global/LogDims",0);
+    int ny = JsonGetInt(main_obj,"problem/global/LogDims",1);
+   
+    adios_define_var(*domain_group_id, "nx", "", adios_integer, "","","");
+    adios_define_var(*domain_group_id, "ny", "", adios_integer, "","","");
+    adios_define_var(*domain_group_id, "X", "" , adios_double, "nx", "", "");
+    adios_define_var(*domain_group_id, "Y", "", adios_double, "ny", "", "");
+    
+    adios_define_mesh_rectilinear (dimensions, "X,Y", "2", *domain_group_id, "rectilinearmesh");
+    adios_define_mesh_timevarying("no", *domain_group_id, "rectilinearmesh");
+    adios_define_var_mesh(*domain_group_id, "data", "rectilinearmesh");
+    adios_define_var_centering(*domain_group_id, "data", "point");
+    
+    user_data_t *ud;
+    ud->groupId = *domain_group_id;
+    ud->groupName = "domain";
+
+}
+
+static void write_quad_mesh_part(int64_t adiosfile, json_object *part, char *adios_mesh_type)
 {
     json_object *coordobj;
     char const *coordnames[] = {"X","Y","Z"};
@@ -136,7 +169,7 @@ static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *ad
     int dims[3] = {1,1,1};
     int dimsz[3] = {1,1,1};
 
-    if (strcmp(adios_mesh_type,"rectilinear"))	
+    if (!strcmp(adios_mesh_type,"rectilinear"))	
         coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
     else
         coordobj = JsonGetObj(part, "Mesh/Coords/XCoords");
@@ -145,7 +178,7 @@ static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *ad
     dimsz[0] = dims[0]-1;
     if (ndims > 1)
     {
-        if (strcmp(adios_mesh_type,"rectilinear"))	
+        if (!strcmp(adios_mesh_type,"rectilinear"))	
             coordobj = JsonGetObj(part, "Mesh/Coords/YAxisCoords");
         else
             coordobj = JsonGetObj(part, "Mesh/Coords/YCoords");
@@ -155,7 +188,7 @@ static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *ad
     }
     if (ndims > 2)
     {
-        if (strcmp(adios_mesh_type,"rectilinear"))	
+        if (!strcmp(adios_mesh_type,"rectilinear"))	
             coordobj = JsonGetObj(part, "Mesh/Coords/ZAxisCoords");
         else
             coordobj = JsonGetObj(part, "Mesh/Coords/ZCoords");
@@ -164,21 +197,8 @@ static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *ad
         dimsz[2] = dims[2]-1;
     }
 
-    int64_t domain_group_id;
-    char * dimensions = "nx,ny";
-
-    adios_declare_group (&domain_group_id, "domain", "", adios_stat_default);
-    adios_select_method (domain_group_id, "MPI", "", "");
-
-    adios_define_var(domain_group_id, "X", "MESH" , adios_double, "nx", "G", "O");
-    adios_define_var(domain_group_id, "Y", "MESH", adios_double, "ny", "G", "O");
-    
-    adios_define_mesh_rectilinear (dimensions, "X,Y", "2", domain_group_id, "rectilinearmesh");
-    adios_define_mesh_timevarying("no", domain_group_id, "rectilinearmesh");
-    adios_define_var_mesh(domain_group_id, "data", "rectilinearmesh");
-    adios_define_var_centering(domain_group_id, "data", "point");
-
-    adios_write(*adiosfile, "X", coords[0]);
+    adios_write(adiosfile, "nx", &dims[0]);
+    adios_write(adiosfile, "X", coords[0]);
 
     /*
     json_object *vars_array = JsonGetObj(part, "Vars");
@@ -199,9 +219,9 @@ static void write_quad_mesh_part(int64_t *adiosfile, json_object *part, char *ad
 static void write_mesh_part(int64_t adios_loc, json_object *part)
 {
     if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "rectilinear"))
-        write_quad_mesh_part(&adios_loc, part, "rectilinear");
+        write_quad_mesh_part(adios_loc, part, "rectilinear");
     else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "curvilinear"))
-        write_quad_mesh_part(&adios_loc, part, "curvilinear");
+        write_quad_mesh_part(adios_loc, part, "curvilinear");
 //    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "ucdzoo"))
 //        write_ucdzoo_mesh_part(adios_loc, part, "ucdzoo");
 //    else if (!strcmp(JsonGetStr(part, "Mesh/MeshType"), "arbitrary"))
@@ -231,44 +251,36 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
         json_object_path_get_string(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
         dumpn,
-        json_object_path_get_string(main_obj, "clargs/fileext"));
+        iface_ext);
+
+    int64_t domain_group_id;
+    declare_adios_structure(&domain_group_id, main_obj);
 
     adiosFile_ptr = (int64_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     adiosFile = *adiosFile_ptr;
 
     json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
 
-    /* calculate a maximum buffer size based on the mesh part_size */
-
-    adios_set_max_buffer_size(json_object_path_get_int(main_obj, "clargs/part_size")/1048576 + 2);
     
     for (int i = 0; i < json_object_array_length(parts); i++)
     {
         char domain_dir[256];
         json_object *this_part = json_object_array_get_idx(parts, i);
-        int64_t domain_group_id;
 
         snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
             json_object_path_get_int(this_part, "Mesh/ChunkID"));
 
-	write_mesh_part(domain_group_id, this_part);
+	write_mesh_part(adiosFile, this_part);
     }
-
-    /* If this is the 'root' processor, also write Silo's multi-XXX objects */
-#if 0
-/*    if (rank == 0)
-        WriteMultiXXXObjects(main_obj, siloFile, bat);
-*/
-#endif
 
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
      * of getting a consistent and up to date view of the file's contents. */
-    MACSIO_MIF_HandOffBaton(bat, adiosFile_ptr);
+    MACSIO_MIF_HandOffBaton(bat, &adiosFile);
 
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
-
+    printf("MIF OVER\n");
 }
 
 static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
@@ -322,6 +334,8 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
         }
         main_dump_mif(main_obj, numFiles, dumpn, dumpt);
     }
+
+    adios_finalize(MACSIO_MAIN_Rank);
 }
 
 static int register_this_interface()
