@@ -56,7 +56,7 @@ CXX ?= mpicxx
 CC ?= mpicc
 LINK ?= mpicxx
 
-COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_iface.c macsio_timing.c macsio_utils.c macsio_log.c macsio_data.c
+COMMON_SRC = macsio_clargs.c macsio_mif.c macsio_iface.c macsio_timing.c macsio_utils.c macsio_log.c macsio_data.c macsio_work.c
 COMMON_HDR=$(COMMON_SRC:.c=.h)
 COMMON_OBJ=$(COMMON_SRC:.c=.o)
 COMMON_RPATHS += -Wl,-rpath,$(JSON_C_LIB)

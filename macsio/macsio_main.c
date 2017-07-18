@@ -659,6 +659,19 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             /* Start dump timer */
             heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
 
+	    /*
+	     * for (t=0; t< maxT; t=t+dt)
+	     * {
+	     *  MACSio_DoComputeWork(&currentDt);
+	     *
+	     *  if (t>=tNextBurstDump)
+	     *	    MACSIO_BurstDump(...,&tNextBurstDump);
+	     *
+	     *	if (t>=tNextTrickleDump)
+	     *	    MACSIO_TrickleDump(..,&tNextTrickleDump);
+	     *
+	     *	t = t + currentDt;
+	     *	}
 #warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
 #warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
             /* do the dump */
