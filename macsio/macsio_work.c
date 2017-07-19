@@ -152,8 +152,8 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 	}
 	for (int j=0; j<4; j++){
 	    for (int k=0; k<3; k++){
-		mesh->mcell[ii].ncv1[j][k] = ii+11.0;
-		mesh->mcell[ii].ncv2[j][k] = ii+12.0;
+		mesh->mcell[ii].ncv1[j][k] = ii+11.0/nm;
+		mesh->mcell[ii].ncv2[j][k] = ii+12.0/nm;
 	    }
 	}
     }
@@ -217,12 +217,12 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 	    zz[i1] += sqrt( cell[loc[i1]].ncs1[0] + cell[loc[i1]].ncs1[1] + cell[loc[i1]].ncs1[2] + cell[loc[i1]].ncs1[3]
 			    + cell[loc[i1]].ncs2[0] + cell[loc[i1]].ncs2[1] + cell[loc[i1]].ncs2[2] + cell[loc[i1]].ncs2[3]);
 
-	    xx[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][0])+ exp(cell[loc[i1]].ncv1[1][0])+ exp(cell[loc[i1]].ncv1[2][0])+ exp(cell[loc[i1]].ncv1[4][0]) 
-			    + exp(cell[loc[i1]].ncv2[0][0])+ exp(cell[loc[i1]].ncv2[1][0])+ exp(cell[loc[i1]].ncv2[2][0])+ exp(cell[loc[i1]].ncv2[4][0]));
-	    yy[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][1])+ exp(cell[loc[i1]].ncv1[1][1])+ exp(cell[loc[i1]].ncv1[2][1])+ exp(cell[loc[i1]].ncv1[4][1]) 
-			    + exp(cell[loc[i1]].ncv2[0][1])+ exp(cell[loc[i1]].ncv2[1][1])+ exp(cell[loc[i1]].ncv2[2][1])+ exp(cell[loc[i1]].ncv2[4][1]));
-	    zz[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][2])+ exp(cell[loc[i1]].ncv1[1][2])+ exp(cell[loc[i1]].ncv1[2][2])+ exp(cell[loc[i1]].ncv1[4][2]) 
-			    + exp(cell[loc[i1]].ncv2[0][2])+ exp(cell[loc[i1]].ncv2[1][2])+ exp(cell[loc[i1]].ncv2[2][2])+ exp(cell[loc[i1]].ncv2[4][2]));
+	    xx[i1] += ( sin(cell[loc[i1]].ncv1[0][0])+ sin(cell[loc[i1]].ncv1[1][0])+ sin(cell[loc[i1]].ncv1[2][0])+ sin(cell[loc[i1]].ncv1[4][0]) 
+			    + sin(cell[loc[i1]].ncv2[0][0])+ sin(cell[loc[i1]].ncv2[1][0])+ sin(cell[loc[i1]].ncv2[2][0])+ sin(cell[loc[i1]].ncv2[4][0]));
+	    yy[i1] += ( sin(cell[loc[i1]].ncv1[0][1])+ sin(cell[loc[i1]].ncv1[1][1])+ sin(cell[loc[i1]].ncv1[2][1])+ sin(cell[loc[i1]].ncv1[4][1]) 
+			    + sin(cell[loc[i1]].ncv2[0][1])+ sin(cell[loc[i1]].ncv2[1][1])+ sin(cell[loc[i1]].ncv2[2][1])+ sin(cell[loc[i1]].ncv2[4][1]));
+	    zz[i1] += ( sin(cell[loc[i1]].ncv1[0][2])+ sin(cell[loc[i1]].ncv1[1][2])+ sin(cell[loc[i1]].ncv1[2][2])+ sin(cell[loc[i1]].ncv1[4][2]) 
+			    + sin(cell[loc[i1]].ncv2[0][2])+ sin(cell[loc[i1]].ncv2[1][2])+ sin(cell[loc[i1]].ncv2[2][2])+ sin(cell[loc[i1]].ncv2[4][2]));
 	}
 
 	time(&end_t);

@@ -644,7 +644,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 #warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
-    for (dumpNum = 0; dumpNum < json_object_path_get_int(main_obj, "clargs/num_dumps"); dumpNum++)
+    int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
+    for (dumpNum = 0; dumpNum < total_dumps; dumpNum++)
     {
         double dt;
         int scr_need_checkpoint_flag = 1;
@@ -687,6 +688,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	     *
 	     *	t = t + currentDt;
 	     *	}
+	     */
 #warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
 #warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
             /* do the dump */
@@ -715,7 +717,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
             MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
 
-	if (phase_spacing > 0){
+	if (phase_spacing > 0 && (total_dumps-dumpNum) > 1){
 	    double *currentDt = 0;
 	    MACSIO_WORK_DoComputeWork(currentDt, phase_spacing, compute_level);
 	}
