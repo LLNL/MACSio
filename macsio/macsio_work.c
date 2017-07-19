@@ -26,6 +26,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 #include <macsio_work.h>
 
@@ -81,15 +82,19 @@ typedef struct _mesh {
 int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 {
     int ret = 0;
-    
+    time_t start_t, end_t;
+
     mesh_t *mesh;
     double *xx,*yy,*zz;
+    cell_t *cell;
 
     int nm = 8000;
     int ng = 150;
-    int np = 100000;
+    int np = 1000000;
     int nshuffle = np/2;
     int nloop = 10;
+    int i1, i2, i3;
+    double rnum;
 
     /* Setup data */
     mesh = (mesh_t*) malloc(sizeof(mesh_t));
@@ -105,11 +110,130 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 
     for (int ii=0; ii<nm; ii++){
 	mesh->mcell[ii].ccs1 = ii+1.0;
+	mesh->mcell[ii].ccs2 = ii+2.0;
+	mesh->mcell[ii].ccs3 = ii+3.0;
+	mesh->mcell[ii].ccs4 = ii+4.0;
+	for (int j=0; j<3; j++){
+	    mesh->mcell[ii].ccv1[j] = ii+5.0;
+	    mesh->mcell[ii].ccv2[j] = ii+6.0;
+	    mesh->mcell[ii].ccv3[j] = ii+7.0;
+	    mesh->mcell[ii].ccv4[j] = ii+8.0;
+	}
+	for (int j=0; j<4; j++){
+	    mesh->mcell[ii].ncs1[j] = ii+9.0;
+	    mesh->mcell[ii].ncs2[j] = ii+10.0;
+	}
+	for (int j=0; j<4; j++){
+	    for (int k=0; k<3; k++){
+		mesh->mcell[ii].ncv1[j][k] = ii+11.0;
+		mesh->mcell[ii].ncv2[j][k] = ii+12.0;
+	    }
+	}
+    }
+    for (int ii=0; ii<ng; ii++){
+	mesh->mcell[ii].ccs1 = ii+1.0-ng;
+	mesh->mcell[ii].ccs2 = ii+2.0-ng;
+	mesh->mcell[ii].ccs3 = ii+3.0-ng;
+	mesh->mcell[ii].ccs4 = ii+4.0-ng;
+	for (int j=0; j<3; j++){
+	    mesh->mcell[ii].ccv1[j] = ii+5.0-ng;
+	    mesh->mcell[ii].ccv2[j] = ii+6.0-ng;
+	    mesh->mcell[ii].ccv3[j] = ii+7.0-ng;
+	    mesh->mcell[ii].ccv4[j] = ii+8.0-ng;
+	}
+	for (int j=0; j<4; j++){
+	    mesh->mcell[ii].ncs1[j] = ii+9.0-ng;
+	    mesh->mcell[ii].ncs2[j] = ii+10.0-ng;
+	}
+	for (int j=0; j<4; j++){
+	    for (int k=0; k<3; k++){
+		mesh->mcell[ii].ncv1[j][k] = ii+11.0-ng;
+		mesh->mcell[ii].ncv2[j][k] = ii+12.0-ng;
+	    }
+	}
+    }
+    for (int ii=0; ii<np; ii++){
+	indx[ii] = ii;
+    }
+    for (int ii=0; ii<nshuffle; ii++){
+	rnum = rand();
+	i1 = int(rnum*(ng+nm))-ng;
+	if (i1 > nm) i1 = nm;
+	if (i1 < (ng*-1)) i1 = ng;
+	if (i1 == 0) i1 = 1;
+	loc[ii] = i1;
     }
 
-    /*Do some steps till we get close to the targetDt*/
+    /* Start timer */ 
+    time(&start_t);
+
+    int ii=0;
+    /* Start of work loop */
+    while (true){
+	i1 = indx[ii];
+	if (loc[i1] > 0){
+	    cell = mesh->mcell;
+	} else {
+	    cell = mesh->gcell;
+	}
+
+	xx[i1]=0.0;
+	yy[i1]=0.0;
+	zz[i1]=0.0;
+
+	for (int jj=0; jj<nloop; jj++){
+	    /* Do flops requiring cell data */
+	    xx[i1] += cell[loc[i1]].ccs1;
+	    yy[i1] += cell[loc[i1]].ccs2;
+	    zz[i1] += cell[loc[i1]].ccs3;
+
+	    xx[i1] += sqrt( square(cell[loc[i1]].ccv1[0]) + square(cell[loc[i1]].ccv2[0]) + square(cell[loc[i1]].ccv3[0]) );
+	    yy[i1] += sqrt( square(cell[loc[i1]].ccv1[1]) + square(cell[loc[i1]].ccv2[1]) + square(cell[loc[i1]].ccv3[1]) );
+	    zz[i1] += sqrt( square(cell[loc[i1]].ccv1[2]) + square(cell[loc[i1]].ccv2[2]) + square(cell[loc[i1]].ccv3[2]) );
+
+	    xx[i1] += log(cell[loc[i1]].ccv4[0]);
+	    yy[i1] += log(cell[loc[i1]].ccv4[1]);
+	    zz[i1] += log(cell[loc[i1]].ccv4[2]);
+
+	    xx[i1] += sqrt( cell[loc[i1]].ncs1[0] + cell[loc[i1]].ncs1[1] + cell[loc[i1]].ncs1[2] + cell[loc[i1]].ncs1[3]);
+	    yy[i1] += sqrt( cell[loc[i1]].ncs2[0] + cell[loc[i1]].ncs2[1] + cell[loc[i1]].ncs2[2] + cell[loc[i1]].ncs2[3]);
+	    zz[i1] += sqrt( cell[loc[i1]].ncs1[0] + cell[loc[i1]].ncs1[1] + cell[loc[i1]].ncs1[2] + cell[loc[i1]].ncs1[3]
+			    + cell[loc[i1]].ncs2[0] + cell[loc[i1]].ncs2[1] + cell[loc[i1]].ncs2[2] + cell[loc[i1]].ncs2[3]);
+
+	    xx[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][0])+ exp(cell[loc[i1]].ncv1[1][0])+ exp(cell[loc[i1]].ncv1[2][0])+ exp(cell[loc[i1]].ncv1[4][0]) 
+			    + exp(cell[loc[i1]].ncv2[0][0])+ exp(cell[loc[i1]].ncv2[1][0])+ exp(cell[loc[i1]].ncv2[2][0])+ exp(cell[loc[i1]].ncv2[4][0]));
+	    yy[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][1])+ exp(cell[loc[i1]].ncv1[1][1])+ exp(cell[loc[i1]].ncv1[2][1])+ exp(cell[loc[i1]].ncv1[4][1]) 
+			    + exp(cell[loc[i1]].ncv2[0][1])+ exp(cell[loc[i1]].ncv2[1][1])+ exp(cell[loc[i1]].ncv2[2][1])+ exp(cell[loc[i1]].ncv2[4][1]));
+	    zz[i1] += sqrt( exp(cell[loc[i1]].ncv1[0][2])+ exp(cell[loc[i1]].ncv1[1][2])+ exp(cell[loc[i1]].ncv1[2][2])+ exp(cell[loc[i1]].ncv1[4][2]) 
+			    + exp(cell[loc[i1]].ncv2[0][2])+ exp(cell[loc[i1]].ncv2[1][2])+ exp(cell[loc[i1]].ncv2[2][2])+ exp(cell[loc[i1]].ncv2[4][2]));
+	}
+
+	cell = NULL;
+	time(&end_t);
+	/* If we've done enough work break out and return to main loop */
+	if (difftime(end_t, start_t) >= targetDelta) break;
+	if (ii == np){
+	    ii = 0;
+	} else {
+	    ii++;
+	}
+    }
+	printf("Worked for %f seconds, targetDelta %f\n", difftime(end_t,start_t), targetDelta);
+	free(xx);
+	free(yy); 
+	free(zz);
+	free(indx);
+	free(loc);
+	free(mesh->mcell);
+	free(mesh->gcell);
+	free(mesh);
 
     return ret;
+}
+
+double square(double num)
+{
+    return num*num;
 }
 
 /* Computation based proxy code */

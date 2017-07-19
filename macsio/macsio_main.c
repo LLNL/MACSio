@@ -52,6 +52,7 @@ extern "C" {
 #include <macsio_main.h>
 #include <macsio_timing.h>
 #include <macsio_utils.h>
+#include <macsio_work.h>
 
 #include <json-cwx/json.h>
 
@@ -469,6 +470,18 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "files. Note that this works only in MIFFPP mode. A request to exercise\n"
             "SCR in any other mode will be ignored and en error message generated.",
 #endif
+	"--compute_level %d", "1",
+	    "Add some work in between I/O phases. There are three levels of 'compute'\n"
+	    "that can be performed as follows:\n"
+	    "\tLevel 1: Perform a basic sleep operation\n"
+	    "\tLevel 2: Perform some simple FLOPS with randomly accessed data\n"
+	    "\tLevel 3: Execute the main kernel from the ? benchmark/mini-app\n"
+	    "This input is intended to be used in conjunection with --io_phase_spacing\n"
+	    "which will roughly control how much time is spent doing work between iops\n",
+	"--io_phase_spacing %f", "",
+	    "A rough lower bound on the number of seconds spent doing work between\n"
+	    "I/O phases. The type of work done is controlled by the --compute_level input\n"
+	    "and defaults to Level 1 (basic sleep).\n",
         "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
             "more frequent and detailed output. A value of zero, the default,\n"
@@ -598,6 +611,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     double dump_loop_start, dump_loop_end;
     double min_dump_loop_start, max_dump_loop_end;
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
+    int compute_level = JsonGetInt(main_obj, "clargs/compute_level");
+    double phase_spacing = json_object_path_get_double(main_obj, "clargs/io_phase_spacing");
 
     /* Sanity check args */
 
@@ -680,8 +695,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             mpi_errno = 0;
 #endif
             errno = 0;
-
-
+	        
             dt = MT_StopTimer(heavy_dump_tid);
 
 #ifdef HAVE_SCR
@@ -700,6 +714,11 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
             MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
             MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+
+	if (phase_spacing > 0){
+	    double *currentDt = 0;
+	    MACSIO_WORK_DoComputeWork(currentDt, phase_spacing, compute_level);
+	}
     }
 
     dump_loop_end = MT_Time();

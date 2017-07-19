@@ -37,6 +37,8 @@ extern int MACSIO_WORK_LevelOne(double *currentDt, double targetDelta);
 extern int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta);
 extern int MACSIO_WORK_LevelThree(double *currentDt, double targetDelta);
 
+double square(double num);
+
 #ifdef __cplusplus
 }
 #endif
