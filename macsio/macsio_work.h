@@ -32,10 +32,10 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 extern "C" {
 #endif
 
-extern int MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity);
-extern int MACSIO_WORK_LevelOne(double *currentDt, double targetDelta);
-extern int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta);
-extern int MACSIO_WORK_LevelThree(double *currentDt, double targetDelta);
+extern void MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity);
+extern void MACSIO_WORK_LevelOne(double *currentDt, double targetDelta);
+extern void MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta);
+extern void MACSIO_WORK_LevelThree(double *currentDt, double targetDelta);
 
 double square(double num);
 

@@ -57,10 +57,8 @@ char *getTimestamp()
     return timestamp;
 }
 
-int MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity) 
+void MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity) 
 {
-    int ret = 0;
-
     char *begin = getTimestamp();
     switch(workIntensity)
     {
@@ -78,18 +76,15 @@ int MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workInt
     }
     char *end = getTimestamp();
     MACSIO_LOG_MSG(Info, ("Work phase: Level %d: Begin %s - End %s", workIntensity, begin, end));
-    return ret;
 }
 
 /* Sleep */
-int MACSIO_WORK_LevelOne(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelOne(double *currentDt, double targetDelta)
 {
-    int ret = 0;
     struct timespec tim, tim2;
     tim.tv_sec = targetDelta;
     tim.tv_nsec = 0;
     nanosleep(&tim, &tim2);
-    return ret;
 }
 
 typedef struct _cell {
@@ -108,9 +103,8 @@ typedef struct _mesh {
 } mesh_t;
 
 /* Spin CPU */
-int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 {
-    int ret = 0;
     time_t start_t, end_t;
 
     mesh_t *mesh;
@@ -240,8 +234,6 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 	free(loc);
 	free(mesh->mcell);
 	free(mesh);
-
-    return ret;
 }
 
 double square(double num)
@@ -250,9 +242,7 @@ double square(double num)
 }
 
 /* Computation based proxy code */
-int MACSIO_WORK_LevelThree(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelThree(double *currentDt, double targetDelta)
 {
-    int ret = 0;
 
-    return ret;
 }
