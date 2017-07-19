@@ -26,14 +26,42 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 #include <math.h>
 
-#include <macsio_work.h>
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
 
+#include <macsio_work.h>
+#include <macsio_log.h>
+
+char *getTimestamp()
+{
+    char *timestamp = (char *)malloc(sizeof(char) *26);
+    char buffer[26];
+    int millisec;
+    struct tm* tm_info;
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    millisec = lrint(tv.tv_usec/1000.0);
+    if (millisec >= 1000){
+	millisec -=1000;
+	tv.tv_sec++;
+    }
+    tm_info = localtime(&tv.tv_sec);
+
+    strftime(buffer, 26, "%H:%M:%S", tm_info);
+    sprintf(timestamp, "%s.%03d", buffer, millisec);
+    return timestamp;
+}
 
 int MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity) 
 {
     int ret = 0;
+
+    char *begin = getTimestamp();
     switch(workIntensity)
     {
 	case 1:
@@ -48,7 +76,8 @@ int MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workInt
 	default:
 	    return 0;
     }
-
+    char *end = getTimestamp();
+    MACSIO_LOG_MSG(Info, ("Work phase: Level %d: Begin %s - End %s", workIntensity, begin, end));
     return ret;
 }
 
@@ -75,7 +104,7 @@ typedef struct _cell {
 } cell_t;
 
 typedef struct _mesh {
-    cell_t *mcell, *gcell;
+    cell_t *mcell;
 } mesh_t;
 
 /* Spin CPU */
@@ -89,7 +118,6 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
     cell_t *cell;
 
     int nm = 8000;
-    int ng = 150;
     int np = 1000000;
     int nshuffle = np/2;
     int nloop = 10;
@@ -99,7 +127,6 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
     /* Setup data */
     mesh = (mesh_t*) malloc(sizeof(mesh_t));
     mesh->mcell = (cell_t*) malloc(nm*sizeof(cell_t));
-    mesh->gcell = (cell_t*) malloc(ng*sizeof(cell_t));
 
     int *indx = (int*) malloc(np*sizeof(int));
     int *loc = (int*) malloc(np*sizeof(int));
@@ -130,57 +157,47 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 	    }
 	}
     }
-    for (int ii=0; ii<ng; ii++){
-	mesh->mcell[ii].ccs1 = ii+1.0-ng;
-	mesh->mcell[ii].ccs2 = ii+2.0-ng;
-	mesh->mcell[ii].ccs3 = ii+3.0-ng;
-	mesh->mcell[ii].ccs4 = ii+4.0-ng;
-	for (int j=0; j<3; j++){
-	    mesh->mcell[ii].ccv1[j] = ii+5.0-ng;
-	    mesh->mcell[ii].ccv2[j] = ii+6.0-ng;
-	    mesh->mcell[ii].ccv3[j] = ii+7.0-ng;
-	    mesh->mcell[ii].ccv4[j] = ii+8.0-ng;
-	}
-	for (int j=0; j<4; j++){
-	    mesh->mcell[ii].ncs1[j] = ii+9.0-ng;
-	    mesh->mcell[ii].ncs2[j] = ii+10.0-ng;
-	}
-	for (int j=0; j<4; j++){
-	    for (int k=0; k<3; k++){
-		mesh->mcell[ii].ncv1[j][k] = ii+11.0-ng;
-		mesh->mcell[ii].ncv2[j][k] = ii+12.0-ng;
-	    }
-	}
-    }
     for (int ii=0; ii<np; ii++){
 	indx[ii] = ii;
     }
+
+    srand((unsigned int)time(NULL));
+    
     for (int ii=0; ii<nshuffle; ii++){
-	rnum = rand();
-	i1 = int(rnum*(ng+nm))-ng;
+	rnum = ((double)rand()/(double)(RAND_MAX));
+	i1 = int(rnum*np);
+	rnum = ((double)rand()/(double)(RAND_MAX));
+	i2 = int(rnum*np);
+	if (i1 < 1) i1 = 1;
+	if (i1 > np) i1=np;
+	if (i2 < 1) i2 = 1;
+	if (i2 > np) i2 = np;
+	i3 = indx[i1];
+	indx[i1] = indx[i2];
+	indx[i2] = i3;
+    }
+    
+    
+    for (int ii=0; ii<np; ii++){
+	rnum = ((double)rand()/(double)(RAND_MAX));
+	i1 = int(rnum*nm);
 	if (i1 > nm) i1 = nm;
-	if (i1 < (ng*-1)) i1 = ng;
-	if (i1 == 0) i1 = 1;
+	if (i1 <= 0) i1 = 1;
 	loc[ii] = i1;
     }
 
     /* Start timer */ 
     time(&start_t);
 
+    cell = mesh->mcell;
     int ii=0;
     /* Start of work loop */
     while (true){
 	i1 = indx[ii];
-	if (loc[i1] > 0){
-	    cell = mesh->mcell;
-	} else {
-	    cell = mesh->gcell;
-	}
 
 	xx[i1]=0.0;
 	yy[i1]=0.0;
 	zz[i1]=0.0;
-
 	for (int jj=0; jj<nloop; jj++){
 	    /* Do flops requiring cell data */
 	    xx[i1] += cell[loc[i1]].ccs1;
@@ -208,24 +225,20 @@ int MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 			    + exp(cell[loc[i1]].ncv2[0][2])+ exp(cell[loc[i1]].ncv2[1][2])+ exp(cell[loc[i1]].ncv2[2][2])+ exp(cell[loc[i1]].ncv2[4][2]));
 	}
 
-	cell = NULL;
 	time(&end_t);
 	/* If we've done enough work break out and return to main loop */
 	if (difftime(end_t, start_t) >= targetDelta) break;
-	if (ii == np){
+	ii++;
+	if (ii >= np){
 	    ii = 0;
-	} else {
-	    ii++;
 	}
     }
-	printf("Worked for %f seconds, targetDelta %f\n", difftime(end_t,start_t), targetDelta);
 	free(xx);
 	free(yy); 
 	free(zz);
 	free(indx);
 	free(loc);
 	free(mesh->mcell);
-	free(mesh->gcell);
 	free(mesh);
 
     return ret;
