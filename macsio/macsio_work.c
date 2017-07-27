@@ -28,6 +28,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <stdlib.h>
+# include <string.h>
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -35,6 +37,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <macsio_work.h>
 #include <macsio_log.h>
+#include <macsio_main.h>
+#include <macsio_utils.h>
 
 char *getTimestamp()
 {
@@ -72,7 +76,7 @@ void MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIn
 	    MACSIO_WORK_LevelThree(currentDt, targetDelta);
 	    break;
 	default:
-	    return 0;
+	    return;
     }
     char *end = getTimestamp();
     MACSIO_LOG_MSG(Info, ("Work phase: Level %d: Begin %s - End %s", workIntensity, begin, end));
@@ -241,8 +245,228 @@ double square(double num)
     return num*num;
 }
 
-/* Computation based proxy code */
+
+/* Level Three solves the 2D Poisson equation via the Jacobi iterative method
+ * The domains are divided into strips and non blocking MPI routines are used
+ */
+void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max, int *left_proc, int *right_proc);
+/* macro to index into a 2-D (N+2)x(N+2) array */
+#define INDEX(i,j) ((N+2)*(i)+(j))
+
 void MACSIO_WORK_LevelThree(double *currentDt, double targetDelta)
 {
+    int N = 1024;			/* number of interior points per dim */
+    double epsilon = 1.0E-03;
+    double *f;
+    int i;
+    int j;
+    double change;
+    double my_change;
+    int my_n;
+    int n;
+    int step;
+    double *swap;
+    double wall_time;
+    double start, end;
+    int *proc;			/* process indexed by vertex */
 
+    double *u, *u_new;		/* linear arrays to hold solution */
+    int *i_min, *i_max;		/* min, max vertex indices of processes */
+    int *left_proc, *right_proc;	/* processes to left and right */
+
+    /* allocate and zero u and u_new */
+    int ndof = ( N + 2 ) * ( N + 2 );
+    u = ( double * ) malloc ( ndof * sizeof ( double ) );
+    for ( i = 0; i < ndof; i++){
+	u[i] = 0.0;
+    }
+
+    u_new = ( double * ) malloc ( ndof * sizeof ( double ) );
+    for ( i = 0; i < ndof; i++ ){
+	u_new[i] = 0.0;
+    }
+
+    /* Set up source term for poisson equation */
+    int k;
+    double q;
+
+    f = ( double * ) malloc ( ( N + 2 ) * ( N + 2 ) * sizeof ( double ) );
+
+    for ( i = 0; i < ( N + 2 ) * ( N + 2 ); i++ ){
+	f[i] = 0.0;
+    }
+    /* Make a dipole. */
+    q = 10.0;
+
+    i = 1 + N / 4;
+    j = i;
+    k = INDEX ( i, j );
+    f[k] = q;
+
+    i = 1 + 3 * N / 4;
+    j = i;
+    k = INDEX ( i, j );
+    f[k] = -q;
+
+    double d;
+    double eps;
+    int p;
+    double x_max;
+    double x_min;
+
+    /* Allocate arrays for process information. */
+    proc = ( int * ) malloc ( ( N + 2 ) * sizeof ( int ) );
+    i_min = ( int * ) malloc ( MACSIO_MAIN_Size * sizeof ( int ) );
+    i_max = ( int * ) malloc ( MACSIO_MAIN_Size * sizeof ( int ) );
+    left_proc = ( int * ) malloc ( MACSIO_MAIN_Size * sizeof ( int ) );
+    right_proc = ( int * ) malloc ( MACSIO_MAIN_Size * sizeof ( int ) );
+    /* Divide the range [(1-eps)..(N+eps)] evenly among the processes. */
+    eps = 0.0001;
+    d = ( N - 1.0 + 2.0 * eps ) / ( double ) MACSIO_MAIN_Size;
+
+    for ( p = 0; p < MACSIO_MAIN_Size; p++ ){
+	/* The I indices assigned to domain P will satisfy X_MIN <= I <= X_MAX. */
+	x_min = - eps + 1.0 + ( double ) ( p * d );
+	x_max = x_min + d;
+	/* For the node with index I, store in PROC[I] the process P it belongs to. */
+	for ( i = 1; i <= N; i++ ){
+	    if ( x_min <= i && i < x_max ){
+		proc[i] = p;
+	    }
+	}
+    }
+    /* Now find the lowest index I associated with each process P. */
+    for ( p = 0; p < MACSIO_MAIN_Size; p++ ){
+	for ( i = 1; i <= N; i++ ){
+	    if ( proc[i] == p ){
+		break;
+	    }
+	}
+	i_min[p] = i;
+	/* Find the largest index associated with each process P. */
+	for ( i = N; 1 <= i; i-- ){
+	    if ( proc[i] == p ){
+		break;
+	    }
+	}
+	i_max[p] = i;
+	/* Find the processes to left and right. */
+	left_proc[p] = -1;
+	right_proc[p] = -1;
+
+	if ( proc[p] != -1 ) {
+	    if ( 1 < i_min[p] && i_min[p] <= N ){
+		left_proc[p] = proc[i_min[p] - 1];
+	    }
+	    if ( 0 < i_max[p] && i_max[p] < N ){
+		right_proc[p] = proc[i_max[p] + 1];
+	    }
+	}
+    }
+
+    step = 0;
+    /* Begin timing. */
+    start = MPI_Wtime ( );
+    /* Begin iteration. */
+    do {
+	jacobi (N, f, u, u_new, i_min, i_max, left_proc, right_proc);
+	++step;
+	/* Estimate the error */
+	change = 0.0;
+	n = 0;
+
+	my_change = 0.0;
+	my_n = 0;
+
+	for ( i = i_min[MACSIO_MAIN_Rank]; i <= i_max[MACSIO_MAIN_Rank]; i++ ){
+	    for ( j = 1; j <= N; j++ ){
+		if ( u_new[INDEX(i,j)] != 0.0 ) {
+		    my_change = my_change + fabs ( 1.0 - u[INDEX(i,j)] / u_new[INDEX(i,j)] );
+		    my_n = my_n + 1;
+		}
+	    }
+	}
+	MPI_Allreduce ( &my_change, &change, 1, MPI_DOUBLE, MPI_SUM, MACSIO_MAIN_Comm );
+	MPI_Allreduce ( &my_n, &n, 1, MPI_INT, MPI_SUM, MACSIO_MAIN_Comm );
+
+	if ( n != 0 ){
+	    change = change / n;
+	}
+	/*  Swap U and U_NEW. */
+	swap = u;
+	u = u_new;
+	u_new = swap;
+
+	/* Because we are aiming to loop for a set time, we need to let the root process
+	 * measure the time elapsed to ensure everyone does the same number of steps */ 
+	end = MPI_Wtime();
+	wall_time = end-start;
+	MPI_Bcast(&wall_time, 1, MPI_DOUBLE, 0, MACSIO_MAIN_Comm);
+    } while (wall_time < targetDelta);
+
+    free ( f );
+}
+
+/* Carry out the Jacobi iteration */
+void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max, int *left_proc, int *right_proc)
+{
+    double h;
+    int i;
+    int j;
+    MPI_Request request[4];
+    int requests;
+    MPI_Status status[4];
+    /* H is the lattice spacing. */
+    h = 1.0 / ( double ) ( N + 1 );
+    /* Update ghost layers using non-blocking send/receive */
+    requests = 0;
+
+    if ( left_proc[MACSIO_MAIN_Rank] >= 0 && left_proc[MACSIO_MAIN_Rank] < MACSIO_MAIN_Size ) {
+	MPI_Irecv ( u + INDEX(i_min[MACSIO_MAIN_Rank] - 1, 1), N, MPI_DOUBLE,
+		left_proc[MACSIO_MAIN_Rank], 0, MACSIO_MAIN_Comm,
+		request + requests++ );
+
+	MPI_Isend ( u + INDEX(i_min[MACSIO_MAIN_Rank], 1), N, MPI_DOUBLE,
+		left_proc[MACSIO_MAIN_Rank], 1, MACSIO_MAIN_Comm,
+		request + requests++ );
+    }
+
+    if ( right_proc[MACSIO_MAIN_Rank] >= 0 && right_proc[MACSIO_MAIN_Rank] < MACSIO_MAIN_Size ) {
+	MPI_Irecv ( u + INDEX(i_max[MACSIO_MAIN_Rank] + 1, 1), N, MPI_DOUBLE,
+		right_proc[MACSIO_MAIN_Rank], 1, MACSIO_MAIN_Comm,
+		request + requests++ );
+
+	MPI_Isend ( u + INDEX(i_max[MACSIO_MAIN_Rank], 1), N, MPI_DOUBLE,
+		right_proc[MACSIO_MAIN_Rank], 0, MACSIO_MAIN_Comm,
+		request + requests++ );
+    }
+    /* Jacobi update for internal vertices in my domain */
+    for ( i = i_min[MACSIO_MAIN_Rank] + 1; i <= i_max[MACSIO_MAIN_Rank] - 1; i++ ){
+	for ( j = 1; j <= N; j++ ){
+	    u_new[INDEX(i,j)] =
+		0.25 * ( u[INDEX(i-1,j)] + u[INDEX(i+1,j)] +
+			u[INDEX(i,j-1)] + u[INDEX(i,j+1)] +
+			h * h * f[INDEX(i,j)] );
+	}
+    }
+    /*  Wait for all non-blocking communications to complete. */
+    MPI_Waitall ( requests, request, status );
+    /* Jacobi update for boundary vertices in my domain. */
+    i = i_min[MACSIO_MAIN_Rank];
+    for ( j = 1; j <= N; j++ ){
+	u_new[INDEX(i,j)] =
+	    0.25 * ( u[INDEX(i-1,j)] + u[INDEX(i+1,j)] +
+		    u[INDEX(i,j-1)] + u[INDEX(i,j+1)] +
+		    h * h * f[INDEX(i,j)] );
+    }
+
+    i = i_max[MACSIO_MAIN_Rank];
+    if (i != i_min[MACSIO_MAIN_Rank]){
+	for (j = 1; j <= N; j++){
+	    u_new[INDEX(i,j)] =
+		0.25 * ( u[INDEX(i-1,j)] + u[INDEX(i+1,j)] +
+			u[INDEX(i,j-1)] + u[INDEX(i,j+1)] +
+			h * h * f[INDEX(i,j)] );
+	}
+    }
 }
