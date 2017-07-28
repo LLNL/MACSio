@@ -61,32 +61,36 @@ char *getTimestamp()
     return timestamp;
 }
 
-void MACSIO_WORK_DoComputeWork(double *currentDt, double targetDelta, int workIntensity) 
+void MACSIO_WORK_DoComputeWork(double *currentT, double currentDt, int workIntensity) 
 {
-    char *begin = getTimestamp();
+    time_t start,end;
+    time(&start);
+    char *start_c = getTimestamp();
     switch(workIntensity)
     {
 	case 1:
-	    MACSIO_WORK_LevelOne(currentDt, targetDelta);
+	    MACSIO_WORK_LevelOne(currentDt);
 	    break;
 	case 2:
-	    MACSIO_WORK_LevelTwo(currentDt, targetDelta);
+	    MACSIO_WORK_LevelTwo(currentDt);
 	    break;
 	case 3:
-	    MACSIO_WORK_LevelThree(currentDt, targetDelta);
+	    MACSIO_WORK_LevelThree(currentDt);
 	    break;
 	default:
 	    return;
     }
-    char *end = getTimestamp();
-    MACSIO_LOG_MSG(Info, ("Work phase: Level %d: Begin %s - End %s", workIntensity, begin, end));
+    char *end_c = getTimestamp();
+    time(&end);
+    MACSIO_LOG_MSG(Info, ("Work phase: Level %d: Begin %s - End %s: Duration %.2f sec", workIntensity, start_c, end_c, difftime(end, start)));
+    *currentT += currentDt;
 }
 
 /* Sleep */
-void MACSIO_WORK_LevelOne(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelOne(double currentDt)
 {
     struct timespec tim, tim2;
-    tim.tv_sec = targetDelta;
+    tim.tv_sec = currentDt;
     tim.tv_nsec = 0;
     nanosleep(&tim, &tim2);
 }
@@ -107,7 +111,7 @@ typedef struct _mesh {
 } mesh_t;
 
 /* Spin CPU */
-void MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelTwo(double currentDt)
 {
     time_t start_t, end_t;
 
@@ -225,7 +229,7 @@ void MACSIO_WORK_LevelTwo(double *currentDt, double targetDelta)
 
 	time(&end_t);
 	/* If we've done enough work break out and return to main loop */
-	if (difftime(end_t, start_t) >= targetDelta) break;
+	if (difftime(end_t, start_t) >= currentDt) break;
 	ii++;
 	if (ii >= np){
 	    ii = 0;
@@ -245,15 +249,14 @@ double square(double num)
     return num*num;
 }
 
-
 /* Level Three solves the 2D Poisson equation via the Jacobi iterative method
  * The domains are divided into strips and non blocking MPI routines are used
  */
-void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max, int *left_proc, int *right_proc);
+
 /* macro to index into a 2-D (N+2)x(N+2) array */
 #define INDEX(i,j) ((N+2)*(i)+(j))
 
-void MACSIO_WORK_LevelThree(double *currentDt, double targetDelta)
+void MACSIO_WORK_LevelThree(double currentDt)
 {
     int N = 1024;			/* number of interior points per dim */
     double epsilon = 1.0E-03;
@@ -402,7 +405,7 @@ void MACSIO_WORK_LevelThree(double *currentDt, double targetDelta)
 	end = MPI_Wtime();
 	wall_time = end-start;
 	MPI_Bcast(&wall_time, 1, MPI_DOUBLE, 0, MACSIO_MAIN_Comm);
-    } while (wall_time < targetDelta);
+    } while (wall_time < currentDt);
 
     free ( f );
 }

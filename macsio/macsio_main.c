@@ -470,17 +470,17 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "files. Note that this works only in MIFFPP mode. A request to exercise\n"
             "SCR in any other mode will be ignored and en error message generated.",
 #endif
-	"--compute_level %d", "1",
+	"--compute_work_intensity %d", "1",
 	    "Add some work in between I/O phases. There are three levels of 'compute'\n"
 	    "that can be performed as follows:\n"
 	    "\tLevel 1: Perform a basic sleep operation\n"
 	    "\tLevel 2: Perform some simple FLOPS with randomly accessed data\n"
 	    "\tLevel 3: Execute the main kernel from the ? benchmark/mini-app\n"
-	    "This input is intended to be used in conjunection with --io_phase_spacing\n"
+	    "This input is intended to be used in conjunection with --compute_time\n"
 	    "which will roughly control how much time is spent doing work between iops\n",
-	"--io_phase_spacing %f", "",
+	"--compute_time %f", "",
 	    "A rough lower bound on the number of seconds spent doing work between\n"
-	    "I/O phases. The type of work done is controlled by the --compute_level input\n"
+	    "I/O phases. The type of work done is controlled by the --compute_work_intensity input\n"
 	    "and defaults to Level 1 (basic sleep).\n",
         "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
@@ -606,13 +606,14 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     unsigned long long problem_nbytes, dumpBytes = 0, summedBytes = 0;
     char nbytes_str[32], seconds_str[32], bandwidth_str[32], seconds_str2[32];
     double dumpTime = 0;
+    double timer_dt;
     double bandwidth, summedBandwidth;
     MACSIO_TIMING_GroupMask_t main_wr_grp = MACSIO_TIMING_GroupMask("main_write");
     double dump_loop_start, dump_loop_end;
     double min_dump_loop_start, max_dump_loop_end;
     int exercise_scr = JsonGetInt(main_obj, "clargs/exercise_scr");
-    int compute_level = JsonGetInt(main_obj, "clargs/compute_level");
-    double phase_spacing = json_object_path_get_double(main_obj, "clargs/io_phase_spacing");
+    int work_intensity = JsonGetInt(main_obj, "clargs/compute_work_intensity");
+    double work_dt = json_object_path_get_double(main_obj, "clargs/compute_time");
 
     /* Sanity check args */
 
@@ -645,83 +646,88 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
-    for (dumpNum = 0; dumpNum < total_dumps; dumpNum++)
-    {
-        double dt;
-        int scr_need_checkpoint_flag = 1;
-        MACSIO_TIMING_TimerId_t heavy_dump_tid;
 
-#warning ADD OPTION TO UNLINK OLD FILE SETS
+    double t;
+    double maxT;
+    double dt;
+    double tNextBurstDump;
+    double tNextTrickleDump;
+   
+    int doWork = 0;
+    if (work_dt > 0){
+	doWork=1;
+    }
 
+    dt = work_dt;
+    maxT = total_dumps*dt;
+    tNextBurstDump = dt;
+    dumpNum = 0;
+    t = 0;
+#warning THIS LOOP CURRENTLY JUST DOES A DUMP AFTER EVERY COMPUTE UP TO THE TOTAL NUMBER OF DUMPS. 
+    while (t < maxT){
+
+	if (doWork)
+	    MACSIO_WORK_DoComputeWork(&t, dt, work_intensity);
+
+	if (t >= tNextBurstDump || !doWork){
+	    int scr_need_checkpoint_flag = 1;
+	    MACSIO_TIMING_TimerId_t heavy_dump_tid;
 #ifdef HAVE_SCR
-        if (exercise_scr)
-            SCR_Need_checkpoint(&scr_need_checkpoint_flag);
+	    if (exercise_scr)
+		SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
-        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
-            json_object_path_get_string(main_obj, "clargs/interface"));
+	    const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
+		    json_object_path_get_string(main_obj, "clargs/interface"));
 
-        /* log dump start */
-
-        if (!exercise_scr || scr_need_checkpoint_flag)
-        {
-            int scr_valid = 0;
-
+	    /* log dump start */
+	    if (!exercise_scr || scr_need_checkpoint_flag){
+		int scr_valid = 0;
 #ifdef HAVE_SCR
-            if (exercise_scr)
-                SCR_Start_checkpoint();
+		if (exercise_scr)
+		    SCR_Start_checkpoint();
 #endif
 
-            /* Start dump timer */
-            heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
-
-	    /*
-	     * for (t=0; t< maxT; t=t+dt)
-	     * {
-	     *  MACSio_DoComputeWork(&currentDt);
-	     *
-	     *  if (t>=tNextBurstDump)
-	     *	    MACSIO_BurstDump(...,&tNextBurstDump);
-	     *
-	     *	if (t>=tNextTrickleDump)
-	     *	    MACSIO_TrickleDump(..,&tNextTrickleDump);
-	     *
-	     *	t = t + currentDt;
-	     *	}
-	     */
+		/* Start dump timer */
+		heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
 #warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
 #warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
-            /* do the dump */
-            (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+		/* do the dump */
+		//MACSIO_BurstDump(dt);
+		(*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 #ifdef HAVE_MPI
-            mpi_errno = 0;
+		mpi_errno = 0;
 #endif
-            errno = 0;
-	        
-            dt = MT_StopTimer(heavy_dump_tid);
+		errno = 0;
+
+		timer_dt = MT_StopTimer(heavy_dump_tid);
 
 #ifdef HAVE_SCR
-            if (exercise_scr)
-                SCR_Complete_checkpoint(scr_valid);
+		if (exercise_scr)
+		    SCR_Complete_checkpoint(scr_valid);
 #endif
-        }
+	    }
 
-        /* stop timer */
-        dumpTime += dt;
-        dumpBytes += problem_nbytes;
-        dumpCount += 1;
+	/* stop timer */
+	dumpTime += timer_dt;
+	dumpBytes += problem_nbytes;
+	dumpCount += 1;
 
-        /* log dump timing */
-        MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
-            MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
-            MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
-            MU_PrBW(problem_nbytes, dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+	/* log dump timing */
+	MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
+		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
+		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+		    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+	
+	dumpNum++;
+	tNextBurstDump += dt;
+	} /* end of burst dump loop */
 
-	if (phase_spacing > 0 && (total_dumps-dumpNum) > 1){
-	    double *currentDt = 0;
-	    MACSIO_WORK_DoComputeWork(currentDt, phase_spacing, compute_level);
-	}
-    }
+	if (t >= tNextTrickleDump){
+	    /* MACSIO_TrickleDump(dt); */
+	} /*end of trickle dump loop */
+
+    } /* end of timetep loop */
 
     dump_loop_end = MT_Time();
 
