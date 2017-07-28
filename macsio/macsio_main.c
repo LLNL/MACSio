@@ -727,6 +727,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	    /* MACSIO_TrickleDump(dt); */
 	} /*end of trickle dump loop */
 
+	/* Increase the timestep if we aren't using the work routine to do so */
+	if (!doWork) t++;
     } /* end of timetep loop */
 
     dump_loop_end = MT_Time();
