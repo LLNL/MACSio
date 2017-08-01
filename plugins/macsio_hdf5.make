@@ -34,7 +34,7 @@ HDF5_URL = http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-$(HDF5_VERSION)/src/$(
 
 ifneq ($(HDF5_HOME),)
 
-HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -lhdf5
+HDF5_LDFLAGS = -L$(HDF5_HOME)/lib -lhdf5 -Wl,-rpath,$(HDF5_HOME)/lib
 HDF5_CFLAGS = -I$(HDF5_HOME)/include
 
 HDF5_SOURCES = macsio_hdf5.c

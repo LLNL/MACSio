@@ -46,7 +46,7 @@ endif
 endif
 
 JSON_C_INC=../json-cwx/install/include
-JSON_C_LIB=../json-cwx/install/lib
+JSON_C_LIB=${PWD}/../json-cwx/install/lib
 JSON_C_LDFLAGS=-ljson-cwx
 DRIVER_INCS += -I$(JSON_C_INC)
 DRIVER_LIBS += -L$(JSON_C_LIB) $(JSON_C_LDFLAGS)

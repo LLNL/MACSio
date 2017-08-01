@@ -37,7 +37,7 @@ PLUGIN_LDFLAGS += $(SILO_LDFLAGS)
 PLUGIN_LIST += silo
 
 SILO_CFLAGS = -I$(SILO_HOME)/include
-SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsilo
+SILO_LDFLAGS = -L$(SILO_HOME)/lib -lsiloh5
 
 ifneq ($(HDF5_HOME),)
 HAVE_SILOH5 = $(shell ls $(SILO_HOME)/lib/libsiloh5.{a,so,dylib} 2>/dev/null)
