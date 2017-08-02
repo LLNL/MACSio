@@ -75,7 +75,11 @@ ifeq ($(SCR_HOME),)
 else
 CFLAGS += -DHAVE_SCR
 SCR_INCS = $(SCR_HOME)/include
+ifeq ($(wildcard $(SCR_HOME)/lib/.),)
 SCR_LIBS = $(SCR_HOME)/lib64
+else
+SCR_LIBS = $(SCR_HOME)/lib
+endif
 DRIVER_INCS += -I$(SCR_INCS)
 LDFLAGS += -L$(SCR_LIBS) -lscr
 COMMON_RPATHS += -Wl,-rpath,$(SCR_LIBS)
