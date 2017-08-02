@@ -31,6 +31,10 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <macsio_log.h>
 #include <macsio_timing.h>
 
+int MACSIO_MAIN_Rank;
+int MACSIO_MAIN_Size;
+int MACSIO_MAIN_Comm;
+
 void func2();
 
 void func4()

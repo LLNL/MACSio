@@ -34,6 +34,10 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mpi.h>
 #endif
 
+int MACSIO_MAIN_Rank;
+int MACSIO_MAIN_Size;
+int MACSIO_MAIN_Comm;
+
 int main (int argc, char **argv)
 {
     int i;
