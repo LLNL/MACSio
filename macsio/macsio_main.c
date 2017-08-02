@@ -656,6 +656,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     int doWork = 0;
     if (work_dt > 0){
 	doWork=1;
+    } else {
+	work_dt = 1;
     }
 
     dt = work_dt;
