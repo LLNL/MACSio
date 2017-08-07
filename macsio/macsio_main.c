@@ -507,7 +507,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Not currently documented",
         "--filebase %s", "macsio",
             "Basename of generated file(s).",
-        "--fileext %s", "dat",
+        "--fileext %s", "",
             "Extension of generated file(s).",
         "--read_path %s", MACSIO_CLARGS_NODEFAULT,
             "Specify a path name (file or dir) to start reading for a read test.",
@@ -681,6 +681,10 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 	    const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
 		    json_object_path_get_string(main_obj, "clargs/interface"));
+
+	    if (!strcmp(json_object_path_get_string(main_obj, "clargs/fileext"),"")){
+		json_object_path_set_string(main_obj, "clargs/fileext", iface->ext);
+	    }
 
 	    /* log dump start */
 	    if (!exercise_scr || scr_need_checkpoint_flag){
