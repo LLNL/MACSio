@@ -58,12 +58,12 @@ list: notes
 
 notes:
 	@echo
-	@echo "To do..."
-	@echo "    Eliminate duplicate inclusion of CONFIG_SITE_FILE"
-	@echo "    Get def'n of MACSIO_CFLAGS from main or re-factor it to another .make include file"
-	@echo "    Add a clean target"
-	@echo "    Add ability to build specific list of plugins"
-	@echo
+#	@echo "To do..."
+#	@echo "    Eliminate duplicate inclusion of CONFIG_SITE_FILE"
+#	@echo "    Get def'n of MACSIO_CFLAGS from main or re-factor it to another .make include file"
+#	@echo "    Add a clean target"
+#	@echo "    Add ability to build specific list of plugins"
+#	@echo
 
 objlist:
 	@echo $(PLUGIN_OBJECTS)
