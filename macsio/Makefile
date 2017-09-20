@@ -158,7 +158,7 @@ dataclean:
 	ls *.json | grep -v macsio_json_object.json | xargs rm -f
 
 allclean: clean dataclean doxclean
-	rm -rf ../json-cwx/{install,build}
+	rm -rf ../json-cwx/install ../json-cwx/build
 
 # Standard GNU target
 html:	dox
