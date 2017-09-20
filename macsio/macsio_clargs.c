@@ -216,7 +216,7 @@ MACSIO_CLARGS_ProcessCmdline(
    }
 
 #ifdef HAVE_MPI
-#warning DO JUST ONE BCAST HERE
+//#warning DO JUST ONE BCAST HERE
    MPI_Bcast(&helpWasRequested, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #endif
 
@@ -420,7 +420,7 @@ MACSIO_CLARGS_ProcessCmdline(
           MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
               flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
               ("invalid argument type encountered at position %d",invalidArgTypeFound));
-#warning FIX WARN FAILURE BEHAVIOR HERE
+//#warning FIX WARN FAILURE BEHAVIOR HERE
       return MACSIO_CLARGS_ERROR;
    }
 
@@ -437,7 +437,7 @@ MACSIO_CLARGS_ProcessCmdline(
       /* processor zero computes size of linearized argv and builds it */
       if (rank == 0)
       {
-#warning MAKE THIS A CLARG
+//#warning MAKE THIS A CLARG
 	 if (getenv("MACSIO_CLARGS_IGNORE_UNKNOWN_ARGS"))
 	    flags.error_mode = MACSIO_CLARGS_WARN;
 

@@ -410,7 +410,7 @@ unsigned long lh_char_hash(const void *k)
 #elif defined _MSC_VER
 		InterlockedCompareExchange(&random_seed, seed, -1);
 #else
-#warning "racy random seed initializtion if used by multiple threads"
+//#warning "racy random seed initializtion if used by multiple threads"
 		random_seed = seed; /* potentially racy */
 #endif
 	}

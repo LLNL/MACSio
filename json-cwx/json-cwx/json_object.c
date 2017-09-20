@@ -986,7 +986,7 @@ static void json_object_extarr_delete(struct json_object* jso)
   json_object_generic_delete(jso);
 }
 
-#warning MOVE ADDTOGROUP TO TOP OF NON-STATIC FUNCTIONS
+//#warning MOVE ADDTOGROUP TO TOP OF NON-STATIC FUNCTIONS
 
 /**
  * \addtogroup jsonclib JSON-C Library
@@ -1429,7 +1429,7 @@ char const *json_object_enum_get_name(struct json_object* jso, int64_t val)
   return NULL;
 }
 
-#warning MAY WANT TO USE -INT_MAX FOR BAD ENUM VALUE
+//#warning MAY WANT TO USE -INT_MAX FOR BAD ENUM VALUE
 /**
   * \brief Get the value of a specific name/value pair in the enumeration
   *
@@ -1637,7 +1637,7 @@ json_bool json_object_set_string(struct json_object *string_obj, char const *val
    (e.g. "/foo/bar/123/front/567/back") */
 static void *json_object_apath_get_leafobj_recurse(struct json_object *src, char *key_path)
 {
-#warning we need to support . and .. notation here too
+//#warning we need to support . and .. notation here too
     int idx;
     struct json_object *sub_object = 0;
     char *slash_char_p, *next = 0;
@@ -2026,7 +2026,7 @@ char const *json_paste_apath(
 
 static void *json_object_path_get_leafobj_recurse(struct json_object *src, char *key_path, json_type jtype)
 {
-#warning we need to support . and .. notation here too
+//#warning we need to support . and .. notation here too
 
     struct json_object *sub_object = 0;
     char *slash_char_p;

@@ -26,7 +26,7 @@ this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#warning ELIMINATE USE OF JSON HEADER FILE HERE
+//#warning ELIMINATE USE OF JSON HEADER FILE HERE
 #include <json-cwx/json.h>
 
 #define MACSIO_IFACE_MAX_COUNT 128
@@ -47,14 +47,14 @@ typedef int (*ProcessArgsFunc)  (int argi, int argc, char **argv);
 typedef int (*QueryFeaturesFunc)(void);
 typedef int (*IdentifyFileFunc) (char const *pathname);
 
-#warning ALLOCATE MPI TAG IDS HERE TOO
+//#warning ALLOCATE MPI TAG IDS HERE TOO
 
-#warning MAKE THE MAKEFILE LINK ANY .o FILES WITH A GIVEN NAME SCHEME
+//#warning MAKE THE MAKEFILE LINK ANY .o FILES WITH A GIVEN NAME SCHEME
 typedef struct MACSIO_IFACE_Handle_t
 {   char                 name[MACSIO_IFACE_MAX_NAME];
     char                 ext[MACSIO_IFACE_MAX_NAME];
-#warning DEFAULT FILE EXTENSION HERE
-#warning Features: Async, compression, sif, grid types, uni-modal or bi-modal
+//#warning DEFAULT FILE EXTENSION HERE
+//#warning Features: Async, compression, sif, grid types, uni-modal or bi-modal
     int                  slotUsed;
     ProcessArgsFunc      processArgsFunc;
     DumpFunc             dumpFunc;

@@ -259,7 +259,7 @@ MACSIO_UTILS_MakeDimsJsonArray(int ndims, const int *dims)
     return dims_array;
 }
 
-#warning WOULD BE MORE CONSISTENT TO STORE AS MIN/MAX PAIRS RATHER THAN ALL MINS FOLLOWED BY ALL MAXS
+//#warning WOULD BE MORE CONSISTENT TO STORE AS MIN/MAX PAIRS RATHER THAN ALL MINS FOLLOWED BY ALL MAXS
 json_object *
 MACSIO_UTILS_MakeBoundsJsonArray(double const * bounds)
 {

@@ -39,7 +39,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 extern "C" {
 #endif
 
-#warning REMOVE THIS TYPEDEF
+//#warning REMOVE THIS TYPEDEF
 typedef struct MACSIO_FileHandlePublic_t
 {
     /* Public Data Members */

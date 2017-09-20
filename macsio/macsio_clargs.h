@@ -64,7 +64,7 @@ typedef struct _MACSIO_CLARGS_ArgvFlags_t
     unsigned int defaults_mode : 1;
 } MACSIO_CLARGS_ArgvFlags_t;
 
-#warning RE-THINK THESE NAMES
+//#warning RE-THINK THESE NAMES
 extern int MACSIO_CLARGS_ProcessCmdline(void **retobj, MACSIO_CLARGS_ArgvFlags_t flags, int argi, int argc, char **argv, ...);
 
 #ifdef __cplusplus

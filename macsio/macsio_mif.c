@@ -97,8 +97,8 @@ processor.
 
 \returns The MACSIO_MIF \em baton object
 */
-#warning ADD A THROTTLE OPTION HERE FOR TOT FILES VS CONCURRENT FILES
-#warning FOR AUTO MODE, MUST HAVE A CALL TO QUERY FILE COUNT
+//#warning ADD A THROTTLE OPTION HERE FOR TOT FILES VS CONCURRENT FILES
+//#warning FOR AUTO MODE, MUST HAVE A CALL TO QUERY FILE COUNT
 MACSIO_MIF_baton_t *MACSIO_MIF_Init(
     int numFiles,                   /**< [in] Number of resultant files. Note: this is entirely independent of
                                          number of processors. Typically, this number is chosen to match

@@ -90,7 +90,7 @@ static void ClosePDBFile(void *file, void *userData)
 
 static void write_mesh_part(PDBfile *pdbfile, json_object *part_obj)
 {
-#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
+//#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
     int i;
     json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
 
@@ -126,7 +126,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
-#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
+//#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
     MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 3,
         CreatePDBFile, OpenPDBFile, ClosePDBFile, 0);
 
@@ -184,14 +184,14 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
 
-#warning MOVE TO A FUNCTION
+//#warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
     json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
         json_object *filecnt = json_object_array_get_idx(parfmode_obj, 1);
-#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
+//#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
         if (!strcmp(json_object_get_string(modestr), "SIF"))
         {
             MACSIO_LOG_MSG(Die, ("PDB plugin cannot handle SIF mode."));
@@ -210,7 +210,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
         else if (!strcmp(modestr, "MIFAUTO"))
         {
             /* Call utility to determine optimal file count */
-#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
+//#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
         }
         main_dump_mif(main_obj, numFiles, dumpn, dumpt);
     }
@@ -223,7 +223,7 @@ static int register_this_interface()
     if (strlen(iface_name) >= MACSIO_IFACE_MAX_NAME)
         MACSIO_LOG_MSG(Die, ("Interface name \"%s\" too long", iface_name));
 
-#warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
+//#warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 
     /* Populate information about this plugin */
     strcpy(iface.name, iface_name);

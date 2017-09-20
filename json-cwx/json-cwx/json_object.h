@@ -669,7 +669,7 @@ extern char const *        json_object_enum_get_choice_name(struct json_object* 
 extern int64_t             json_object_enum_get_choice_val(struct json_object* jso);
 
 
-#warning ADD A METHOD TO TRAVERSE A HIERARCHY AND ELIM ALL PRINTBUF STRING MEMORY
+//#warning ADD A METHOD TO TRAVERSE A HIERARCHY AND ELIM ALL PRINTBUF STRING MEMORY
 extern void json_object_free_printbuf(struct json_object *obj);
 
 extern struct json_object*   json_object_new_extarr(void const *data, enum json_extarr_type type,

@@ -44,9 +44,9 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 @{
 */
 
-#warning ADD PWRITE OPTION
-#warning ADD MPI_FILE_WRITE OPTION
-#warning ADD AGGREGATION OPTION
+//#warning ADD PWRITE OPTION
+//#warning ADD MPI_FILE_WRITE OPTION
+//#warning ADD AGGREGATION OPTION
 
 /*!
 \addtogroup MIF Template
@@ -294,14 +294,14 @@ static json_object *write_mesh_part(
 {
     json_object *part_info = json_object_new_object();
 
-#warning SOMEHOW SHOULD INCLUDE OFFSETS TO EACH VARIABLE
+//#warning SOMEHOW SHOULD INCLUDE OFFSETS TO EACH VARIABLE
     /* Write the json mesh part object as an ascii string */
     fprintf(myFile, "%s\n", json_object_to_json_string_ext(part_obj, JSON_C_TO_STRING_PRETTY));
     json_object_free_printbuf(part_obj);
 
     /* Form the return 'value' holding the information on where to find this part */
     json_object_object_add(part_info, "partid",
-#warning CHANGE NAME OF KEY IN JSON TO PartID
+//#warning CHANGE NAME OF KEY IN JSON TO PartID
         json_object_new_int(json_object_path_get_int(part_obj, "Mesh/ChunkID")));
     json_object_object_add(part_info, "file",
         json_object_new_string(fileName));
@@ -345,7 +345,7 @@ static void main_dump(
     process_args(argi, argc, argv);
 
     /* ensure we're in MIF mode and determine the file count */
-#warning SIMPLIFY THIS LOGIC USING NEW JSON INTERFACE
+//#warning SIMPLIFY THIS LOGIC USING NEW JSON INTERFACE
     json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
     {
@@ -407,7 +407,7 @@ static void main_dump(
     /* Use MACSIO_MIF a second time to manage writing of the master/root
        file contents. This winds up being serial I/O but also means we
        never collect all info on all parts to any single processor. */
-#warning THERE IS A BETTER WAY TO DO USING LOOP OF NON-BLOCKING RECIEVES
+//#warning THERE IS A BETTER WAY TO DO USING LOOP OF NON-BLOCKING RECIEVES
     bat = MACSIO_MIF_Init(1, ioFlags, MACSIO_MAIN_Comm, 5,
         CreateMyFile, OpenMyFile, CloseMyFile, 0);
 
@@ -420,7 +420,7 @@ static void main_dump(
     /* Wait for MACSIO_MIF to give this processor exclusive access */
     myFile = (FILE *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
-#warning FIX THE STRING THAT WE PRODUCE HERE SO ITS A SINGLE JSON ARRAY OBJECT
+//#warning FIX THE STRING THAT WE PRODUCE HERE SO ITS A SINGLE JSON ARRAY OBJECT
     /* This processor's work on the file is just to write its part_infos */
     fprintf(myFile, "%s\n", json_object_to_json_string_ext(part_infos, JSON_C_TO_STRING_PRETTY));
 

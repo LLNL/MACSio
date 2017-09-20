@@ -298,7 +298,7 @@ MACSIO_DATA_MakeRandomTable(int nbytes)
     int nbytes_per_entry = random() % (nbytes / divisor) + 4;
 }
 
-#warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
+//#warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
 static json_object *
 make_uniform_mesh_coords(int ndims, int const *dims, double const *bounds)
 {
@@ -318,7 +318,7 @@ make_uniform_mesh_coords(int ndims, int const *dims, double const *bounds)
     return coords;
 }
 
-#warning PACKAGE EXTARR METHOD WITH CHECKSUM STUFF
+//#warning PACKAGE EXTARR METHOD WITH CHECKSUM STUFF
 
 static json_object *
 make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
@@ -327,7 +327,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
     double *vals, delta;
     int i;
 
-#warning SUPPORT DIFFERENT DATATYPES HERE
+//#warning SUPPORT DIFFERENT DATATYPES HERE
 
     json_object_object_add(coords, "CoordBasis", json_object_new_string("X,Y,Z"));
 
@@ -358,7 +358,7 @@ make_rect_mesh_coords(int ndims, int const *dims, double const *bounds)
         json_object_object_add(coords, "ZAxisCoords", json_object_new_extarr(vals, json_extarr_type_flt64, 1, &dims[2], 0));
     }
 
-#warning ADD GLOBAL IDS
+//#warning ADD GLOBAL IDS
 
     return coords;
 }
@@ -381,7 +381,7 @@ make_curv_mesh_coords(int ndims, int const *dims, double const *bounds)
         y = (double *) malloc(nx * ny * nz * sizeof(double));
     if (ndims > 2)
         z = (double *) malloc(nx * ny * nz * sizeof(double));
-#warning X IS VARYING SLOWEST HERE. SEEMS BACKWARDS FROM NORMAL
+//#warning X IS VARYING SLOWEST HERE. SEEMS BACKWARDS FROM NORMAL
     for (k = 0; k < nz; k++)
     {
         for (j = 0; j < ny; j++)
@@ -605,10 +605,10 @@ make_arb_mesh_topology(int ndims, int const *dims)
 
     json_object *topology = json_object_new_object();
 
-#warning WE NEED TO DOCUMENT THE MACSIO DATA MODEL
-#warning WE REALLY HAVE MULTIPLE MAPS HERE ONE FROM ZONES TO FACES AND ONE FROM FACES TO NODES
-#warning EACH MAP HAS A DOMAIN AND RANGE TYPE
-#warning WE COULD EVEN DO FULL DIMENSIONAL CASCADE TOO
+//#warning WE NEED TO DOCUMENT THE MACSIO DATA MODEL
+//#warning WE REALLY HAVE MULTIPLE MAPS HERE ONE FROM ZONES TO FACES AND ONE FROM FACES TO NODES
+//#warning EACH MAP HAS A DOMAIN AND RANGE TYPE
+//#warning WE COULD EVEN DO FULL DIMENSIONAL CASCADE TOO
     json_object_object_add(topology, "Type", json_object_new_string("Explicit"));
     json_object_object_add(topology, "DomainDim", json_object_new_int(ndims));
     json_object_object_add(topology, "RangeDim", json_object_new_int(0)); /* node refs */
@@ -760,11 +760,11 @@ make_arb_mesh_topology(int ndims, int const *dims)
     return topology;
 }
 
-#warning WE SHOULD ENABLE ABILITY TO CHANGE TOPOLOGY WITH TIME
+//#warning WE SHOULD ENABLE ABILITY TO CHANGE TOPOLOGY WITH TIME
 
-#warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
-#warning WE NEED TO GENERALIZE THIS VAR METHOD TO ALLOW FOR NON-RECT NODE/ZONE CONFIGURATIONS
-#warning SUPPORT FACE AND EDGE CENTERINGS TOO
+//#warning REPLACE STRINGS FOR CENTERING AND DTYPE WITH ENUMS
+//#warning WE NEED TO GENERALIZE THIS VAR METHOD TO ALLOW FOR NON-RECT NODE/ZONE CONFIGURATIONS
+//#warning SUPPORT FACE AND EDGE CENTERINGS TOO
 static json_object *
 make_scalar_var(int ndims, int const *dims, double const *bounds,
     char const *centering, char const *dtype, char const *kind)
@@ -784,7 +784,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
         dims_diameter2 += dims[i]*dims[i];
     }
 
-#warning NEED EXPLICIT NAME FOR VARIABLE
+//#warning NEED EXPLICIT NAME FOR VARIABLE
     json_object_object_add(var_obj, "name", json_object_new_string(kind));
     json_object_object_add(var_obj, "centering", json_object_new_string(centering));
     if (!strcmp(dtype, "double"))
@@ -796,7 +796,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     valip = (int *) json_object_extarr_data(data_obj);
 
     n = 0;
-#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
+//#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
     srandom(0xBabeFace);
     for (k = 0; k < dims2[2]; k++)
     {
@@ -804,8 +804,8 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
         {
             for (i = 0; i < dims2[0]; i++)
             {
-#warning PUT THESE INTO A GENERATOR FUNCTION
-#warning ACCOUNT FOR HALF ZONE OFFSETS
+//#warning PUT THESE INTO A GENERATOR FUNCTION
+//#warning ACCOUNT FOR HALF ZONE OFFSETS
                 if (strstr(kind, "constant")!=NULL)
                     valdp[n++] = 1.0;
                 else if (strstr(kind, "random")!=NULL)
@@ -828,7 +828,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                 }
                 else if (strstr(kind, "noise_sum")!=NULL)
                 {
-#warning SHOULD USE GLOBAL DIMS DIAMETER HERE
+//#warning SHOULD USE GLOBAL DIMS DIAMETER HERE
                     int q, nlevels = (int) log2(sqrt(dims_diameter2))+1;
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
@@ -853,7 +853,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
             }
         }
     }
-#warning ADD CHECKSUM TO JSON OBJECT
+//#warning ADD CHECKSUM TO JSON OBJECT
 
     return var_obj; 
 
@@ -907,8 +907,8 @@ make_mesh_vars(int ndims, int const *dims, double const *bounds, int nvars)
     return vars_array;
 }
 
-#warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
-#warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
+//#warning UNIFY PART CHUNK TERMINOLOGY THEY ARE THE SAME
+//#warning SHOULD NAME CHUNK/PART NUMBER HERE TO INDICATE IT IS A GLOBAL NUMBER
 static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *chunk_obj = json_object_new_object();
@@ -926,7 +926,7 @@ static json_object *make_uniform_mesh_chunk(int chunkId, int ndims, int const *d
     return chunk_obj;
 }
 
-#warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
+//#warning ADD CALLS TO VARGEN FOR OTHER MESH TYPES
 static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, int nvars)
 {
     json_object *chunk_obj = json_object_new_object();
@@ -940,7 +940,7 @@ static json_object *make_rect_mesh_chunk(int chunkId, int ndims, int const *dims
     json_object_object_add(mesh_obj, "Coords", make_rect_mesh_coords(ndims, dims, bounds));
     json_object_object_add(mesh_obj, "Topology", make_rect_mesh_topology(ndims, dims));
     json_object_object_add(chunk_obj, "Mesh", mesh_obj);
-#warning ADD NVARS AND VARMAPS ARGS HERE
+//#warning ADD NVARS AND VARMAPS ARGS HERE
     json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
     return chunk_obj;
 }
@@ -958,7 +958,7 @@ static json_object *make_curv_mesh_chunk(int chunkId, int ndims, int const *dims
     json_object_object_add(mesh_obj, "Coords", make_curv_mesh_coords(ndims, dims, bounds));
     json_object_object_add(mesh_obj, "Topology", make_curv_mesh_topology(ndims, dims));
     json_object_object_add(chunk_obj, "Mesh", mesh_obj);
-#warning ADD NVARS AND VARMAPS ARGS HERE
+//#warning ADD NVARS AND VARMAPS ARGS HERE
     json_object_object_add(chunk_obj, "Vars", make_mesh_vars(ndims, dims, bounds, nvars));
     return chunk_obj;
 }
@@ -1046,10 +1046,10 @@ static int choose_part_count(int K, int mod, int *R, int *Q)
     return retval;
 }
 
-#warning ADD ABILITY TO VARY MESH TOPOLOGY WITH TIME AND ADD KEY TO INDICATE IF ITS BEEN CHANGED
-#warning GET FUNTION NAMING CONSISTENT THROUGHOUT SOURCE FILES
-#warning MAYBE PASS IN SEED HERE OR ADD TO MAIN_OBJ
-#warning COULD IMPROVE DESIGN A BIT BY SEPARATING ALGORITHM FOR GEN WITH A CALLBACK
+//#warning ADD ABILITY TO VARY MESH TOPOLOGY WITH TIME AND ADD KEY TO INDICATE IF ITS BEEN CHANGED
+//#warning GET FUNTION NAMING CONSISTENT THROUGHOUT SOURCE FILES
+//#warning MAYBE PASS IN SEED HERE OR ADD TO MAIN_OBJ
+//#warning COULD IMPROVE DESIGN A BIT BY SEPARATING ALGORITHM FOR GEN WITH A CALLBACK
 /* Just a very simple spatial partitioning. We use the same exact algorithm
    to determine which rank owns a chunk. So, we overload this method and
    for that purpose as well even though in that case, it doesn generate
@@ -1057,7 +1057,7 @@ static int choose_part_count(int K, int mod, int *R, int *Q)
 json_object *
 MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_chunkId)
 {
-#warning FIX LEAK OF OBJECTS FOR QUERY CASE
+//#warning FIX LEAK OF OBJECTS FOR QUERY CASE
     json_object *mesh_obj = rank_owning_chunkId?0:json_object_new_object();
     json_object *global_obj = rank_owning_chunkId?0:json_object_new_object();
     json_object *part_array = rank_owning_chunkId?0:json_object_new_array();
@@ -1134,7 +1134,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     if (!rank_owning_chunkId)
     {
         json_object_object_add(global_obj, "TotalParts", json_object_new_int(total_num_parts));
-#warning NOT SURE PartsLogDims IS USEFUL IN GENERAL CASE
+//#warning NOT SURE PartsLogDims IS USEFUL IN GENERAL CASE
         json_object_object_add(global_obj, "PartsLogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, part_block_dims));
         json_object_object_add(global_obj, "LogDims", MACSIO_UTILS_MakeDimsJsonArray(dim, global_log_dims));
         json_object_object_add(global_obj, "Bounds", MACSIO_UTILS_MakeBoundsJsonArray(global_bounds));
@@ -1161,8 +1161,8 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                     json_object *part_obj = make_mesh_chunk(chunk, dim, part_dims, part_bounds,
                         json_object_path_get_string(main_obj, "clargs/part_type"), vars_per_part);
                     MACSIO_UTILS_SetDims(global_indices, ipart, jpart, kpart);
-#warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
-#warning GlogalLogIndices MAY NOT BE NEEDED
+//#warning MAYBE MOVE GLOBAL LOG INDICES TO make_mesh_chunk
+//#warning GlogalLogIndices MAY NOT BE NEEDED
                     json_object_object_add(part_obj, "GlobalLogIndices",
                         MACSIO_UTILS_MakeDimsJsonArray(dim, global_indices));
                     MACSIO_UTILS_SetDims(global_log_origin, ipart * nx, jpart * ny, kpart * nz);
@@ -1202,7 +1202,7 @@ int MACSIO_DATA_GetRankOwningPart(json_object *main_obj, int chunkId)
 
 int MACSIO_DATA_ValidateDataRead(json_object *main_obj)
 {
-#warning IMPLEMENT THE DATA READ VALIDATION 
+//#warning IMPLEMENT THE DATA READ VALIDATION 
     return 0;
 }
 

@@ -64,7 +64,7 @@ typedef struct _MACSIO_LOG_LogHandle_t
     int log_line_length;      /**< Maximum length of a message line in the log file */
     int lines_per_proc;       /**< Number of message lines allocated in the file for each processor */
     int extra_lines_proc0;    /**< Additional number of message lines for processor with MPI rank 0 */
-#warning FIX USE OF MUTABLE HERE
+//#warning FIX USE OF MUTABLE HERE
     mutable int current_line; /**< Index into this processor's group of lines in the log file at
                                    which the next message will be written */
     mutable log_flags_t flags; /**< Informational flags regarding the log */
@@ -81,7 +81,7 @@ MACSIO_LOG_MakeMsg(
     ...                 /**< [in] Optional, variable length set of arguments for format to be printed out. */
 )
 {
-#warning MAKE THIS THREAD SAFE BY ALLOCATING THE RETURNED STRING OR USE A LARGE CIRCULAR BUFFER
+//#warning MAKE THIS THREAD SAFE BY ALLOCATING THE RETURNED STRING OR USE A LARGE CIRCULAR BUFFER
   static char error_buffer[1024];
   static int error_buffer_ptr = 0;
   size_t L,Lmax;
@@ -279,7 +279,7 @@ MACSIO_LOG_LogMsgWithDetails(
         _mpistr[len] = '\0';
     }
 #endif
-#warning CLEAN UP SO ONLY PRINT NON-EMPTY STRINGS
+//#warning CLEAN UP SO ONLY PRINT NON-EMPTY STRINGS
     MACSIO_LOG_LogMsg(log, "%s:%s:%s:%s:%s", _sig, _msg, _err, _mpistr, _mpicls);
     if (sevVal == MACSIO_LOG_MsgDie)
 #ifdef HAVE_MPI
@@ -301,7 +301,7 @@ MACSIO_LOG_LogFinalize(
     int was_logged = log->flags.was_logged;
     int reduced_was_logged = was_logged;
 
-#warning ADD ATEXIT FUNCTIONALITY TO CLOSE LOGS
+//#warning ADD ATEXIT FUNCTIONALITY TO CLOSE LOGS
     if (log->logfile != fileno(stderr))
         close(log->logfile);
 

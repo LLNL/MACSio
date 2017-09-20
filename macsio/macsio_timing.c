@@ -270,7 +270,7 @@ MACSIO_TIMING_TimerId_t MACSIO_TIMING_StartTimer(
         n++;
     }
 
-#warning LOG THIS ERROR
+//#warning LOG THIS ERROR
     /* log a fatal error */
 
     return MACSIO_TIMING_INVALID_TIMER;
@@ -287,7 +287,7 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
     {
         timerHashTable[tid].total_time_this_iter += timer_time;
         timerHashTable[tid].total_time += timer_time;
-#warning UPDATE MIN/MAX TOO
+//#warning UPDATE MIN/MAX TOO
     }
     else
     {
@@ -609,8 +609,8 @@ dump_timers_to_strings(
                 max_in_stddev_steps_from_mean = (table[i].max_time - table[i].running_mean) / dev;
             }
 
-#warning USE COLUMN HEADINGS INSTEAD
-#warning HANDLE INDENTATION HERE
+//#warning USE COLUMN HEADINGS INSTEAD
+//#warning HANDLE INDENTATION HERE
             len = snprintf(_strs[_nstrs-1], max_str_size,
                 "TOT=%10.5f,CNT=%04d,MIN=%8.5f(%4.2f):%06d,AVG=%8.5f,MAX=%8.5f(%4.2f):%06d,DEV=%8.8f:FILE=%s:LINE=%d:LAB=%s",
                 table[i].total_time,

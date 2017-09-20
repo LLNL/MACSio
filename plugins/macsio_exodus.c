@@ -168,7 +168,7 @@ static void *CreateExodusFile(const char *fname, const char *nsname, void *userD
     return 0;
 }
 
-#warning HOW DO WE WRITE NEW TIMES TO SAME FILES WITH MACSIO_MIF INTERFACE?
+//#warning HOW DO WE WRITE NEW TIMES TO SAME FILES WITH MACSIO_MIF INTERFACE?
 static void *OpenExodusFile(const char *fname, const char *nsname, MACSIO_MIF_ioFlags_t ioFlags,
     void *userData)
 {
@@ -272,7 +272,7 @@ static void write_rect_mesh_coords_all_parts(int exoid, ex_global_init_params_t 
     json_object *parts, int **elem_block_coord_offsets)
 {
     int p, exo_err, n = 0;
-#warning FIX BUG IN JSON-C LIB FOR THIS CALL
+//#warning FIX BUG IN JSON-C LIB FOR THIS CALL
 #if 0
     int num_parts = JsonGetInt(parts,"");
 #else
@@ -287,7 +287,7 @@ static void write_rect_mesh_coords_all_parts(int exoid, ex_global_init_params_t 
     if (params->num_dim > 2)
         exo_z_coords = (double *) malloc(params->num_nodes * sizeof(double));
 
-#warning WE ARE DUPING COORDS ON PART BOUNDARIES AND WE SHOULD NOT BE
+//#warning WE ARE DUPING COORDS ON PART BOUNDARIES AND WE SHOULD NOT BE
     for (p = 0; p < num_parts; p++)
     {
         int i, j, k, dims[3] = {1,1,1};
@@ -375,7 +375,7 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
     ex_put_elem_block(exoid, elem_block_id, params->num_dim==2?"QUAD":"HEX",
         num_elems_in_block, nodes_per_elem, 0);
 
-#warning ONLY NEED TO DO CONNECT STUFF ONCE
+//#warning ONLY NEED TO DO CONNECT STUFF ONCE
     connect = (int *) malloc(nodes_per_elem * num_elems_in_block * sizeof(int));
 
     for (i = 0; i < num_elems_in_block; i++)
@@ -430,7 +430,7 @@ static void write_mesh_part_blocks_and_vars(int exoid, ex_global_init_params_t c
             free(elem_var_names);
         }
 
-#warning MOVE TO MORE GLOBAL PLACE IN DUMP SEQUENCE
+//#warning MOVE TO MORE GLOBAL PLACE IN DUMP SEQUENCE
         ex_put_time(exoid, dumpn+1, &dumpt);
 
         ev = 1;
@@ -534,7 +534,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
     /* Without this barrier, I get strange behavior with MACSIO_MIF interface */
-#warning CONFIRM THIS IS STILL NEEDED
+//#warning CONFIRM THIS IS STILL NEEDED
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
@@ -543,7 +543,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     rank = JsonGetInt(main_obj, "parallel/mpi_rank");
     size = JsonGetInt(main_obj, "parallel/mpi_size");
 
-#warning MOVE TO A FUNCTION
+//#warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
     json_object *parfmode_obj = JsonGetObj(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
@@ -609,7 +609,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     {
         WriteNemesis(main_obj, *exoid_ptr, dumpn, bat);
 
-#warning DECOMP MESH SHOULDN'T BE INCLUDED IN PERFORMANCE NUMBERS
+//#warning DECOMP MESH SHOULDN'T BE INCLUDED IN PERFORMANCE NUMBERS
         /* output a top-level quadmesh and vars to indicate processor decomp */
         if (MACSIO_LOG_DebugLevel >= 2)
         {

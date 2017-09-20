@@ -267,7 +267,7 @@ static const char *filename;
 static int has_mesh = 0;
 static int driver = DB_HDF5;
 static int show_all_errors = FALSE;
-#warning MOVE LOG HANDLE TO IO CONTEXT
+//#warning MOVE LOG HANDLE TO IO CONTEXT
 
 static int process_args(int argi, int argc, char *argv[])
 {
@@ -359,7 +359,7 @@ static void write_quad_mesh_part(DBfile *dbfile, json_object *part, int silo_mes
     int dims[3] = {1,1,1};
     int dimsz[3] = {1,1,1};
 
-#warning SHOULD REALLY MAKE COORD MEMBER NAMES FOR ALL CASES INSTEAD OF XAXISCOORDS AND XCOORDS
+//#warning SHOULD REALLY MAKE COORD MEMBER NAMES FOR ALL CASES INSTEAD OF XAXISCOORDS AND XCOORDS
     if (silo_mesh_type == DB_COLLINEAR)	
         coordobj = JsonGetObj(part, "Mesh/Coords/XAxisCoords");
     else
@@ -579,7 +579,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
         }
         else
         {
-#warning USE SILO NAMESCHEMES INSTEAD
+//#warning USE SILO NAMESCHEMES INSTEAD
             sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/mesh",
                 JsonGetStr(main_obj, "clargs/filebase"),
                 groupRank, dumpn,
@@ -609,7 +609,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
             }
             else
             {
-#warning USE SILO NAMESCHEMES INSTEAD
+//#warning USE SILO NAMESCHEMES INSTEAD
                 sprintf(blockNames[i], "%s_silo_%05d_%03d.%s:/domain_%07d/%s",
                     JsonGetStr(main_obj, "clargs/filebase"),
                     groupRank,
@@ -624,7 +624,7 @@ static void WriteMultiXXXObjects(json_object *main_obj, DBfile *siloFile, int du
         /* Write the multi-block objects */
         DBPutMultivar(siloFile, JsonGetStr(vars_array, "", j, "name"), numChunks, blockNames, blockTypes, 0);
 
-#warning WRITE MULTIBLOCK DOMAIN ASSIGNMENT AS A TINY QUADMESH OF SAME PHYSICAL SIZE OF MESH BUT FEWER ZONES
+//#warning WRITE MULTIBLOCK DOMAIN ASSIGNMENT AS A TINY QUADMESH OF SAME PHYSICAL SIZE OF MESH BUT FEWER ZONES
 
     }
 
@@ -696,8 +696,8 @@ static void WriteDecompMesh(json_object *main_obj, DBfile *siloFile, int dumpn, 
         zdims, ndims, NULL, 0, DB_DOUBLE, DB_ZONECENT, 0);
 }
 
-#warning HOW IS A NEW DUMP CLASS HANDLED
-#warning ADD TIMING LOGIC
+//#warning HOW IS A NEW DUMP CLASS HANDLED
+//#warning ADD TIMING LOGIC
 static void main_dump(int argi, int argc, char **argv, json_object *main_obj, int dumpn, double dumpt)
 {
     DBfile *siloFile;
@@ -709,7 +709,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
-#warning CONFIRM THIS IS STILL NEEDED
+//#warning CONFIRM THIS IS STILL NEEDED
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
 
     /* process cl args */
@@ -718,7 +718,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     rank = JsonGetInt(main_obj, "parallel/mpi_rank");
     size = JsonGetInt(main_obj, "parallel/mpi_size");
 
-#warning MOVE TO A FUNCTION
+//#warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
     json_object *parfmode_obj = JsonGetObj(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
@@ -750,7 +750,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         else if (!strcmp(modestr, "MIFAUTO"))
         {
             /* Call utility to determine optimal file count */
-#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
+//#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
         }
     }
 
@@ -759,7 +759,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         CreateSiloFile, OpenSiloFile, CloseSiloFile, &driver);
 
     /* Construct name for the silo file */
-#warning CHANGE NAMING SCHEME SO LS WORKS BETTER
+//#warning CHANGE NAMING SCHEME SO LS WORKS BETTER
     sprintf(fileName, "%s_silo_%05d_%03d.%s",
         JsonGetStr(main_obj, "clargs/filebase"),
         MACSIO_MIF_RankOfGroup(bat, rank),
@@ -796,7 +796,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     {
         WriteMultiXXXObjects(main_obj, siloFile, dumpn, bat);
 
-#warning DECOMP MESH SHOULDN'T BE INCLUDED IN PERFORMANCE NUMBERS
+//#warning DECOMP MESH SHOULDN'T BE INCLUDED IN PERFORMANCE NUMBERS
         /* output a top-level quadmesh and vars to indicate processor decomp */
         if (MACSIO_LOG_DebugLevel >= 2)
         {
@@ -813,7 +813,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     MACSIO_MIF_Finish(bat);
 }
 
-#warning TO BE MOVED TO SILO LIBRARY
+//#warning TO BE MOVED TO SILO LIBRARY
 static void DBSplitMultiName(char *mname, char **file, char **dir, char **obj)
 {
     char *_file, *_dir, *_obj;
@@ -854,14 +854,14 @@ static void DBSplitMultiName(char *mname, char **file, char **dir, char **obj)
     }
 }
 
-#warning TO BE MOVED TO SILO LIBRARY
+//#warning TO BE MOVED TO SILO LIBRARY
 static char const *
 DBGetFilename(DBfile const *f)
 {
     return f->pub.name;
 }
 
-#warning SHOULD USE MACSIO_MIF FOR READ TOO BUT INTERFACE IS LACKING
+//#warning SHOULD USE MACSIO_MIF FOR READ TOO BUT INTERFACE IS LACKING
 static
 void main_load(int argi, int argc, char **argv, char const *path, json_object *main_obj, json_object **data_read_obj)
 {

@@ -165,7 +165,7 @@ LINK = $(CXX)
  * behavior. However, its conceivable that some C++'isms have crept into the code causing
  * warnings or outright errors with some C compilers.
  *
- * In addition, MACSio sources currently include a large number of \c \#warning statements
+ * In addition, MACSio sources currently include a large number of \c \////#warning statements
  * to help remind developers (namely me) of minor issues to be fixed. When compiling, these
  * produce a lot of sprurios output in stderr but are otherwise harmless.
  *
@@ -343,10 +343,10 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     int plugin_args_start = -1;
     int cl_result;
 
-#warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
-#warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
-#warning OPTION TO CONTROL TOTAL BUFFER SIZE IN LOWER-LAYERS
-#warning OPTION TO SET OUTPUT PRECISION TO FLOAT
+////#warning SUBGROUP OPTIONS INTO READ AND WRITE OPTIONS
+////#warning MAYBE MAKE IT EASIER TO SPECIFY STRONG OR WEAK SCALING CASE
+////#warning OPTION TO CONTROL TOTAL BUFFER SIZE IN LOWER-LAYERS
+////#warning OPTION TO SET OUTPUT PRECISION TO FLOAT
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
         "--units_prefix_system %s", "binary",
@@ -429,7 +429,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "will generate a random set of tables of somewhat random structure\n"
             "and content. For amorphous, MACSio will generate a random hierarchy\n"
             "of random type and sized objects.",
-#warning MAY WANT SOME PORTIONS OF METADATA TO SCALE WITH MESH PIECE COUNT
+////#warning MAY WANT SOME PORTIONS OF METADATA TO SCALE WITH MESH PIECE COUNT
         "--meta_size %d %d", "10000 50000",
             "Specify the size of the metadata objects on each processor and\n"
             "separately, the root (or master) processor (MPI rank 0). The size\n"
@@ -621,7 +621,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     json_object *problem_obj = MACSIO_DATA_GenerateTimeZeroDumpObject(main_obj,0);
     problem_nbytes = (unsigned long long) json_object_object_nbytes(problem_obj, JSON_C_FALSE);
 
-#warning MAKE JSON OBJECT KEY CASE CONSISTENT
+////#warning MAKE JSON OBJECT KEY CASE CONSISTENT
     json_object_object_add(main_obj, "problem", problem_obj);
 
     /* Just here for debugging for the moment */
@@ -640,9 +640,9 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
         fclose(outf);
     }
 
-#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
+////#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
-#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
+////#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
@@ -665,7 +665,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     tNextBurstDump = dt;
     dumpNum = 0;
     t = 0;
-#warning THIS LOOP CURRENTLY JUST DOES A DUMP AFTER EVERY COMPUTE UP TO THE TOTAL NUMBER OF DUMPS. 
+////#warning THIS LOOP CURRENTLY JUST DOES A DUMP AFTER EVERY COMPUTE UP TO THE TOTAL NUMBER OF DUMPS. 
     while (t < maxT){
 
 	if (doWork)
@@ -696,8 +696,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 		/* Start dump timer */
 		heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
-#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
-#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
+////#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
+////#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
 		/* do the dump */
 		//MACSIO_BurstDump(dt);
 		(*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
@@ -768,7 +768,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     }
 }
 
-#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
+////#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
 static int
 main_read(int argi, int argc, char **argv, json_object *main_obj)
 {
@@ -830,11 +830,11 @@ main(int argc, char *argv[])
     for (i = 0; i < argc && !exercise_scr; i++)
         exercise_scr = !strcmp("exercise_scr", argv[i]);
 
-#warning SHOULD WE BE USING MPI-3 API
+////#warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
 #ifdef HAVE_SCR
-#warning SANITY CHECK WITH MIFFPP
+////#warning SANITY CHECK WITH MIFFPP
     if (exercise_scr)
         SCR_Init();
 #endif
@@ -864,7 +864,7 @@ main(int argc, char *argv[])
         JsonGetInt(clargs_obj, "log_line_cnt/0"),
         JsonGetInt(clargs_obj, "log_line_cnt/1"));
 
-#warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
+////#warning THESE INITIALIZATIONS SHOULD BE IN MACSIO_LOG
     MACSIO_LOG_DebugLevel = JsonGetInt(clargs_obj, "debug_level");
 
     /* Setup parallel information */
@@ -872,8 +872,8 @@ main(int argc, char *argv[])
     json_object_object_add(parallel_obj, "mpi_rank", json_object_new_int(MACSIO_MAIN_Rank));
     json_object_object_add(main_obj, "parallel", parallel_obj);
 
-#warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEYRE RESTRICTED
-#warning CREATE AN IO CONTEXT OBJECT
+////#warning SHOULD WE INCLUDE TOP-LEVEL INFO ON VAR NAMES AND WHETHER THEYRE RESTRICTED
+////#warning CREATE AN IO CONTEXT OBJECT
     /* Acquire an I/O context handle from the plugin */
 
     /* Do a read or write test */
@@ -891,7 +891,7 @@ main(int argc, char *argv[])
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
-#warning ATEXIT THESE
+////#warning ATEXIT THESE
     if (json_object_put(main_obj) != 1)
     {
         MACSIO_LOG_MSG(Info, ("Unable to free main JSON object"));
@@ -914,6 +914,6 @@ main(int argc, char *argv[])
     }
 #endif
 
-#warning FIX RETVAL OF MAIN TO BE NON-ZERO WHEN ERRORS OCCUR
+////#warning FIX RETVAL OF MAIN TO BE NON-ZERO WHEN ERRORS OCCUR
     return (0);
 }

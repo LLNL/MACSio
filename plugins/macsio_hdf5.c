@@ -1042,15 +1042,15 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 
     MPI_Info mpiInfo = MPI_INFO_NULL;
 
-#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
-#warning INCLUDE ARGS FOR ISTORE AND K_SYM
-#warning INCLUDE ARG PROCESS FOR HINTS
-#warning FAPL PROPS: ALIGNMENT 
+//#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
+//#warning INCLUDE ARGS FOR ISTORE AND K_SYM
+//#warning INCLUDE ARG PROCESS FOR HINTS
+//#warning FAPL PROPS: ALIGNMENT 
 #if H5_HAVE_PARALLEL
     H5Pset_fapl_mpio(fapl_id, MACSIO_MAIN_Comm, mpiInfo);
 #endif
 
-#warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
+//#warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
     /* Construct name for the HDF5 file */
     sprintf(fileName, "%s_hdf5_%03d.%s",
         json_object_path_get_string(main_obj, "clargs/filebase"),
@@ -1096,7 +1096,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     for (v = -1; v < json_object_array_length(first_part_vars_array); v++) /* -1 start is for Mesh */
     {
 
-#warning SKIPPING MESH
+//#warning SKIPPING MESH
         if (v == -1) continue; /* All ranks skip mesh (coords) for now */
 
         /* Inspect the first part's var object for name, datatype, etc. */
@@ -1104,21 +1104,21 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         char const *varName = json_object_path_get_string(var_obj, "name");
         char *centering = strdup(json_object_path_get_string(var_obj, "centering"));
         json_object *dataobj = json_object_path_get_extarr(var_obj, "data");
-#warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
+//#warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
         hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
         hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
         hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
-#warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
+//#warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
         
         hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id); 
         H5Sclose(fspace_id);
         H5Pclose(dcpl_id);
 
         /* Loop to make write calls for this var for each part on this rank */
-#warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
+//#warning USE NEW MULTI-DATASET API WHEN AVAILABLE TO AGLOMERATE ALL PARTS INTO ONE CALL
         use_part_count = (int) ceil(json_object_path_get_double(main_obj, "clargs/avg_num_parts"));
         for (p = 0; p < use_part_count; p++)
         {
@@ -1196,7 +1196,7 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
     hid_t h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (h5File >= 0)
     {
-#warning USE NEWER GROUP CREATION SETTINGS OF HDF5
+//#warning USE NEWER GROUP CREATION SETTINGS OF HDF5
         if (nsname && userData)
         {
             user_data_t *ud = (user_data_t *) userData;
@@ -1239,7 +1239,7 @@ static void CloseHDF5File(void *file, void *userData)
 
 static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 {
-#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
+//#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
     int i;
     json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
 
@@ -1282,9 +1282,9 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
         JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
-#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
-#warning SET FILE AND DATASET PROPERTIES
-#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
+//#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
+//#warning SET FILE AND DATASET PROPERTIES
+//#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
     MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
 
@@ -1341,7 +1341,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
 {
     int rank, size, numFiles;
 
-#warning SET ERROR MODE OF HDF5 LIBRARY
+//#warning SET ERROR MODE OF HDF5 LIBRARY
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
@@ -1352,14 +1352,14 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
 
-#warning MOVE TO A FUNCTION
+//#warning MOVE TO A FUNCTION
     /* ensure we're in MIF mode and determine the file count */
     json_object *parfmode_obj = json_object_path_get_array(main_obj, "clargs/parallel_file_mode");
     if (parfmode_obj)
     {
         json_object *modestr = json_object_array_get_idx(parfmode_obj, 0);
         json_object *filecnt = json_object_array_get_idx(parfmode_obj, 1);
-#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
+//#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
         if (!strcmp(json_object_get_string(modestr), "SIF"))
         {
             main_dump_sif(main_obj, dumpn, dumpt);
@@ -1380,7 +1380,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
                 main_dump_sif(main_obj, dumpn, dumpt);
             else
             {
-#warning CURRENTLY, SIF CAN WORK ONLY ON WHOLE PART COUNTS
+//#warning CURRENTLY, SIF CAN WORK ONLY ON WHOLE PART COUNTS
                 MACSIO_LOG_MSG(Die, ("HDF5 plugin cannot currently handle SIF mode where "
                     "there are different numbers of parts on each MPI rank. "
                     "Set --avg_num_parts to an integral value." ));
@@ -1391,7 +1391,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
         else if (!strcmp(modestr, "MIFAUTO"))
         {
             /* Call utility to determine optimal file count */
-#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
+//#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
         }
         main_dump_mif(main_obj, numFiles, dumpn, dumpt);
     }
@@ -1404,7 +1404,7 @@ static int register_this_interface()
     if (strlen(iface_name) >= MACSIO_IFACE_MAX_NAME)
         MACSIO_LOG_MSG(Die, ("Interface name \"%s\" too long", iface_name));
 
-#warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
+//#warning DO HDF5 LIB WIDE (DEFAULT) INITITILIAZATIONS HERE
 
     /* Populate information about this plugin */
     strcpy(iface.name, iface_name);
