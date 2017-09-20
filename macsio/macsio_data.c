@@ -1210,3 +1210,10 @@ int MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank, int *my_pa
 {
     return 0;
 }
+
+/* Add new data as we enter new phases of the simulation which generates additional arrays etc */
+json_object *
+MACSIO_DATA_EvolveDataset(json_object *main_obj)
+{
+    
+}
