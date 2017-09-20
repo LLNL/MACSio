@@ -1215,5 +1215,10 @@ int MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank, int *my_pa
 json_object *
 MACSIO_DATA_EvolveDataset(json_object *main_obj)
 {
-    
+    /* Datapath from main_obj:
+        Root -> problem -> parts[:] -> Vars[:] -> [name, centering, data]
+    */
+
+    json_object *vars_object = json_object_path
+    return NULL;
 }
