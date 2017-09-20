@@ -47,7 +47,5 @@ macsio_pdb.o: ../plugins/macsio_pdb.c
 list-tpls-pdb:
 	@echo "$(SILO_FILE) ($(SILO_URL))"
 
-$(SILO_FILE):
-	$(DLCMD) $(SILO_FILE) $(SILO_URL)
-
-download-tpls-pdb: $(SILO_FILE)
+download-tpls-pdb: 
+    $(DLCMD) $(SILO_FILE) $(SILO_URL)
