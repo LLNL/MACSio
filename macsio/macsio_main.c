@@ -727,6 +727,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	
 	dumpNum++;
 	tNextBurstDump += dt;
+
+    MACSIO_DATA_EvolveDataset(main_obj);
 	} /* end of burst dump loop */
 
 	if (t >= tNextTrickleDump){

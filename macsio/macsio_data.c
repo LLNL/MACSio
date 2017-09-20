@@ -1218,7 +1218,21 @@ MACSIO_DATA_EvolveDataset(json_object *main_obj)
     /* Datapath from main_obj:
         Root -> problem -> parts[:] -> Vars[:] -> [name, centering, data]
     */
+    json_object *part_array = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *part_obj = json_object_array_get_idx(part_array, 0);
+    json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
 
-    json_object *vars_object = json_object_path
-    return NULL;
+    int var_number = json_object_array_length(vars_array);
+
+    char const *centering = "node";
+    char const *type = "double";
+    char const *name = "expansion";
+
+    int ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
+    int *dims = (int*)json_object_extarr_data(json_object_path_get_extarr(part_obj, "Mesh/LogDims"));
+    double *bounds = (double*)json_object_extarr_data(json_object_path_get_extarr(part_obj, "Mesh/Bounds"));
+
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name)); 
+
+    return main_obj;
 }
