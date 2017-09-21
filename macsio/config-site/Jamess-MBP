@@ -1,0 +1,9 @@
+HDF5_HOME=/Users/James/Software/libs/hdf5
+SILO_HOME=/Users/James/Software/libs/silo
+SZIP_HOME=/usr/local/Cellar/szip/2.1.1
+ZLIB_HOME=/Users/James/Software/libs/zlib
+
+CXX=/Users/James/Software/libs/openmpi/bin/mpicxx
+CC=/Users/James/Software/libs/openmpi/bin/mpicc
+CFLAGS= -g -w
+LINK=$(CXX)
