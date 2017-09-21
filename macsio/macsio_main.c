@@ -652,6 +652,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     double dt;
     double tNextBurstDump;
     double tNextTrickleDump;
+    int dataset_evolved = 0;
    
     int doWork = 0;
     if (work_dt > 0){
@@ -728,7 +729,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	dumpNum++;
 	tNextBurstDump += dt;
 
-    MACSIO_DATA_EvolveDataset(main_obj);
+    MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved);
 	} /* end of burst dump loop */
 
 	if (t >= tNextTrickleDump){

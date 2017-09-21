@@ -1213,7 +1213,7 @@ int MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank, int *my_pa
 
 /* Add new data as we enter new phases of the simulation which generates additional arrays etc */
 json_object *
-MACSIO_DATA_EvolveDataset(json_object *main_obj)
+MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved)
 {
     /* Datapath from main_obj:
         Root -> problem -> parts[:] -> Vars[:] -> [name, centering, data]
@@ -1222,23 +1222,47 @@ MACSIO_DATA_EvolveDataset(json_object *main_obj)
     json_object *part_obj = json_object_array_get_idx(part_array, 0);
     json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
 
-    int var_number = json_object_array_length(vars_array);
-
     char const *centering = "node";
     char const *type = "double";
     char const *name = "expansion";
 
     int ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
-    json_object *log_dims_obj = json_object_path_get_array(part_obj, "Mesh/LogDims");
-    json_object *bounds_obj = json_object_path_get_array(part_obj, "Mesh/Bounds");
-    int dims[3];
-    double bounds[3];
-    for (int i=0; i < ndims; i++){
-        dims[i] = JsonGetInt(log_dims_obj, "", i);
-        bounds[i] = JsonGetDbl(bounds_obj, "", i);
+
+    if (*dataset_evolved){
+        /* expansion var exists - replace this variable with a new one */
+        int var_number = json_object_array_length(vars_array);
+        int idx;
+        for (idx=0; idx < var_number; idx++){
+            if (strstr(json_object_path_get_string(json_object_array_get_idx(vars_array, idx), "name"), "expansion")!=NULL){
+                break;
+            }
+        } 
+        json_object *bounds_obj = json_object_path_get_array(part_obj, "Mesh/Bounds");
+        json_object *var_data_obj = json_object_path_get_extarr(json_object_array_get_idx(vars_array, idx), "data");
+        int dims[3];
+        double bounds[3];
+        for (int i=0; i < ndims; i++){
+            dims[i] = (int) (1.5*json_object_extarr_dim(var_data_obj, i));
+            bounds[i] = JsonGetDbl(bounds_obj, "", i);
+        }
+
+        json_object_array_put_idx(vars_array, idx, make_scalar_var(ndims, dims, bounds, centering, type, name));
+
+    } else {
+        /* no expansion variables exist so create a new one */
+       
+        json_object *log_dims_obj = json_object_path_get_array(part_obj, "Mesh/LogDims");
+        json_object *bounds_obj = json_object_path_get_array(part_obj, "Mesh/Bounds");
+        int dims[3];
+        double bounds[3];
+        for (int i=0; i < ndims; i++){
+            dims[i] = JsonGetInt(log_dims_obj, "", i);
+            bounds[i] = JsonGetDbl(bounds_obj, "", i);
+        }
+
+        json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name)); 
+        *dataset_evolved = 1;
     }
-
-    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name)); 
-
+    
     return main_obj;
 }
