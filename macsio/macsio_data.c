@@ -808,7 +808,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
 //#warning ACCOUNT FOR HALF ZONE OFFSETS
                 if (strstr(kind, "constant")!=NULL)
                     valdp[n++] = 1.0;
-                else if (strstr(kind, "random")!=NULL)
+                else if (strstr(kind, "random")!=NULL || strstr(kind, "expansion")!=NULL)
                     valdp[n++] = (double) (random() % 1000) / 1000;
                 else if (strstr(kind, "xramp")!=NULL)
                     valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
@@ -1229,8 +1229,14 @@ MACSIO_DATA_EvolveDataset(json_object *main_obj)
     char const *name = "expansion";
 
     int ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
-    int *dims = (int*)json_object_extarr_data(json_object_path_get_extarr(part_obj, "Mesh/LogDims"));
-    double *bounds = (double*)json_object_extarr_data(json_object_path_get_extarr(part_obj, "Mesh/Bounds"));
+    json_object *log_dims_obj = json_object_path_get_array(part_obj, "Mesh/LogDims");
+    json_object *bounds_obj = json_object_path_get_array(part_obj, "Mesh/Bounds");
+    int dims[3];
+    double bounds[3];
+    for (int i=0; i < ndims; i++){
+        dims[i] = JsonGetInt(log_dims_obj, "", i);
+        bounds[i] = JsonGetDbl(bounds_obj, "", i);
+    }
 
     json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name)); 
 

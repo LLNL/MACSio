@@ -7,4 +7,5 @@ CC=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/openmpi-3.0.
 CXX=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/openmpi-3.0.0-mu5iefsq6siu324xokfufy4lquytmym6/bin/mpic++
 LINK=$(CXX)
 
-CFLAGS= -w
+CFLAGS= -w -g
+DOXCMD=doxygen
