@@ -720,7 +720,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	dumpBytes += problem_nbytes;
 	dumpCount += 1;
 
-	/* log dump timing */
+	/* log dump timing */ // THIS ISN'T WORKING AS EXPECTED, THE VOLUME OF DATA WRITTEN TO FILE =/= SIZE OF JSON PROBLEM OBJECT
 	MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
 		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
 		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
@@ -729,7 +729,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 	dumpNum++;
 	tNextBurstDump += dt;
 
-    MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved);
+    float factor = 1.5;
+    MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor);
 	} /* end of burst dump loop */
 
 	if (t >= tNextTrickleDump){

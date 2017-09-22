@@ -1213,7 +1213,7 @@ int MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank, int *my_pa
 
 /* Add new data as we enter new phases of the simulation which generates additional arrays etc */
 json_object *
-MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved)
+MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved, float factor)
 {
     /* Datapath from main_obj:
         Root -> problem -> parts[:] -> Vars[:] -> [name, centering, data]
@@ -1242,7 +1242,7 @@ MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved)
         int dims[3];
         double bounds[3];
         for (int i=0; i < ndims; i++){
-            dims[i] = (int) (1.5*json_object_extarr_dim(var_data_obj, i));
+            dims[i] = (int) (factor*json_object_extarr_dim(var_data_obj, i));
             bounds[i] = JsonGetDbl(bounds_obj, "", i);
         }
 
