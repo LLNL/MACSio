@@ -585,6 +585,8 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
         MACSIO_MIF_RankOfGroup(bat, rank),
         JsonGetStr(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
     /* Wait for write access to the file. All processors call this.
      * Some processors (the first in each group) return immediately
      * with write access to the file. Other processors wind up waiting

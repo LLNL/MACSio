@@ -28,6 +28,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <math.h>
 #include <stdio.h>
 #include <strings.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #include <macsio_utils.h>
 
@@ -426,4 +428,73 @@ char const *MACSIO_UTILS_PrintSeconds(double seconds, char const *fmt, char *str
     }
 
     return str;
+}
+
+typedef struct s_filegroup {
+    int size;
+    int total;
+    char **names;
+} filegroup;
+
+filegroup* files;
+int filegroup_count = 0;
+
+void MACSIO_UTILS_CreateFileStore(int num_dumps, int files_per_dump)
+{
+    filegroup_count = num_dumps;
+    files = (filegroup*)malloc(num_dumps * sizeof(filegroup));
+    for (int i=0; i<num_dumps; i++){
+        files[i].size = 0;
+        files[i].total = files_per_dump;
+        files[i].names = (char**)malloc(files_per_dump*sizeof(char*));
+    }
+}
+
+void MACSIO_UTILS_RecordOutputFiles(int dump_num, char *filename)
+{
+    if (dump_num > filegroup_count) return;
+
+    int count = files[dump_num].size;
+
+    char *name = (char*) malloc(sizeof(char)*strlen(filename)+1);
+    strcpy(name, filename);
+
+    if (files[dump_num].size == files[dump_num].total){
+        files[dump_num].names = (char**)realloc(files[dump_num].names, 1.5*files[dump_num].total*sizeof(char*));
+        files[dump_num].total *= 1.5;
+    }
+
+    files[dump_num].names[count] = name;
+    files[dump_num].size++;
+}
+
+void MACSIO_UTILS_CleanupFileStore()
+{   
+    for (int i=0; i<filegroup_count; i++){
+        for ( int j=0; j<files[i].size; j++){
+            free(files[i].names[j]);
+        }
+        free(files[i].names);
+    }
+    free(files);
+}
+
+unsigned long long MACSIO_UTILS_StatFiles(int dump_num)
+{
+    if (dump_num > filegroup_count) return 0;
+
+    unsigned long long dump_bytes = 0;
+
+    struct stat *buf;
+    buf = (struct stat*)malloc(sizeof(struct stat));
+
+    for (int i=0; i<files[dump_num].size; i++){
+        stat(files[dump_num].names[i], buf);
+        int size = buf->st_size;
+        dump_bytes += size;
+        //printf("%s: %d\n", files[dump_num].names[i], size);
+
+    }
+    free(buf);
+    return dump_bytes;
 }

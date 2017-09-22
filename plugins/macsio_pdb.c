@@ -140,6 +140,8 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
     pdbfile = (PDBfile*) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
     json_object *parts = json_object_path_get_array(main_obj, "problem/parts");

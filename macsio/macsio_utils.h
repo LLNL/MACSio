@@ -97,6 +97,11 @@ extern char const *MACSIO_UTILS_PrintSeconds(double seconds, char const *fmt, ch
 extern char const *MACSIO_UTILS_PrintBandwidth(unsigned long long bytes, double seconds,
     char const *fmt, char *str, int n);
 
+extern void MACSIO_UTILS_CreateFileStore(int num_dumps, int files_per_dump);
+extern void MACSIO_UTILS_RecordOutputFiles(int dump_num, char *filename);
+extern void MACSIO_UTILS_CleanupFileStore();
+extern unsigned long long MACSIO_UTILS_StatFiles(int dump_num);
+
 #ifdef __cplusplus
 }
 #endif

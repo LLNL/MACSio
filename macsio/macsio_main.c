@@ -647,6 +647,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     dumpTime = 0.0;
     int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
 
+    MACSIO_UTILS_CreateFileStore(total_dumps, 1);
+
     double t;
     double maxT;
     double dt;
@@ -725,6 +727,11 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
 		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
 		    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+    unsigned long long stat_bytes = MACSIO_UTILS_StatFiles(dumpNum);
+    MACSIO_LOG_MSG(Info, ("Dump %02d Stat BW: %s/%s = %s", dumpNum,
+            MU_PrByts(stat_bytes, 0, nbytes_str, sizeof(nbytes_str)),
+            MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+            MU_PrBW(stat_bytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
 	
 	dumpNum++;
 	tNextBurstDump += dt;
@@ -770,6 +777,10 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrSecs(max_dump_loop_end - min_dump_loop_start, 0, seconds_str, sizeof(seconds_str)),
             MU_PrBW(summedBytes, max_dump_loop_end - min_dump_loop_start, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
+    for (int j=0; j<total_dumps; j++){
+        MACSIO_UTILS_StatFiles(j);
+    }
+    MACSIO_UTILS_CleanupFileStore();
 }
 
 ////#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE

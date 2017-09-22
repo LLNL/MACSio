@@ -387,6 +387,8 @@ static void main_dump(
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
     myFile = (FILE *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
     parts = json_object_path_get_array(main_obj, "problem/parts");
@@ -416,6 +418,9 @@ static void main_dump(
         json_object_path_get_string(main_obj, "clargs/filebase"),
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
+
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
 
     /* Wait for MACSIO_MIF to give this processor exclusive access */
     myFile = (FILE *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
