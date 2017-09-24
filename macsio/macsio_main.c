@@ -642,7 +642,6 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 ////#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
-////#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
@@ -671,81 +670,83 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 ////#warning THIS LOOP CURRENTLY JUST DOES A DUMP AFTER EVERY COMPUTE UP TO THE TOTAL NUMBER OF DUMPS. 
     while (t < maxT){
 
-	if (doWork)
-	    MACSIO_WORK_DoComputeWork(&t, dt, work_intensity);
+    	if (doWork){
+    	    MACSIO_WORK_DoComputeWork(&t, dt, work_intensity);
+        }
 
-	if (t >= tNextBurstDump || !doWork){
-	    int scr_need_checkpoint_flag = 1;
-	    MACSIO_TIMING_TimerId_t heavy_dump_tid;
+    	if (t >= tNextBurstDump || !doWork){
+    	    int scr_need_checkpoint_flag = 1;
+    	    MACSIO_TIMING_TimerId_t heavy_dump_tid;
 #ifdef HAVE_SCR
-	    if (exercise_scr)
-		SCR_Need_checkpoint(&scr_need_checkpoint_flag);
+    	    if (exercise_scr)
+    		SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
-	    const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
-		    json_object_path_get_string(main_obj, "clargs/interface"));
+            const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
+                json_object_path_get_string(main_obj, "clargs/interface"));
 
-	    if (!strcmp(json_object_path_get_string(main_obj, "clargs/fileext"),"")){
-		json_object_path_set_string(main_obj, "clargs/fileext", iface->ext);
-	    }
+            if (!strcmp(json_object_path_get_string(main_obj, "clargs/fileext"),"")){
+                json_object_path_set_string(main_obj, "clargs/fileext", iface->ext);
+            }
 
-	    /* log dump start */
-	    if (!exercise_scr || scr_need_checkpoint_flag){
-		int scr_valid = 0;
+    	    /* log dump start */
+    	    if (!exercise_scr || scr_need_checkpoint_flag){
+                int scr_valid = 0;
 #ifdef HAVE_SCR
-		if (exercise_scr)
-		    SCR_Start_checkpoint();
+        		if (exercise_scr)
+        		    SCR_Start_checkpoint();
 #endif
 
-		/* Start dump timer */
-		heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
+        		/* Start dump timer */
+        		heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
 ////#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
-////#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
-		/* do the dump */
-		//MACSIO_BurstDump(dt);
-		(*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+        		/* do the dump */
+        		//MACSIO_BurstDump(dt);
+        		(*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 #ifdef HAVE_MPI
-		mpi_errno = 0;
+        		mpi_errno = 0;
 #endif
-		errno = 0;
+        		errno = 0;
 
-		timer_dt = MT_StopTimer(heavy_dump_tid);
+        		timer_dt = MT_StopTimer(heavy_dump_tid);
 
 #ifdef HAVE_SCR
-		if (exercise_scr)
-		    SCR_Complete_checkpoint(scr_valid);
+        		if (exercise_scr)
+        		    SCR_Complete_checkpoint(scr_valid);
 #endif
-	    }
+    	    }
 
-	/* stop timer */
-	dumpTime += timer_dt;
-	dumpBytes += problem_nbytes;
-	dumpCount += 1;
+        	/* stop timer */
+        	dumpTime += timer_dt;
+        	dumpBytes += problem_nbytes;
+        	dumpCount += 1;
 
-	/* log dump timing */ // THIS ISN'T WORKING AS EXPECTED, THE VOLUME OF DATA WRITTEN TO FILE =/= SIZE OF JSON PROBLEM OBJECT
-	MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
-		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
-		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
-		    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
-    unsigned long long stat_bytes = MACSIO_UTILS_StatFiles(dumpNum);
-    MACSIO_LOG_MSG(Info, ("Dump %02d Stat BW: %s/%s = %s", dumpNum,
-            MU_PrByts(stat_bytes, 0, nbytes_str, sizeof(nbytes_str)),
-            MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
-            MU_PrBW(stat_bytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+        	/* log dump timing */ // THE VOLUME OF DATA WRITTEN TO FILE =/= SIZE OF JSON PROBLEM OBJECT
+        	MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
+        		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
+        		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+        		    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+            unsigned long long stat_bytes = MACSIO_UTILS_StatFiles(dumpNum);
+            MACSIO_LOG_MSG(Info, ("Dump %02d Stat BW: %s/%s = %s", dumpNum,
+                    MU_PrByts(stat_bytes, 0, nbytes_str, sizeof(nbytes_str)),
+                    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+                    MU_PrBW(stat_bytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
 	
-	dumpNum++;
-	tNextBurstDump += dt;
+        	dumpNum++;
+        	tNextBurstDump += dt;
 
-    float factor = 1.5;
-    MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor);
-	} /* end of burst dump loop */
+            float factor = 1.0;
+            if (factor > 1.0 || factor < 1.0){
+                MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor);
+            }
+    	} /* end of burst dump loop */
 
-	if (t >= tNextTrickleDump){
-	    /* MACSIO_TrickleDump(dt); */
-	} /*end of trickle dump loop */
+        if (t >= tNextTrickleDump){
+        /* MACSIO_TrickleDump(dt); */
+        } /*end of trickle dump loop */
 
-	/* Increase the timestep if we aren't using the work routine to do so */
-	if (!doWork) t++;
+    	/* Increase the timestep if we aren't using the work routine to do so */
+    	if (!doWork) t++;
     } /* end of timetep loop */
 
     dump_loop_end = MT_Time();
