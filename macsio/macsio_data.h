@@ -44,7 +44,7 @@ extern int                 MACSIO_DATA_GetRankOwningPart(json_object *main_obj, 
 extern int                 MACSIO_DATA_ValidateDataRead(json_object *main_obj);
 extern int                 MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank,
                                int *my_part_cnt, int **my_part_ids);
-extern struct json_object *MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved, float factor);
+extern struct json_object *MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved, float factor, int growth_bytes);
 
 #ifdef __cplusplus
 }
