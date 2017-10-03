@@ -1057,6 +1057,7 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
     h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
 
     /* Create an HDF5 Dataspace for the global whole of mesh and var objects in the file. */
@@ -1298,6 +1299,8 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
         dumpn,
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+    
     h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     h5File = *h5File_ptr;
     h5Group = userData.groupId;

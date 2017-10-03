@@ -33,6 +33,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 
 /*!
@@ -795,6 +796,13 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     valdp = (double *) json_object_extarr_data(data_obj);
     valip = (int *) json_object_extarr_data(data_obj);
 
+    srandom(time(NULL));
+
+    int exp_random_type = -1;
+    if (strstr(kind, "expansion")!=NULL){
+        exp_random_type = random()%8;
+    }
+
     n = 0;
 //#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
     srandom(0xBabeFace);
@@ -806,27 +814,27 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
             {
 //#warning PUT THESE INTO A GENERATOR FUNCTION
 //#warning ACCOUNT FOR HALF ZONE OFFSETS
-                if (strstr(kind, "constant")!=NULL)
+                if (strstr(kind, "constant")!=NULL || exp_random_type == 1)
                     valdp[n++] = 1.0;
-                else if (strstr(kind, "random")!=NULL)
+                else if (strstr(kind, "random")!=NULL || exp_random_type == 2)
                     valdp[n++] = (double) (random() % 1000) / 1000;
-                else if (strstr(kind, "xramp")!=NULL)
+                else if (strstr(kind, "xramp")!=NULL || exp_random_type == 3)
                     valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
-                else if (strstr(kind, "spherical")!=NULL)
+                else if (strstr(kind, "spherical")!=NULL || exp_random_type == 4)
                 {
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = sqrt(x*x+y*y+z*z);
                 }
-                else if (strstr(kind, "noise")!=NULL)
+                else if (strstr(kind, "noise")!=NULL || exp_random_type == 5)
                 {
                     double x = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     double z = bounds[2] + k * MACSIO_UTILS_ZDelta(dims, bounds);
                     valdp[n++] = noise(x,y,z,bounds);
                 }
-                else if (strstr(kind, "noise_sum")!=NULL)
+                else if (strstr(kind, "noise_sum")!=NULL || exp_random_type == 6)
                 {
 //#warning SHOULD USE GLOBAL DIMS DIAMETER HERE
                     int q, nlevels = (int) log2(sqrt(dims_diameter2))+1;
@@ -841,12 +849,12 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                         mult *= 2;
                     }
                 }
-                else if (strstr(kind, "ysin")!=NULL)
+                else if (strstr(kind, "ysin")!=NULL || exp_random_type == 7)
                 {
                     double y = bounds[1] + j * MACSIO_UTILS_YDelta(dims, bounds);
                     valdp[n++] = sin(y*3.1415266);
                 }
-                else if (strstr(kind, "xlayers")!=NULL)
+                else if (strstr(kind, "xlayers")!=NULL || exp_random_type == 8)
                 {
                     valip[n++] = (i / 20) % 3;
                 }
@@ -1209,4 +1217,71 @@ int MACSIO_DATA_ValidateDataRead(json_object *main_obj)
 int MACSIO_DATA_SimpleAssignKPartsToNProcs(int k, int n, int my_rank, int *my_part_cnt, int **my_part_ids)
 {
     return 0;
+}
+
+/* Add new data as we enter new phases of the simulation which generates additional arrays etc */
+json_object *
+MACSIO_DATA_EvolveDataset(json_object *main_obj, int *dataset_evolved, float factor, int growth_bytes)
+{
+    /* Datapath from main_obj:
+        Root -> problem -> parts[:] -> Vars[:] -> [name, centering, data]
+    */
+    json_object *part_array = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *part_obj = json_object_array_get_idx(part_array, 0);
+    json_object *vars_array = json_object_path_get_array(part_obj, "Vars");
+
+    char const *centering = "node";
+    char const *type = "double";
+    char tmpname[32];
+    char name[32];
+
+    snprintf(tmpname, sizeof(tmpname), "expansion_%03d", *dataset_evolved);
+
+    int ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
+
+    double doubles_required = growth_bytes/sizeof(double);
+
+    json_object *bounds_obj = json_object_path_get_array(part_obj, "Mesh/Bounds");
+    json_object *log_dims_obj = json_object_path_get_array(part_obj, "Mesh/LogDims");
+
+    int dims_total=1;
+
+    int dims[3];
+    double bounds[6];
+    for (int i=0; i < ndims; i++){
+        dims[i] = JsonGetInt(log_dims_obj, "", i);
+        dims_total *= dims[i];
+    }
+
+    for (int i=0; i < 6; i++){
+        bounds[i] = JsonGetDbl(bounds_obj, "", i);
+    }
+
+    double arrays_required = (doubles_required/dims_total);
+
+    int whole;
+    for (whole=1; whole<arrays_required; whole++){
+        snprintf(name, sizeof(name), "expansion_%03d", *dataset_evolved);
+        json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name));
+        *dataset_evolved += 1;
+    }
+
+    double partial = arrays_required - whole + 1;
+
+    int dims_partial = dims_total * partial;
+
+    dims[0] = dims_partial;
+    dims[1] = 1;
+    dims[2] = 1;
+
+    if (ndims == 2){
+        MACSIO_UTILS_Best2DFactors(dims_partial, &dims[0], &dims[1]);
+    } else if (ndims == 3){
+        MACSIO_UTILS_Best3DFactors(dims_partial, &dims[0], &dims[1], &dims[2]);
+    }
+
+    snprintf(name, sizeof(name), "expansion_%03d", *dataset_evolved);
+    json_object_array_add(vars_array, make_scalar_var(ndims, dims, bounds, centering, type, name));
+
+    return main_obj;
 }

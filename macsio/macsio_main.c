@@ -355,7 +355,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "\"binary\" and \"decimal\". For \"binary\" unit prefixes, sizes are reported\n"
             "in powers of 1024 and unit symbols Ki, Mi, Gi, Ti, Pi are used. For \"decimal\",\n"
             
-	    "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
+        "sizes are reported in powers of 1000 and unit symbols are Kb, Mb, Gb, Tb, Pb.\n"
             "See http://en.wikipedia.org/wiki/Binary_prefix. for more information",
         "--interface %s", "miftmpl",
             "Specify the name of the interface to be tested. Use keyword 'list'\n"
@@ -381,9 +381,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "number multiplied by the MPI communicator size. If the result of that\n"
             "product is non-integral, it will be rounded and a warning message will\n"
             "be generated.",
-	"--mesh_decomp %d %d %d", MACSIO_CLARGS_NODEFAULT,
-	    "The layout of parts in the mesh overriding the simple decomposition\n"
-	    "e.g. 4 8 1 will decompose into 32 parts in the stucture (x y z).",
+        "--mesh_decomp %d %d %d", MACSIO_CLARGS_NODEFAULT,
+            "The layout of parts in the mesh overriding the simple decomposition\n"
+            "e.g. 4 8 1 will decompose into 32 parts in the stucture (x y z).",
         "--part_size %d", "80000",
             "Mesh part size in bytes. This becomes the nominal I/O request size\n"
             "used by each MPI rank when marshalling data. A following B|K|M|G\n"
@@ -395,13 +395,13 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "topology and variable data with realistic variation in features (e.g.\n"
             "zone- and node-centering), this target byte count is hit exactly for\n"
             "only the most frequently dumped objects and approximately for other objects.",
-	"--part_mesh_dims %d %d %d", MACSIO_CLARGS_NODEFAULT,
-	    "Specify the number of elements in each dimension per mesh part.\n"
-	    "This overrides the part_size parameter and instead allows the size\n"
-	    "of the mesh to be determined by dimensions.\n"
-	    "e.g. 300 300 2, 300 300 0 (set final dimension to 0 for 2d",
-	"--part_dim %d", "2",
-            "Spatial dimension of parts; 1, 2, or 3",
+        "--part_mesh_dims %d %d %d", MACSIO_CLARGS_NODEFAULT,
+            "Specify the number of elements in each dimension per mesh part.\n"
+            "This overrides the part_size parameter and instead allows the size\n"
+            "of the mesh to be determined by dimensions.\n"
+            "e.g. 300 300 2, 300 300 0 (set final dimension to 0 for 2d",
+        "--part_dim %d", "2",
+                "Spatial dimension of parts; 1, 2, or 3",
         "--part_type %s", "rectilinear",
             "Options are 'uniform', 'rectilinear', 'curvilinear', 'unstructured'\n"
             "and 'arbitrary' (currently, only rectilinear is implemented)",
@@ -415,6 +415,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
+        "--dataset_growth %f", MACSIO_CLARGS_NODEFAULT, 
+            "The factor by which the volume of data will grow between dump iterations\n"
+            "If no value is given or the value is <1.0 no dataset changes will take place.",
         "--topology_change_probability %f", "0.0",
             "The probability that the topology of the mesh (e.g. something fundamental\n"
             "about the mesh's structure) will change between dumps. A value of 1.0\n"
@@ -448,7 +451,6 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "The maximum number of filesystem objects (e.g. files or subdirectories)\n"
             "that MACSio will create in any one subdirectory. This is typically\n"
             "relevant only in MIF mode because MIF mode can wind up generating many\n"
-            "files on each dump. The default setting is unlimited meaning that MACSio\n"
             "will continue to create output files in the same directory until it has\n"
             "completed all dumps. Use a value of zero to force MACSio to put each\n"
             "dump in a separate directory but where the number of top-level directories\n"
@@ -470,18 +472,18 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "files. Note that this works only in MIFFPP mode. A request to exercise\n"
             "SCR in any other mode will be ignored and en error message generated.",
 #endif
-	"--compute_work_intensity %d", "1",
-	    "Add some work in between I/O phases. There are three levels of 'compute'\n"
-	    "that can be performed as follows:\n"
-	    "\tLevel 1: Perform a basic sleep operation\n"
-	    "\tLevel 2: Perform some simple FLOPS with randomly accessed data\n"
-	    "\tLevel 3: Execute the main kernel from the ? benchmark/mini-app\n"
-	    "This input is intended to be used in conjunection with --compute_time\n"
-	    "which will roughly control how much time is spent doing work between iops\n",
-	"--compute_time %f", "",
-	    "A rough lower bound on the number of seconds spent doing work between\n"
-	    "I/O phases. The type of work done is controlled by the --compute_work_intensity input\n"
-	    "and defaults to Level 1 (basic sleep).\n",
+        "--compute_work_intensity %d", "1",
+            "Add some work in between I/O phases. There are three levels of 'compute'\n"
+            "that can be performed as follows:\n"
+            "\tLevel 1: Perform a basic sleep operation\n"
+            "\tLevel 2: Perform some simple FLOPS with randomly accessed data\n"
+            "\tLevel 3: Solves the 2D Poisson equation via the Jacobi iterative method\n"
+            "This input is intended to be used in conjunection with --compute_time\n"
+            "which will roughly control how much time is spent doing work between iops",
+        "--compute_time %f", "",
+            "A rough lower bound on the number of seconds spent doing work between\n"
+            "I/O phases. The type of work done is controlled by the --compute_work_intensity input\n"
+            "and defaults to Level 1 (basic sleep).\n",
         "--debug_level %d", "0",
             "Set debugging level (1, 2 or 3) of log files. Higher numbers mean\n"
             "more frequent and detailed output. A value of zero, the default,\n"
@@ -642,22 +644,25 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 
 ////#warning WERE NOT GENERATING OR WRITING ANY METADATA STUFF
 
-////#warning MAKE THIS LOOP MORE LIKE A MAIN SIM LOOP WITH SIMPLE COMPUTE AND COMM STEP
     dump_loop_start = MT_Time();
     dumpTime = 0.0;
     int total_dumps = json_object_path_get_int(main_obj, "clargs/num_dumps");
+
+    MACSIO_UTILS_CreateFileStore(total_dumps, 1);
 
     double t;
     double maxT;
     double dt;
     double tNextBurstDump;
     double tNextTrickleDump;
+    int dataset_evolved = 0;
+    float factor = json_object_path_get_double(main_obj, "clargs/dataset_growth");
    
     int doWork = 0;
     if (work_dt > 0){
-	doWork=1;
+    doWork=1;
     } else {
-	work_dt = 1;
+    work_dt = 1;
     }
 
     dt = work_dt;
@@ -668,73 +673,84 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 ////#warning THIS LOOP CURRENTLY JUST DOES A DUMP AFTER EVERY COMPUTE UP TO THE TOTAL NUMBER OF DUMPS. 
     while (t < maxT){
 
-	if (doWork)
-	    MACSIO_WORK_DoComputeWork(&t, dt, work_intensity);
+        if (doWork){
+            MACSIO_WORK_DoComputeWork(&t, dt, work_intensity);
+        }
 
-	if (t >= tNextBurstDump || !doWork){
-	    int scr_need_checkpoint_flag = 1;
-	    MACSIO_TIMING_TimerId_t heavy_dump_tid;
+        if (t >= tNextBurstDump || !doWork){
+            int scr_need_checkpoint_flag = 1;
+            MACSIO_TIMING_TimerId_t heavy_dump_tid;
 #ifdef HAVE_SCR
-	    if (exercise_scr)
-		SCR_Need_checkpoint(&scr_need_checkpoint_flag);
+            if (exercise_scr)
+            SCR_Need_checkpoint(&scr_need_checkpoint_flag);
 #endif
 
-	    const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
-		    json_object_path_get_string(main_obj, "clargs/interface"));
+            const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetByName(
+                json_object_path_get_string(main_obj, "clargs/interface"));
 
-	    if (!strcmp(json_object_path_get_string(main_obj, "clargs/fileext"),"")){
-		json_object_path_set_string(main_obj, "clargs/fileext", iface->ext);
-	    }
+            if (!strcmp(json_object_path_get_string(main_obj, "clargs/fileext"),"")){
+                json_object_path_set_string(main_obj, "clargs/fileext", iface->ext);
+            }
 
-	    /* log dump start */
-	    if (!exercise_scr || scr_need_checkpoint_flag){
-		int scr_valid = 0;
+            /* log dump start */
+            if (!exercise_scr || scr_need_checkpoint_flag){
+                int scr_valid = 0;
 #ifdef HAVE_SCR
-		if (exercise_scr)
-		    SCR_Start_checkpoint();
+                if (exercise_scr)
+                    SCR_Start_checkpoint();
 #endif
 
-		/* Start dump timer */
-		heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
+                /* Start dump timer */
+                heavy_dump_tid = MT_StartTimer("heavy dump", main_wr_grp, dumpNum);
 ////#warning REPLACE DUMPN AND DUMPT WITH A STATE TUPLE
-////#warning SHOULD HAVE PLUGIN RETURN FILENAMES SO MACSIO CAN STAT FOR TOTAL BYTES ON DISK
-		/* do the dump */
-		//MACSIO_BurstDump(dt);
-		(*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
+                /* do the dump */
+                //MACSIO_BurstDump(dt);
+                (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 #ifdef HAVE_MPI
-		mpi_errno = 0;
+                mpi_errno = 0;
 #endif
-		errno = 0;
+                errno = 0;
 
-		timer_dt = MT_StopTimer(heavy_dump_tid);
+                timer_dt = MT_StopTimer(heavy_dump_tid);
 
 #ifdef HAVE_SCR
-		if (exercise_scr)
-		    SCR_Complete_checkpoint(scr_valid);
+                if (exercise_scr)
+                    SCR_Complete_checkpoint(scr_valid);
 #endif
-	    }
+            }
 
-	/* stop timer */
-	dumpTime += timer_dt;
-	dumpBytes += problem_nbytes;
-	dumpCount += 1;
+            /* stop timer */
+            dumpTime += timer_dt;
+            dumpBytes += problem_nbytes;
+            dumpCount += 1;
 
-	/* log dump timing */
-	MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
-		    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
-		    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
-		    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
-	
-	dumpNum++;
-	tNextBurstDump += dt;
-	} /* end of burst dump loop */
+            /* log dump timing */ // THE VOLUME OF DATA WRITTEN TO FILE =/= SIZE OF JSON PROBLEM OBJECT
+            MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
+                    MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
+                    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+                    MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+            unsigned long long stat_bytes = MACSIO_UTILS_StatFiles(dumpNum);
+            MACSIO_LOG_MSG(Info, ("Dump %02d Stat BW: %s/%s = %s", dumpNum,
+                    MU_PrByts(stat_bytes, 0, nbytes_str, sizeof(nbytes_str)),
+                    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+                    MU_PrBW(stat_bytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
+    
+            dumpNum++;
+            tNextBurstDump += dt;
 
-	if (t >= tNextTrickleDump){
-	    /* MACSIO_TrickleDump(dt); */
-	} /*end of trickle dump loop */
+            if (factor > 1.0){
+                unsigned long long prev_bytes = MACSIO_UTILS_StatFiles(dumpNum-1);
+                int growth_bytes = (prev_bytes*factor) - prev_bytes;
+                MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor, growth_bytes);
+            }
+        } /* end of burst dump loop */
 
-	/* Increase the timestep if we aren't using the work routine to do so */
-	if (!doWork) t++;
+        if (t >= tNextTrickleDump){
+        /* MACSIO_TrickleDump(dt); */
+        } /*end of trickle dump loop */
+
+        /* Increase the timestep if we aren't using the work routine to do so */
+        if (!doWork) t++;
     } /* end of timetep loop */
 
     dump_loop_end = MT_Time();
@@ -766,6 +782,10 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             MU_PrSecs(max_dump_loop_end - min_dump_loop_start, 0, seconds_str, sizeof(seconds_str)),
             MU_PrBW(summedBytes, max_dump_loop_end - min_dump_loop_start, 0, bandwidth_str, sizeof(bandwidth_str))));
     }
+    for (int j=0; j<total_dumps; j++){
+        MACSIO_UTILS_StatFiles(j);
+    }
+    MACSIO_UTILS_CleanupFileStore();
 }
 
 ////#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
