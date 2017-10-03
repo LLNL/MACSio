@@ -416,7 +416,8 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "unstructured mesh it is the number of spatial dimensions plus\n"
             "2^number of topological dimensions. [50]",
         "--dataset_growth %f", MACSIO_CLARGS_NODEFAULT, 
-            "The factor by which the volume of data will grow between dump iterations",
+            "The factor by which the volume of data will grow between dump iterations\n"
+            "If no value is given or the value is <1.0 no dataset changes will take place.",
         "--topology_change_probability %f", "0.0",
             "The probability that the topology of the mesh (e.g. something fundamental\n"
             "about the mesh's structure) will change between dumps. A value of 1.0\n"
@@ -450,7 +451,6 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "The maximum number of filesystem objects (e.g. files or subdirectories)\n"
             "that MACSio will create in any one subdirectory. This is typically\n"
             "relevant only in MIF mode because MIF mode can wind up generating many\n"
-            "files on each dump. The default setting is unlimited meaning that MACSio\n"
             "will continue to create output files in the same directory until it has\n"
             "completed all dumps. Use a value of zero to force MACSio to put each\n"
             "dump in a separate directory but where the number of top-level directories\n"
@@ -477,9 +477,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "that can be performed as follows:\n"
             "\tLevel 1: Perform a basic sleep operation\n"
             "\tLevel 2: Perform some simple FLOPS with randomly accessed data\n"
-            "\tLevel 3: Execute the main kernel from the ? benchmark/mini-app\n"
+            "\tLevel 3: Solves the 2D Poisson equation via the Jacobi iterative method\n"
             "This input is intended to be used in conjunection with --compute_time\n"
-            "which will roughly control how much time is spent doing work between iops\n",
+            "which will roughly control how much time is spent doing work between iops",
         "--compute_time %f", "",
             "A rough lower bound on the number of seconds spent doing work between\n"
             "I/O phases. The type of work done is controlled by the --compute_work_intensity input\n"
@@ -738,7 +738,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             dumpNum++;
             tNextBurstDump += dt;
 
-            if (factor > 1.0 || factor < 1.0){
+            if (factor > 1.0){
                 unsigned long long prev_bytes = MACSIO_UTILS_StatFiles(dumpNum-1);
                 int growth_bytes = (prev_bytes*factor) - prev_bytes;
                 MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor, growth_bytes);
