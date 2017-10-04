@@ -2,7 +2,7 @@ SILO_HOME=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/silo-
 HDF5_HOME=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/hdf5-1.10.1-rvbzavhooxzltqspjdzehbo7hvpculol
 SZIP_HOME=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/libszip-2.1.1-auuxygjdz57wrexn3fhrs3n6mfb6e2bo
 ZLIB_HOME=/opt/zlib/1.2.10/gnu/6.3.0
-TYPHONIO_HOME=/home/jd/Software/typhonio/build/gcc-debug
+TYPHONIO_HOME=/home/jd/Software/typhonio/build/gcc
 
 CC=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/openmpi-3.0.0-mu5iefsq6siu324xokfufy4lquytmym6/bin/mpicc
 CXX=/home/jd/Software/spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/openmpi-3.0.0-mu5iefsq6siu324xokfufy4lquytmym6/bin/mpic++

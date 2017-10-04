@@ -534,6 +534,8 @@ static void main_dump_mif(
             dumpn,
             "h5");//json_object_path_get_string(main_obj, "clargs/fileext"));
 
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
     tioFile_ptr = (TIO_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     tioFile = *tioFile_ptr;
     tioGroup = userData.groupId;
@@ -1103,6 +1105,8 @@ static void main_dump_sif(
             json_object_path_get_string(main_obj, "clargs/filebase"),
             file_suffix,
             "h5"); //json_object_path_get_string(main_obj, "clargs/fileext"));
+
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
 
     TIO_Call( TIO_Create(fileName, &tiofile_id, TIO_ACC_REPLACE, "MACSio",
         "0.9", date, fileName, MACSIO_MAIN_Comm, MPI_INFO_NULL, MACSIO_MAIN_Rank),
