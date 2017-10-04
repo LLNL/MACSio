@@ -741,7 +741,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             if (factor > 1.0){
                 unsigned long long prev_bytes = MACSIO_UTILS_StatFiles(dumpNum-1);
                 int growth_bytes = (prev_bytes*factor) - prev_bytes;
-                MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor, growth_bytes);
+                if (growth_bytes > 0)
+                    MACSIO_DATA_EvolveDataset(main_obj, &dataset_evolved, factor, growth_bytes);
             }
         } /* end of burst dump loop */
 
