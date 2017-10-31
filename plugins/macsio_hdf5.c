@@ -43,9 +43,9 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mpi.h>
 #endif
 
-#ifdef HAVE_SILO
-#include <silo.h> /* for the Silo block based VFD option */
-#endif
+// #ifdef HAVE_SILO
+// #include <silo.h> /* for the Silo block based VFD option */
+// #endif
 
 #include <H5pubconf.h>
 #include <hdf5.h>

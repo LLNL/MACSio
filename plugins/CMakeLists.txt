@@ -23,5 +23,4 @@ IF(ENABLE_TYPHONIO_PLUGIN)
     LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_typhonio.c)
 ENDIF(ENABLE_TYPHONIO_PLUGIN)
 
-MESSAGE("${plugin_srcs}")
 SET(PLUGIN_SRCS ${plugin_srcs} PARENT_SCOPE)
