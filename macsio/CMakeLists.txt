@@ -10,12 +10,14 @@ SET(mio_srcs
     macsio_utils.c
     macsio_log.c
     macsio_data.c
+    macsio_work.c
     macsio_main.c
 )
 
 SET_SOURCE_FILES_PROPERTIES(${mio_srcs} PROPERTIES LANGUAGE CXX)
+SET_SOURCE_FILES_PROPERTIES(${PROJECT_SOURCE_DIR}/plugins/${PLUGIN_SRCS} PROPERTIES LANGUAGE CXX)
 
-ADD_EXECUTABLE(macsio ${mio_srcs} ${PLUGIN_SRCS})
+ADD_EXECUTABLE(macsio ${mio_srcs} ${PROJECT_SOURCE_DIR}/plugins/${PLUGIN_SRCS})
 IF(ENABLE_MPI)
     SET_TARGET_PROPERTIES(macsio PROPERTIES COMPILE_DEFINITIONS "HAVE_MPI")
 ENDIF(ENABLE_MPI)
