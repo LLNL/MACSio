@@ -1,0 +1,26 @@
+# Header files need not be enumerated
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+
+LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_miftmpl.c)
+
+IF(ENABLE_HDF5_PLUGIN)
+    LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_hdf5.c)
+ENDIF(ENABLE_HDF5_PLUGIN)
+
+IF(ENABLE_PDB_PLUGIN)
+    LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_pdb.c)
+ENDIF(ENABLE_PDB_PLUGIN)
+
+IF(ENABLE_EXODUS_PLUGIN)
+    LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_exodus.c)
+ENDIF(ENABLE_EXODUS_PLUGIN)
+
+IF(ENABLE_SILO_PLUGIN)
+    LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_silo.c)
+ENDIF(ENABLE_SILO_PLUGIN)
+
+IF(ENABLE_TYPHONIO_PLUGIN)
+    LIST(APPEND plugin_srcs ${PROJECT_SOURCE_DIR}/plugins/macsio_typhonio.c)
+ENDIF(ENABLE_TYPHONIO_PLUGIN)
+
+SET(PLUGIN_SRCS ${plugin_srcs} PARENT_SCOPE)

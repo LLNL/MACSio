@@ -6,3 +6,16 @@ json-cwx/json-cwx/config.h.in
 json-cwx/json-cwx/configure
 json-cwx/json-cwx/ltmain.sh
 json-cwx/json-cwx/tests/Makefile.in
+
+#CMAKE
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+build
+Build
+#Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
