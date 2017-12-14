@@ -1,0 +1,18 @@
+title: MACSio
+email: gonsie@llnl.gov
+description: A Multi-purpose, Application-Centric, Scalable I/O Proxy Application
+baseurl: "/macsio"
+url: ""
+github_username: markmiller86
+
+# Build settings
+markdown: kramdown
+
+# Gem theme
+#theme: jekyll-llnl-theme
+
+# Gem theme through gh-pages
+remote_theme: gonsie/Jekyll-LLNL-Theme
+
+plugins_dir:
+  - jekyll-feed
