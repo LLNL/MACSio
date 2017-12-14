@@ -5,6 +5,10 @@ baseurl: "/MACSio"
 url: ""
 github_username: markmiller86
 
+# vars used by Jekyll-LLNL-Theme
+name: MACSio
+githubrepo: MACSio
+
 # Build settings
 markdown: kramdown
 
