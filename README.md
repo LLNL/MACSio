@@ -26,6 +26,14 @@ We hope MACSio helps to put the MAX in scalable I/O performance ;)
 
 The name "MACSio" is pronounced max-eee-oh.
 
+## Installing
+
+The easiest way to get MACSio is to install using the Spack package manager (see [https://spack.readthedocs.io](https://spack.readthedocs.io/en/latest/)).
+Installing with Spack is as simple as `spack install macsio`.
+
+Alternatively, see the [INSTALLING](/INSTALLING) file for manual installation instructions.
+
+
 ## Release
 
 MACSio is released under the terms of the GPL license. For full details
