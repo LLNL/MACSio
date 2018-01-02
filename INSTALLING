@@ -1,41 +1,22 @@
-1. Create a file in macsio/config-site directory whose name is whatever
-   string the command 'hostname -f' returns. Example...
-        % hostname -f
-        scratlantis
-        % touch macsio/config-site/scratlantis 
+1. Download and install json-cwx (json-c with extensions) from https://github.com/LLNL/json-cwx
 
-2. Populate the file you created in step one with variables to
-   define where various third party libraries (TPLs) for plugins
-   can be found. MACSio will not attempt to build any plugins
-   for which the requisite TPL variables are not defined.
-   Example...
-        # For the silo plugin, we need Silo and, optionally, HDF5
-        SILO_HOME=/foo/bar/silo/4.10.2-h5par/i386-apple-darwin12_gcc-4.2
-        HDF5_HOME=/foo/bar/hdf5/1.8.11-par/i386-apple-darwin12_gcc-4.2
-
-        # Sometimes, HDF5 needs szip and the HDF5 plugin does szip compression
-        SZIP_HOME=/foo/bar/szip/2.1/i386-apple-darwin12_gcc-4.2
-
-        # For the Exodus plugin, we need Exodus and netCDF.
-        EXODUS_HOME=/foo/bar/exodus-6.09/exodus/myinstall
-        NETCDF_HOME=/foo/bar/netcdf/4.1.1/i386-apple-darwin12_mpicc
-
-3. Continue populating the file you created in step one with
-   variables to control the location of C/C++ compilers, compiler
-   flags, linker flags, etc. Note that a C++ compiler is used
-   only to link the executables. Most of the standard GNU make
-   variables are supported. Example...
-        CXX=mpicxx
-        CC=mpicc
-        CFLAGS=-DHAVE_MPI -g
-        LINK=$(CXX)
-        DOXCMD=doxygen
-
-4. Go into the macsio directory and type 'make all'. That should
-   produce the 'macsio' executable. Make 'help' will give you
-   some instructions on other useful make targets
-
-5. MACSio has default values for all command-line arguments. So if you
+2. Create a build directory
+      % mkdir build
+      % cd build
+      
+3. Use CMake to build MACSio and any of the desired plugins (builds with silo by default)
+      % cmake -DCMAKE_INSTALL_PREFIX=[desired-install-location] -DWITH_JSON-CWX_PREFIX=[path to json-cwx] -DWITH_SILO_PREFIX=[path to silo] ..
+      % make
+      % make install
+      
+   NOTE: Some options for the cmake line:
+      Build docs:             -DBUILD_DOCS=ON   
+      Build HDF5 Plugin:      -DENABLE_HDF5_PLUGIN=ON -DWITH_HDF5_PREFIX=[path to hdf5]
+      Build TyphonIO Plugin:  -DENABLE_TYPHONIO_PLUGIN=ON -DWITH_TYPHONIO_PREFIX=[path to typhonio]
+      Build PDB Plugin:       -DENABLE_PBD_PLUGIN=ON
+      Build Exodus Plugin:    -DENABLE_EXODUS_PLUGIN=ON -DWITH_EXODUS_PREFIX=[path to exodus]
+      
+4. MACSio has default values for all command-line arguments. So if you
    just run the command './macsio', it will do something but probably
    not what you want. Here are some example command-lines. . .
 
