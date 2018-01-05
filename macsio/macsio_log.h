@@ -134,7 +134,7 @@ do{                                                                             
 
 /*!
 \def MACSIO_LOG_MSGV
-\breif Alterantive to \c MACSIO_LOG_MSG when severity is a runtime variable
+\brief Alterantive to \c MACSIO_LOG_MSG when severity is a runtime variable
 \param [in] VSEV Runtime variable in which message severity is stored
 \param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
 */
@@ -214,7 +214,7 @@ call.
 extern int                     mpi_errno;
 
 /*!
-\breif Filtering level for debugging messages
+\brief Filtering level for debugging messages
 
 MACSIO generates 3 levels of debug messages numbered 1, 2 and 3. Each level is intended to
 represent more and more detailed debugging messages. Level 1 messages are issued rare enough

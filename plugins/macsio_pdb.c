@@ -54,6 +54,11 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 @{
 */
 
+/*!
+\addtogroup PDB
+@{
+*/
+
 /* the name you want to assign to the interface */
 static char const *iface_name = "pdb";
 static char const *iface_ext = "pdb";
@@ -248,5 +253,7 @@ static int register_this_interface()
    iface_map array merely by virtue of the fact that this code is linked
    with a main. */
 static int dummy = register_this_interface();
+
+/*!@}*/
 
 /*!@}*/

@@ -65,7 +65,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #ifdef HAVE_ZFP
 /*!
-\addtogroup ZFP As HDF5 Compression Filter
+\addtogroup ZFP 
+\brief HDF5 Compression Filter
 
 Copyright (c) 2014-2015, RWTH Aachen University, JARA - Juelich Aachen Research Alliance.
 Produced at the RWTH Aachen University, Germany.
@@ -665,9 +666,11 @@ H5Z_register_zfp(void)
     H5Zregister(ZFP_H5Filter);
 }
 
+/*!@}*/
+
 #endif /* HAVE_ZFP */
 
-/*!@}*/
+
 
 /* the name you want to assign to the interface */
 static char const *iface_name = "hdf5";
