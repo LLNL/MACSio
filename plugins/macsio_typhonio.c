@@ -567,6 +567,22 @@ static void main_dump_mif(
 
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
+}
+
+/*!
+\brief Main MSF dump implementation for the plugin
+
+This function is called to handle MSF file dumps.
+
+The files and states are created before passing off to write_quad_mesh_part_shared
+or write_ucd_mesh_part_shared to handle the dump of the data.
+*/
+static void main_dump_msf(
+    json_object *main_obj,
+    int numFiles,
+    int dumpn,
+    double dumpt)
+{
 
 }
 
