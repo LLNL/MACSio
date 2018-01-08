@@ -5,6 +5,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 SET(mio_srcs
     macsio_clargs.c
     macsio_mif.c
+    macsio_msf.c
     macsio_iface.c
     macsio_timing.c
     macsio_utils.c

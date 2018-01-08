@@ -9,6 +9,7 @@
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
+#include <macsio_msf.h>
 #include <macsio_utils.h>
 
 #ifdef HAVE_MPI
@@ -583,6 +584,72 @@ static void main_dump_msf(
     int dumpn,
     double dumpt)
 {
+    int size, rank;
+    TIO_t *tioFile_ptr;
+    TIO_File_t tioFile;
+    TIO_Object_t state_id;
+    char fileName[256];
+    char stateName[256];
+    group_data_t userData;
+    MACSIO_MSF_ioFlags_t ioFlags = {MACSIO_MSF_WRITE, JsonGetInt(main_obj, "clargs/exercise_scr") & 0x1};
+
+    MACSIO_MSF_baton_t *bat = MACSIO_MSF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 1, &userData);
+
+    rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
+    size = json_object_path_get_int(main_obj, "parallel/mpi_size");
+
+    /* Construct name for the typhonio file */
+    sprintf(fileName, "%s_typhonio_%05d_%03d.%s",
+            json_object_path_get_string(main_obj, "clargs/filebase"),
+            MACSIO_MSF_RankOfGroup(bat, rank),
+            dumpn,
+            "h5");//json_object_path_get_string(main_obj, "clargs/fileext"));
+
+    sprintf(stateName, "state0");
+
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+
+    /* Create */
+    TIO_File_t tioFile;
+    //MPI_Comm *groupComm = (MPI_Comm*)userData;
+    char *date = getDate();
+    TIO_Call( TIO_Create(fileName, &tioFile, TIO_ACC_REPLACE, "MACSio",
+                         "1.0", date, (char*)fileName, MACSIO_MSF_CommOfGroup(bat), MPI_INFO_NULL, MACSIO_MAIN_Rank),
+              "File Creation Failed\n");
+    TIO_Call( TIO_Create_State(tioFile, stateName, &state_id, 1, (TIO_Time_t)0.0, "us"),
+        "State Create Failed\n");
+    /* Create */ 
+
+    json_object *parts = json_object_path_get_array(main_obj, "problem/parts");
+
+    for (int i = 0; i < json_object_array_length(parts); i++)
+    {
+        char domain_dir[256];
+        json_object *this_part = json_object_array_get_idx(parts, i);
+        TIO_Object_t domain_group_id;
+
+        snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
+                 json_object_path_get_int(this_part, "Mesh/ChunkID"));
+
+        TIO_Call( TIO_Create_State(tioFile, domain_dir, &domain_group_id, 1, (TIO_Time_t)0.0, "us"),
+                  "State Create Failed\n");
+
+        write_mesh_part(tioFile, domain_group_id, this_part);
+
+        TIO_Call( TIO_Close_State(tioFile, domain_group_id),
+                  "State Close Failed\n");
+    }
+
+    TIO_Call( TIO_Close_State(tioFile, state_id),
+        "State Close Failed\n");
+
+    /* Close the checkpoint file */
+    TIO_Call( TIO_Close(tioFile),
+      "Close File failed\n");
+
+    /* We're done using MACSIO_MIF, so finish it off */
+    MACSIO_MIF_Finish(bat);
+
 
 }
 
@@ -1125,7 +1192,7 @@ static void main_dump_sif(
     MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
 
     TIO_Call( TIO_Create(fileName, &tiofile_id, TIO_ACC_REPLACE, "MACSio",
-        "0.9", date, fileName, MACSIO_MAIN_Comm, MPI_INFO_NULL, MACSIO_MAIN_Rank),
+        "1.0", date, fileName, MACSIO_MAIN_Comm, MPI_INFO_NULL, MACSIO_MAIN_Rank),
     "File Creation Failed\n");
     TIO_Call( TIO_Create_State(tiofile_id, state_name, &state_id, 1, (TIO_Time_t)0.0, "us"),
         "State Create Failed\n");
