@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 #include <macsio_msf.h>
+#include <macsio_log.h>
 
 #define MACSIO_MSF_BATON_OK  0
 #define MACSIO_MSF_BATON_ERR 1
@@ -92,6 +93,10 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
 
     MPI_Comm_size(mpiComm, &commSize);
     MPI_Comm_rank(mpiComm, &rankInComm);
+
+    if (commSize < numGroups){
+        MACSIO_LOG_MSG(Die, ("More files than ranks!"));
+    }
 
     groupSize              = commSize / numGroups;
     numGroupsWithExtraProc = commSize % numGroups;
@@ -188,6 +193,13 @@ int MACSIO_MSF_RankInGroup(
     }
 
     return retval;
+}
+
+int MACSIO_MSF_SizeOfGroup(
+    MACSIO_MSF_baton_t const *Bat
+)
+{
+    return Bat->groupSize;
 }
 
 MPI_Comm MACSIO_MSF_CommOfGroup(

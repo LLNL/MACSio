@@ -69,6 +69,7 @@ extern MACSIO_MSF_baton_t *MACSIO_MSF_Init(int numFiles, MACSIO_MSF_ioFlags_t io
 extern void   MACSIO_MSF_Finish(MACSIO_MSF_baton_t *bat);
 extern int    MACSIO_MSF_RankOfGroup(const MACSIO_MSF_baton_t *Bat, int rankInComm);
 extern int    MACSIO_MSF_RankInGroup(const MACSIO_MSF_baton_t *Bat, int rankInComm);
+extern int    MACSIO_MSF_SizeOfGroup(const MACSIO_MSF_baton_t *Bat);
 extern MPI_Comm MACSIO_MSF_CommOfGroup(MACSIO_MSF_baton_t const *Bat);
 
 #ifdef __cplusplus
