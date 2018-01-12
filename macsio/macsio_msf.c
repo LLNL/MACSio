@@ -61,6 +61,8 @@ typedef struct _MACSIO_MSF_baton_t
     int groupRank;              /**< Rank of this processor's group */
     int commSplit;              /**< Rank of the last MPI task assigned to +1 groups */
     int rankInGroup;            /**< Rank of this processor within its group */
+    int *groupRanks;            /**< Array of all of the ranks in the group */
+    int groupRoot;          /**< Rank of the root process for this group */
     int procBeforeMe;           /**< Rank of processor before this processor in the group */
     int procAfterMe;            /**< Rank of processor after this processor in the group */
     mutable int MSFErr;         /**< MSF error value */
@@ -122,6 +124,22 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
     /* Create group communicator */
     MPI_Comm groupComm;
     MPI_Comm_split(mpiComm, groupRank, rankInGroup, &groupComm);
+ 
+    /* Gather the ranks of each process in this group */
+    int *groupRanks = (int*)malloc(sizeof(int) * groupSize);
+    MPI_Allgather(&rankInComm, 1, MPI_INT, groupRanks, 1, MPI_INT, groupComm);
+
+    /* Broadcast the rank from the group root to rest of group */
+    int groupRootRank;
+    int amIRoot = rankInGroup == 0 ? rankInComm : -1;
+    int *rankArray = (int*)malloc(sizeof(int) * groupSize);
+    MPI_Allgather(&amIRoot, 1, MPI_INT, rankArray, 1, MPI_INT, groupComm);
+    for (int i = 0; i<groupSize; i++){
+        if (rankArray[i] > -1){
+            groupRootRank = rankArray[i];
+            break;
+        }
+    }
 
     ret = (MACSIO_MSF_baton_t *) malloc(sizeof(MACSIO_MSF_baton_t));
     ret->ioFlags = ioFlags;
@@ -133,6 +151,8 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
     ret->commSplit = commSplit;
     ret->groupRank = groupRank;
     ret->rankInGroup = rankInGroup;
+    ret->groupRanks = groupRanks;
+    ret->groupRoot = groupRootRank;
     ret->procBeforeMe = procBeforeMe;
     ret->procAfterMe = procAfterMe;
     ret->MSFErr = MACSIO_MSF_BATON_OK;
@@ -209,4 +229,10 @@ MPI_Comm MACSIO_MSF_CommOfGroup(
     return Bat->mpiComm;
 }
 
+int MACSIO_MSF_RootOfGroup(
+    MACSIO_MSF_baton_t const *Bat
+)
+{
+    return Bat->groupRoot;
+}
 /*!@}*/

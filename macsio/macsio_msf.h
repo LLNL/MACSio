@@ -71,6 +71,7 @@ extern int    MACSIO_MSF_RankOfGroup(const MACSIO_MSF_baton_t *Bat, int rankInCo
 extern int    MACSIO_MSF_RankInGroup(const MACSIO_MSF_baton_t *Bat, int rankInComm);
 extern int    MACSIO_MSF_SizeOfGroup(const MACSIO_MSF_baton_t *Bat);
 extern MPI_Comm MACSIO_MSF_CommOfGroup(MACSIO_MSF_baton_t const *Bat);
+extern int MACSIO_MSF_RootOfGroup(MACSIO_MSF_baton_t const *Bat);
 
 #ifdef __cplusplus
 }
