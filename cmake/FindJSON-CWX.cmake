@@ -5,8 +5,7 @@
 #  JSON-CWX_LIBRARIES - The libraries needed to use libjson-cwx
 
 FIND_PATH(WITH_JSON-CWX_PREFIX
-    NAMES include/json-cwx/json-cwx.h
-    HINTS /usr/gapps/json-cwx/current/$ENV{SYS_TYPE}/
+    NAMES include/json-cwx/json.h
 )
 
 FIND_LIBRARY(JSON-CWX_LIBRARIES
