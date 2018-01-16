@@ -677,7 +677,7 @@ static void write_quad_mesh_whole(
                     }
                                     
                     TIO_Size_t chunk_indices[MACSIO_MSF_SizeOfGroup(bat)][6];
-                    MPI_Allgather(local_chunk_indices, 6, MPI_DOUBLE, chunk_indices, 6, MPI_DOUBLE, MACSIO_MSF_CommOfGroup(bat));
+                    MPI_Allgather(local_chunk_indices, 6, MPI_UNSIGNED_LONG, chunk_indices, 6, MPI_UNSIGNED_LONG, MACSIO_MSF_CommOfGroup(bat));
 
                     for (int k=0; k<MACSIO_MSF_SizeOfGroup(bat); k++){
                         TIO_Call( TIO_Set_Quad_Chunk(file_id, mesh_id, k, ndims_tio,
@@ -716,11 +716,11 @@ static void write_quad_mesh_whole(
                             bound_array[j] = JsonGetInt(bounds,"",j);
                         }
 
-                        MPI_Gather((void*)x_coord, local_mesh_dims[0], MPI_DOUBLE, x_coord_root, local_mesh_dims[0], MPI_DOUBLE, MACSIO_MSF_RootOfGroup(bat), MACSIO_MSF_CommOfGroup(bat));
+                        MPI_Gather((void*)x_coord, local_mesh_dims[0], MPI_DOUBLE, x_coord_root, local_mesh_dims[0], MPI_DOUBLE, 0, MACSIO_MSF_CommOfGroup(bat));
                         if (ndims > 1){
-                            MPI_Gather((void*)y_coord, local_mesh_dims[1], MPI_DOUBLE, y_coord_root, local_mesh_dims[1], MPI_DOUBLE, MACSIO_MSF_RootOfGroup(bat), MACSIO_MSF_CommOfGroup(bat));                  
+                            MPI_Gather((void*)y_coord, local_mesh_dims[1], MPI_DOUBLE, y_coord_root, local_mesh_dims[1], MPI_DOUBLE, 0, MACSIO_MSF_CommOfGroup(bat));                  
                             if (ndims > 2){
-                                MPI_Gather((void*)z_coord, local_mesh_dims[2], MPI_DOUBLE, z_coord_root, local_mesh_dims[2], MPI_DOUBLE, MACSIO_MSF_RootOfGroup(bat), MACSIO_MSF_CommOfGroup(bat));
+                                MPI_Gather((void*)z_coord, local_mesh_dims[2], MPI_DOUBLE, z_coord_root, local_mesh_dims[2], MPI_DOUBLE, 0, MACSIO_MSF_CommOfGroup(bat));
                             }
                         }
                     } else {
