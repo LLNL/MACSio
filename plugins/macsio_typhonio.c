@@ -748,7 +748,7 @@ static void write_quad_mesh_whole(
                         TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
                     }
                 } else {
-                    TIO_Call( TIO_Write_QuadMesh_Chunk(file_id, mesh_id, MACSIO_MAIN_Rank, TIO_XFER,
+                    TIO_Call( TIO_Write_QuadMesh_Chunk(file_id, mesh_id, MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank), TIO_XFER,
                                                         TIO_DOUBLE, x_coord, y_coord, z_coord),
                                 "Write Non-Colinear Mesh Coords failed\n");
                     TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
@@ -836,7 +836,7 @@ static void main_dump_msf(
     //MPI_Comm *groupComm = (MPI_Comm*)userData;
     char *date = getDate();
     TIO_Call( TIO_Create(fileName, &tioFile, TIO_ACC_REPLACE, "MACSio",
-                         "1.0", date, (char*)fileName, MACSIO_MSF_CommOfGroup(bat), MPI_INFO_NULL, MACSIO_MAIN_Rank),
+                         "1.0", date, (char*)fileName, MACSIO_MSF_CommOfGroup(bat), MPI_INFO_NULL, MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank)),
               "File Creation Failed\n");
     /* Create */ 
 
