@@ -951,7 +951,7 @@ static void write_ucd_mesh_whole(
                         y_coord = json_object_extarr_data(json_object_path_get_extarr(coords, "YCoords"));
                         z_coord = json_object_extarr_data(json_object_path_get_extarr(coords, "ZCoords"));
 
-                        int chunkID = JsonGetInt(mesh_obj, "ChunkID");
+                        int chunkID = MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank); //JsonGetInt(mesh_obj, "ChunkID");
                         void const *node_connectivity = (void const*) json_object_extarr_data(JsonGetObj(topoobj, "Nodelist"));
                         int *nodeIDs = (int*) malloc(sizeof(int) * chunk_nodes);
                         int *cellIDs = (int*) malloc(sizeof(int) * chunk_cells);
@@ -985,13 +985,13 @@ static void write_ucd_mesh_whole(
                             shapetype[s] = (TIO_Shape_t)4;
                         }
 
-                        int *global_nodes = (int*)malloc(sizeof(int)*MACSIO_MAIN_Size);
-                        int *global_cells = (int*)malloc(sizeof(int)*MACSIO_MAIN_Size);
+                        int *global_nodes = (int*)malloc(sizeof(int)*MACSIO_MSF_SizeOfGroup(bat));
+                        int *global_cells = (int*)malloc(sizeof(int)*MACSIO_MSF_SizeOfGroup(bat));
 
-                        MPI_Allgather(&chunk_nodes, 1, MPI_INT, global_nodes, 1, MPI_INT, MACSIO_MAIN_Comm);
-                        MPI_Allgather(&chunk_cells, 1, MPI_INT, global_cells, 1, MPI_INT, MACSIO_MAIN_Comm);
+                        MPI_Allgather(&chunk_nodes, 1, MPI_INT, global_nodes, 1, MPI_INT, MACSIO_MSF_CommOfGroup(bat));
+                        MPI_Allgather(&chunk_cells, 1, MPI_INT, global_cells, 1, MPI_INT, MACSIO_MSF_CommOfGroup(bat));
                 
-                        for (i=0; i<MACSIO_MAIN_Size; i++)
+                        for (i=0; i<MACSIO_MSF_SizeOfGroup(bat); i++)
                         {
                             nconnectivity = global_cells[i] * shapesize; 
                             TIO_Call( TIO_Set_Unstr_Chunk(file_id, mesh_id, i, (TIO_Dims_t)ndims,
@@ -1009,7 +1009,7 @@ static void write_ucd_mesh_whole(
                         y_coord = json_object_extarr_data(json_object_path_get_extarr(coords, "YCoords"));
                         z_coord = json_object_extarr_data(json_object_path_get_extarr(coords, "ZCoords"));
 
-                        int chunkID = JsonGetInt(mesh_obj, "ChunkID");
+                        int chunkID = MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank); //JsonGetInt(mesh_obj, "ChunkID");
                         void const *node_connectivity = (void const*) json_object_extarr_data(JsonGetObj(topoobj, "Nodelist"));
                         int *nodeIDs = (int*) malloc(sizeof(int) * chunk_nodes);
                         int *cellIDs = (int*) malloc(sizeof(int) * chunk_cells);
@@ -1025,7 +1025,7 @@ static void write_ucd_mesh_whole(
                         void const *node_ptr = nodeIDs;
                         void const *cell_ptr = cellIDs;
 
-                        TIO_Call( TIO_Write_UnstrMesh_Chunk(file_id, mesh_id, (TIO_Size_t)MACSIO_MAIN_Rank, TIO_XFER, 
+                        TIO_Call( TIO_Write_UnstrMesh_Chunk(file_id, mesh_id, (TIO_Size_t)chunkID, TIO_XFER, 
                                                     TIO_INT, TIO_DOUBLE, node_ptr, cell_ptr, shapetype, 
                                                     &ncells_per_shape, node_connectivity, x_coord, y_coord, z_coord),
                                     "Write Unstructured Mesh Failed\n");
