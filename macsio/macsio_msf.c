@@ -110,6 +110,7 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
         rankInGroup = rankInComm % (groupSize + 1);
         if (rankInGroup < groupSize)
             procAfterMe = rankInComm + 1;
+        groupSize++;
     }
     else
     {

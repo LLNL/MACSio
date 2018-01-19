@@ -623,7 +623,7 @@ static void write_quad_mesh_whole(
                                       NULL, NULL, NULL),
 
                       "Mesh Create Failed\n");
-            TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+            //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
         } else{
             char const *varName = json_object_path_get_string(var_obj, "name");
             centering = strdup(json_object_path_get_string(var_obj, "centering"));
@@ -634,7 +634,7 @@ static void write_quad_mesh_whole(
             TIO_Call( TIO_Create_Quant(file_id, mesh_id, varName, &object_id, dtype_id, tio_centering,
                                         TIO_GHOSTS_NONE, TIO_FALSE, "qunits"),
                     "Quant Create Failed\n");
-            TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+            //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
 
             free(centering);
         }
@@ -686,7 +686,7 @@ static void write_quad_mesh_whole(
                                                 chunk_indices[k][4], chunk_indices[k][5],
                                                  (TIO_Size_t)0, (TIO_Size_t)0),
                              "Set Quad Mesh Chunk Failed\n");
-                        TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+                        //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
                     }
 
                     json_object *coords = json_object_path_get_object(mesh_obj, "Coords");
@@ -745,23 +745,23 @@ static void write_quad_mesh_whole(
                     if (MACSIO_MAIN_Rank == MACSIO_MSF_RootOfGroup(bat)){                 
                         TIO_Call( TIO_Write_QuadMesh_All(file_id, mesh_id, TIO_DOUBLE, x_coord_root, y_coord_root, z_coord_root),
                             "Write Quad Mesh All Failed\n");
-                        TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+                        //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
                     }
                 } else {
                     TIO_Call( TIO_Write_QuadMesh_Chunk(file_id, mesh_id, MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank), TIO_XFER,
                                                         TIO_DOUBLE, x_coord, y_coord, z_coord),
                                 "Write Non-Colinear Mesh Coords failed\n");
-                    TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+                    //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
                 }
             } else {                
                 TIO_Call( TIO_Write_QuadQuant_Chunk(file_id, object_id, MACSIO_MSF_RankInGroup(bat, MACSIO_MAIN_Rank), 
                                                 TIO_XFER, dtype_id, buf, (void*)TIO_NULL),
                     "Write Quad Quant Chunk Failed\n");
-                TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+                //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
 
                 TIO_Call( TIO_Close_Quant(file_id, object_id),
                     "Close Quant Failed\n");
-                TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
+                //TIO_Call( TIO_Flush(file_id), "Flush Failed\n");
             }
 
             free(x_coord_root);
