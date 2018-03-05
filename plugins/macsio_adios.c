@@ -100,28 +100,26 @@ typedef struct _user_data {
 static void *CreateADIOSFile(const char *fname, const char *nsname, void *userData)
 {
     int64_t *retval = 0;
-    int64_t adios_file;
+    int64_t adios_file = 0;
     
     user_data_t *ud = (user_data_t *) userData;
-    adios_open(&adios_file, "domain", fname, "w", MACSIO_MAIN_Comm);
+    adios_open(&adios_file, "domain", fname, "w", MPI_COMM_SELF);
 
     retval = (int64_t *) malloc(sizeof(int64_t));
     *retval = adios_file;
 
     return (void *) retval;
-
-    return (void *) &adios_file;
 }
 
 static void *OpenADIOSFile(const char *fname, const char *nsname,
                    MACSIO_MIF_ioFlags_t ioFlags, void *userData)
 {
     int64_t *retval = 0;
-    int64_t adios_file;
+    int64_t adios_file = 0;
     int64_t domain_group_id;
    
     user_data_t *ud = (user_data_t *) userData;
-    adios_open(&adios_file, "domain", fname, "u", MACSIO_MAIN_Comm);
+    adios_open(&adios_file, "domain", fname, "u", MPI_COMM_SELF);
         
     retval = (int64_t *) malloc(sizeof(int64_t));
     *retval = adios_file;
@@ -152,10 +150,10 @@ static void declare_adios_structure(int64_t *domain_group_id, json_object *main_
    
     adios_define_var(*domain_group_id, "nx", "", adios_integer, "","","");
     adios_define_var(*domain_group_id, "ny", "", adios_integer, "","","");
-    adios_define_var(*domain_group_id, "X", "" , adios_double, "nx", "", "");
-    adios_define_var(*domain_group_id, "Y", "", adios_double, "ny", "", "");
+    adios_define_var(*domain_group_id, "XAxisCoords", "" , adios_double, "nx", "", "");
+    adios_define_var(*domain_group_id, "YAxisCoords", "", adios_double, "ny", "", "");
     
-    adios_define_mesh_rectilinear (dimensions, "X,Y", "2", *domain_group_id, "rectilinearmesh");
+    adios_define_mesh_rectilinear (dimensions, "XAxisCoords,YAxisCoords", "2", *domain_group_id, "rectilinearmesh");
     adios_define_mesh_timevarying("no", *domain_group_id, "rectilinearmesh");
     adios_define_var_mesh(*domain_group_id, "data", "rectilinearmesh");
     adios_define_var_centering(*domain_group_id, "data", "point");
@@ -204,7 +202,13 @@ static void write_quad_mesh_part(int64_t adiosfile, json_object *part, char *adi
     }
 
     adios_write(adiosfile, "nx", &dims[0]);
-    adios_write(adiosfile, "X", coords[0]);
+    adios_write(adiosfile, "XAxisCoords", coords[0]);
+
+    if (ndims > 1)
+    {
+        adios_write(adiosfile, "ny", &dims[1]);
+        adios_write(adiosfile, "YAxisCoords", coords[1]);
+    }
 
     /*
     json_object *vars_array = JsonGetObj(part, "Vars");
@@ -286,7 +290,6 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
     /* We're done using MACSIO_MIF, so finish it off */
     MACSIO_MIF_Finish(bat);
-    printf("MIF OVER\n");
 }
 
 static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
