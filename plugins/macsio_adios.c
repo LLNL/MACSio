@@ -99,10 +99,16 @@ typedef struct _user_data {
 
 static void *CreateADIOSFile(const char *fname, const char *nsname, void *userData)
 {
+    int64_t *retval = 0;
     int64_t adios_file;
     
     user_data_t *ud = (user_data_t *) userData;
     adios_open(&adios_file, "domain", fname, "w", MACSIO_MAIN_Comm);
+
+    retval = (int64_t *) malloc(sizeof(int64_t));
+    *retval = adios_file;
+
+    return (void *) retval;
 
     return (void *) &adios_file;
 }
@@ -132,7 +138,7 @@ static void CloseADIOSFile(void *file, void *userData)
 /* To accomodate the no XML adios calls we need to define the adios file structure before opening.
  * This messes with the way MACSio does baton passing for file control so we need somewhere else to do it
  */
-static void declare_adios_structure(int64_t *domain_group_id, json_object *main_obj)
+static void declare_adios_structure(int64_t *domain_group_id, json_object *main_obj, void *userData)
 {
     /* calculate a maximum buffer size based on the mesh part_size */
 
@@ -154,7 +160,7 @@ static void declare_adios_structure(int64_t *domain_group_id, json_object *main_
     adios_define_var_mesh(*domain_group_id, "data", "rectilinearmesh");
     adios_define_var_centering(*domain_group_id, "data", "point");
     
-    user_data_t *ud;
+    user_data_t *ud = (user_data_t *) userData;
     ud->groupId = *domain_group_id;
     ud->groupName = "domain";
 
@@ -254,7 +260,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
         iface_ext);
 
     int64_t domain_group_id;
-    declare_adios_structure(&domain_group_id, main_obj);
+    declare_adios_structure(&domain_group_id, main_obj, &userData);
 
     adiosFile_ptr = (int64_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     adiosFile = *adiosFile_ptr;
