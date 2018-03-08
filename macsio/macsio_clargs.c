@@ -180,7 +180,7 @@ MACSIO_CLARGS_ProcessCmdline(
    int firstArg;
    int terminalWidth = 120 - 10;
    int haveSeenSeparatorArg = 0;
-   MACSIO_KnownArgInfo_t *knownArgs;
+   MACSIO_KnownArgInfo_t *knownArgs, *newArg, *oldArg;
    va_list ap;
    json_object *ret_json_obj = 0;
    int depth;
@@ -231,7 +231,6 @@ MACSIO_CLARGS_ProcessCmdline(
       int n, paramCount, argNameLength;
       char *fmtStr, *defStr, *helpStr, *p, *paramTypes, *paramFlags;
       void **paramPtrs;
-      MACSIO_KnownArgInfo_t *newArg, *oldArg;
       int isgroup_begin, isgroup_end;
 
       /* get this arg's format specifier string */
