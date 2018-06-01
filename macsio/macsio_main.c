@@ -493,7 +493,8 @@ write_timings_file(char const *filename)
     MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
 #endif
 
-    timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, filename, rdata_out[0], rdata_out[1], rdata_out[2]+1);
+    /* add 32 chars to line len for log leader */
+    timing_log = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, filename, rdata_out[0]+32, rdata_out[1], rdata_out[2]+1);
 
     /* dump this processor's timers */
     for (i = 0; i < ntimers; i++)

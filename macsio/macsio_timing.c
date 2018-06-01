@@ -517,13 +517,10 @@ MACSIO_TIMING_ReduceTimers(
 
     if (root == -1)
     {
-        if (timerinfo_reduce_op != NULL)
-        {
-            MPI_Op_free(&timerinfo_reduce_op);
-            MPI_Type_free(&str_32_mpi_type);
-            MPI_Type_free(&str_64_mpi_type);
-            MPI_Type_free(&timerinfo_mpi_type);
-        }
+        MPI_Op_free(&timerinfo_reduce_op);
+        MPI_Type_free(&str_32_mpi_type);
+        MPI_Type_free(&str_64_mpi_type);
+        MPI_Type_free(&timerinfo_mpi_type);
         first = 1;
         return;
     }
