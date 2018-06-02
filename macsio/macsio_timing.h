@@ -30,6 +30,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mpi.h>
 
 #include <stdio.h>
+#include <string.h>
 
 /*!
 \defgroup MACSIO_TIMING MACSIO_TIMING
@@ -133,7 +134,8 @@ of the timer explicitly.
 \param [in] GMASK User defined group mask. Use MACSIO_TIMING_NO_GROUP if timer grouping is not needed.
 \param [in] ITER The iteration number. Use MACSIO_TIMING_ITER_IGNORE if timer iteration is not needed.
 */
-#define MT_StartTimer(LAB, GMASK, ITER) MACSIO_TIMING_StartTimer(LAB, GMASK, ITER, __FILE__, __LINE__)
+#define __BASEFILE__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define MT_StartTimer(LAB, GMASK, ITER) MACSIO_TIMING_StartTimer(LAB, GMASK, ITER, __BASEFILE__, __LINE__)
 
 /*!
 \def MT_StopTimer
@@ -212,6 +214,24 @@ MACSIO_TIMING_GetReducedTimer(
 This call will find all used timers in the hash table matching the specified \c gmask group mask and dumps
 each timer to a string. For convenience, the maximum length of the strings is also returned. This is to
 facilitate dumping the strings to a MACSIO_LOG.
+
+Each timer is dumped to a string with the following informational fields catenated together ...
+
+  - TOT=%10.5f total amount of time spent in this time over all iterations (and ranks when reduced)
+  - CNT=%04d total number of iterations this timer was triggered (over all ranks when reduced)
+  - MIN=%8.5f(%4.2f):%06d
+    - minimum time recorded for this timer over all iterations (and ranks when reduced)
+    - (%4.2f) the number of standard deviations from the mean time
+    - :%06d the rank (when reduced) where the minimum was observed.
+  - AVG=%8.5f the mean time of this timer over all iterations (and ranks when reduced)
+  - MAX=%8.5f(%4.2f):%06d,
+    - maximum time recorded for this timer over all iterations (and ranks when reduced)
+    - (%4.2f) the number of standard deviations from the mean time
+    - :%06d the rank (when reduced) where the maximum was observed.
+  - DEV=%8.8f standard deviation observed for all iterations of this timer
+  - FILE=%s the source file where this timer is triggered
+  - LINE=%d the source line number where this timer is triggered
+  - LAB=%s the user-defined label for this timer
 */
 extern void MACSIO_TIMING_DumpTimersToStrings(
     MACSIO_TIMING_GroupMask_t gmask, /**< Group mask to filter only timers belonging to specific groups */
