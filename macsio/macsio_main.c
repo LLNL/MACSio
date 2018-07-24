@@ -662,12 +662,12 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             /* log dump timing */ // THE VOLUME OF DATA WRITTEN TO FILE =/= SIZE OF JSON PROBLEM OBJECT
             MACSIO_LOG_MSG(Info, ("Dump %02d BW: %s/%s = %s", dumpNum,
                     MU_PrByts(problem_nbytes, 0, nbytes_str, sizeof(nbytes_str)),
-                    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+                    MU_PrSecs(timer_dt, 0, seconds_str, sizeof(seconds_str)),
                     MU_PrBW(problem_nbytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
             unsigned long long stat_bytes = MACSIO_UTILS_StatFiles(dumpNum);
             MACSIO_LOG_MSG(Info, ("Dump %02d Stat BW: %s/%s = %s", dumpNum,
                     MU_PrByts(stat_bytes, 0, nbytes_str, sizeof(nbytes_str)),
-                    MU_PrSecs(dt, 0, seconds_str, sizeof(seconds_str)),
+                    MU_PrSecs(timer_dt, 0, seconds_str, sizeof(seconds_str)),
                     MU_PrBW(stat_bytes, timer_dt, 0, bandwidth_str, sizeof(bandwidth_str))));
     
             dumpNum++;
