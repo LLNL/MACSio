@@ -522,18 +522,6 @@ write_timings_file(char const *filename)
     MACSIO_LOG_LogFinalize(timing_log);
 }
 
-static void spin()
-{
-    int i = 0;
-    char hostname[256];
-    gethostname(hostname, sizeof(hostname));
-    printf("PID %d on %s ready for attach\n", getpid(), hostname);
-    fflush(stdout);
-    while (0 == i)
-        sleep(5);
-}
-
-
 static int
 main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
@@ -639,7 +627,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
                 /* do the dump */
                 //MACSIO_BurstDump(dt);
 
-                //spin();
+                
                 (*(iface->dumpFunc))(argi, argc, argv, main_obj, dumpNum, dumpTime);
 #ifdef HAVE_MPI
                 mpi_errno = 0;
