@@ -1510,7 +1510,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
     int *theData;
     user_data_t userData;
     MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
-        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
+        (unsigned int) JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
 //#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 //#warning SET FILE AND DATASET PROPERTIES
