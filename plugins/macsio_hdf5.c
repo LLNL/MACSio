@@ -30,6 +30,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdio.h>
 #include <string.h>
 
+
 #include <json-cwx/json.h>
 
 #include <macsio_clargs.h>
@@ -51,6 +52,8 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <hdf5.h>
 #include <H5Tpublic.h>
 
+#define main_dump_sif main_dump_sif_hyperslab
+
 /* Disable debugging messages */
 
 /*!
@@ -65,7 +68,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #ifdef HAVE_ZFP
 /*!
-\addtogroup ZFP 
+\addtogroup ZFP
 \brief HDF5 Compression Filter
 
 Copyright (c) 2014-2015, RWTH Aachen University, JARA - Juelich Aachen Research Alliance.
@@ -258,9 +261,9 @@ H5Z_can_apply_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
 
     /* check datatype's class - try to get datatype class identifier
      * typedef enum H5T_class_t {
-     * 		H5T_NO_CLASS = -1,  error
-     * 		H5T_INTEGER  = 0,   integer types
-     * 		H5T_FLOAT    = 1,   floating-point types
+     *      H5T_NO_CLASS = -1,  error
+     *      H5T_INTEGER  = 0,   integer types
+     *      H5T_FLOAT    = 1,   floating-point types
      */
     if(H5T_NO_CLASS == (dclass = H5Tget_class(type_id))) {
       PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid datatype class");
@@ -685,12 +688,14 @@ static int sbuf_size = -1;
 static int mbuf_size = -1;
 static int rbuf_size = -1;
 static int lbuf_size = 0;
+static int h5_align = -1;
 static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
 static int show_errors = 0;
 static char compression_alg_str[64];
 static char compression_params_str[512];
+static char mpi_info_params_str[512];
 
 static hid_t make_fapl()
 {
@@ -706,6 +711,8 @@ static hid_t make_fapl()
     if (rbuf_size >= 0)
         h5status |= H5Pset_small_data_block_size(fapl_id, mbuf_size);
 
+    if (h5_align >= 0 && sbuf_size >= 0)
+    h5status |= H5Pset_alignment(fapl_id, sbuf_size, h5_align);
 #if 0
     if (silo_block_size && silo_block_count)
     {
@@ -775,6 +782,51 @@ get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
     return 1;
 }
 
+static MPI_Info make_mpi_info_object(char const *params_str)
+{
+    int ierr = 0;
+    char *token, *string, *tofree;
+    char access_style[64], coll_buffer[16];
+    int cb_block_size = -1;
+    int cb_buffer_size = -1;
+    MPI_Info file_info;
+
+    if (!params_str || !strlen(params_str))
+    return MPI_INFO_NULL;
+
+    ierr = MPI_Info_create(&file_info);
+
+    tofree = string = strdup(params_str);
+    while ((token = strsep(&string, ",")) != NULL)
+    {
+    if (get_tokval(token, "access_style %s", &access_style))
+            continue;
+    if (get_tokval(token, "collective_buffering %s", &coll_buffer))
+            continue;
+    if (get_tokval(token, "cb_block_size %d", &cb_block_size))
+        continue;
+    if (get_tokval(token, "cb_buffer_size %d", &cb_block_size))
+        continue;
+    }
+    free(tofree);
+
+    if (strlen(access_style))
+        ierr = MPI_Info_set(file_info, "access_style", access_style);
+    if (strlen(coll_buffer))
+    ierr = MPI_Info_set(file_info, "collective_buffering", coll_buffer);
+    if (cb_block_size >= 0){
+    char cb_block_size_str[32];
+    snprintf(cb_block_size_str, 32, "%d", cb_block_size);
+    ierr = MPI_Info_set(file_info, "cb_block_size", cb_block_size_str);
+    }
+    if (cb_buffer_size >= 0){
+    char cb_buffer_size_str[32];
+    snprintf(cb_buffer_size_str, 32, "%d", cb_buffer_size);
+    ierr = MPI_Info_set(file_info, "cb_buffer_size", cb_buffer_size_str);
+    }
+    return file_info;
+}
+
 static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id, hid_t dtype_id)
 {
     int shuffle = -1;
@@ -836,7 +888,7 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     /*
      * Ok, now handle various properties related to compression
      */
- 
+
     /* Initially, as a default in case nothing else is selected,
        set chunk size equal to dataset size (e.g. single chunk) */
     H5Pset_chunk(retval, ndims, dims);
@@ -935,11 +987,22 @@ static int process_args(int argi, int argc, char *argv[])
 
     char *c_alg = compression_alg_str;
     char *c_params = compression_params_str;
+    char *info_params = mpi_info_params_str;
 
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
         "--show_errors", "",
             "Show low-level HDF5 errors",
             &show_errors,
+    "--mpi_hints %s", MACSIO_CLARGS_NODEFAULT,
+        "The string argument is a comma-separater set of paramaters in\n"
+        "the form 'param1=val1,param2=val2. The hints that can be passed\n"
+        "in here are described below.\n"
+        "\n"
+        "\"access_style\" : TODO\n"
+        "\"collective_buffering\": TODO\n"
+        "\"cb_block_size\": TODO\n"
+        "\"cb_buffer_size\": TODO\n",
+        &info_params,
         "--compression %s %s", MACSIO_CLARGS_NODEFAULT,
             "The first string argument is the compression algorithm name. The second\n"
             "string argument is a comma-separated set of params of the form\n"
@@ -1003,6 +1066,9 @@ static int process_args(int argi, int argc, char *argv[])
         "--sieve_buf_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify sieve buffer size (see H5Pset_sieve_buf_size)",
             &sbuf_size,
+    "--alignment %d", MACSIO_CLARGS_NODEFAULT,
+        "Specify the HDF5 alignment (see H5Pset_alignmnet)",
+        &h5_align,
         "--meta_block_size %d", MACSIO_CLARGS_NODEFAULT,
             "Specify size of meta data blocks (see H5Pset_meta_block_size)",
             &mbuf_size,
@@ -1015,7 +1081,7 @@ static int process_args(int argi, int argc, char *argv[])
             &use_log,
 #ifdef HAVE_SILO
         "--silo_fapl %d %d", MACSIO_CLARGS_NODEFAULT,
-            "Use Silo's block-based VFD and specify block size and block count", 
+            "Use Silo's block-based VFD and specify block size and block count",
             &silo_block_size, &silo_block_count,
 #endif
            MACSIO_CLARGS_END_OF_ARGS);
@@ -1025,7 +1091,7 @@ static int process_args(int argi, int argc, char *argv[])
     return 0;
 }
 
-static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
+static void main_dump_sif1(json_object *main_obj, int dumpn, double dumpt)
 {
 #ifdef HAVE_MPI
     int ndims;
@@ -1043,14 +1109,23 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     hsize_t global_log_dims_nodal[3];
     hsize_t global_log_dims_zonal[3];
 
-    MPI_Info mpiInfo = MPI_INFO_NULL;
+    MPI_Info mpiInfo = make_mpi_info_object(mpi_info_params_str);;
 
 //#warning WE ARE DOING SIF SLIGHTLY WRONG, DUPLICATING SHARED NODES
 //#warning INCLUDE ARGS FOR ISTORE AND K_SYM
 //#warning INCLUDE ARG PROCESS FOR HINTS
-//#warning FAPL PROPS: ALIGNMENT 
+//#warning FAPL PROPS: ALIGNMENT
 #if H5_HAVE_PARALLEL
+    /* File access transfer property list */
     H5Pset_fapl_mpio(fapl_id, MACSIO_MAIN_Comm, mpiInfo);
+
+    /* Dataset transfer property list used in all H5Dwrite calls */
+    if (no_collective){
+        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
+    } else {
+        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
+    H5Pset_preserve(dxpl_id, 0u);
+    }
 #endif
 
 //#warning FOR MIF, NEED A FILEROOT ARGUMENT OR CHANGE TO FILEFMT ARGUMENT
@@ -1086,13 +1161,6 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
     json_object *first_part_obj = json_object_array_get_idx(part_array, 0);
     json_object *first_part_vars_array = json_object_path_get_array(first_part_obj, "Vars");
 
-    /* Dataset transfer property list used in all H5Dwrite calls */
-#if H5_HAVE_PARALLEL
-    if (no_collective)
-        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
-    else
-        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
-#endif
 
 
     /* Loop over vars and then over parts */
@@ -1109,15 +1177,15 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
         char *centering = strdup(json_object_path_get_string(var_obj, "centering"));
         json_object *dataobj = json_object_path_get_extarr(var_obj, "data");
 //#warning JUST ASSUMING TWO TYPES NOW. CHANGE TO A FUNCTION
-        hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64? 
+        hid_t dtype_id = json_object_extarr_type(dataobj)==json_extarr_type_flt64?
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
         hid_t fspace_id = H5Scopy(strcmp(centering, "zone") ? fspace_nodal_id : fspace_zonal_id);
         hid_t dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
 
         /* Create the file dataset (using old-style H5Dcreate API here) */
 //#warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
-        
-        hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id); 
+
+        hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id);
         H5Sclose(fspace_id);
         H5Pclose(dcpl_id);
 
@@ -1190,6 +1258,164 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #endif
 }
 
+enum Centering {NODAL = 0, ZONAL = 1};
+enum Datatype {DOUBLE = 0, INTEGER = 1};
+
+typedef struct {
+    char const *name;
+    enum Centering var_centering;
+    int num_dimensions;
+    int block_dimensions[3];
+    int num_blocks;
+    int first_block_offset;
+    enum Datatype var_datatype;
+    void const *data;
+} Variable;
+
+static void main_dump_sif_hyperslab(json_object *main_obj, int dumpn, double dumpt)
+{
+    int ndims;
+    int i, v, p, block;
+    char const *mesh_type = json_object_path_get_string(main_obj, "clargs/part_type");
+    char fileName[256];
+    int local_blocks;
+    int num_vars;
+    int total_parts;
+    Variable *vars;
+
+    hid_t h5file_id;
+    MPI_Info mpiInfo;
+    hid_t fapl_id = make_fapl();
+    hid_t dxpl_id ;
+    hid_t dcpl_id;
+    hid_t ds_id;
+    hid_t dtype_id;
+    hid_t fspace_id;
+    hid_t mspace_id;
+
+    hsize_t dimens_4d[4];
+    hsize_t start_4d[4], stride_4d[4], count_4d[4];
+
+    num_vars = json_object_path_get_int(main_obj, "clargs/vars_per_part");
+    vars = (Variable*) malloc(sizeof(Variable)*num_vars);
+
+    ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
+    /* Get the list of vars on the first part as a guide to loop over vars */
+    json_object *part_array = json_object_path_get_array(main_obj, "problem/parts");
+    json_object *vars_array = json_object_path_get_array(json_object_array_get_idx(part_array, 0), "Vars");
+
+    local_blocks = json_object_array_length(part_array);
+
+    for (v = 0; v < num_vars; v++){
+        json_object *var_obj = json_object_array_get_idx(vars_array, v);
+        vars[v].name = json_object_path_get_string(var_obj, "name");
+        vars[v].var_centering = strcmp(strdup(json_object_path_get_string(var_obj, "centering")),"zone") ? NODAL : ZONAL;
+        vars[v].num_dimensions = ndims;
+        vars[v].var_datatype = json_object_extarr_type(json_object_path_get_extarr(var_obj, "data"))==json_extarr_type_flt64 ? DOUBLE : INTEGER;
+        vars[v].block_dimensions[0] = 1;
+        vars[v].block_dimensions[1] = 1;
+        vars[v].block_dimensions[2] = 1;
+        vars[v].num_blocks = local_blocks;
+
+        for (i = 0; i < ndims; i++){
+            vars[v].block_dimensions[i] = json_object_extarr_dim(json_object_path_get_extarr(var_obj, "data"), i);
+        }
+
+        vars[v].first_block_offset = json_object_path_get_int(json_object_array_get_idx(part_array, 0), "Mesh/ChunkID");
+
+        int block_bytes = json_object_extarr_nbytes(json_object_path_get_extarr(var_obj, "data"));
+        /* Malloc memory to store all blocks on this rank contiguously */
+        vars[v].data = (const void *) malloc(block_bytes*local_blocks);
+
+        void *ptr = (void*)vars[v].data;
+
+        for (block = 0; block < local_blocks; block++){
+            const void *temp_data = json_object_extarr_data(json_object_path_get_extarr(json_object_array_get_idx(json_object_path_get_array(json_object_array_get_idx(part_array, block), "Vars"), v), "data"));
+            memcpy(ptr, temp_data, block_bytes);
+            ptr = ((char*)ptr) + block_bytes;
+        }
+    }
+
+#if H5_HAVE_PARALLEL
+    mpiInfo = make_mpi_info_object(mpi_info_params_str);
+    /* File access transfer property list */
+    H5Pset_fapl_mpio(fapl_id, MACSIO_MAIN_Comm, mpiInfo);
+
+    /* Dataset transfer property list used in all H5Dwrite calls */
+    if (no_collective){
+        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_INDEPENDENT);
+    } else {
+        H5Pset_dxpl_mpio(dxpl_id, H5FD_MPIO_COLLECTIVE);
+    }
+#endif
+
+    /* Construct name for the HDF5 file */
+    sprintf(fileName, "%s_hdf5_%03d.%s", json_object_path_get_string(main_obj, "clargs/filebase"),
+                                dumpn, json_object_path_get_string(main_obj, "clargs/fileext"));
+
+    MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+    h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
+
+    total_parts = JsonGetInt(main_obj, "problem/global/TotalParts");
+
+    /* Loop over vars */
+    /* currently assumes all vars exist on all ranks. but not all parts */
+    for (v = 0; v < num_vars; v++) /* -1 start is for Mesh */
+    {
+        dimens_4d[0] = total_parts;
+        dimens_4d[1] = vars[v].block_dimensions[0];
+        dimens_4d[2] = vars[v].block_dimensions[1];
+        dimens_4d[3] = vars[v].block_dimensions[2];
+
+        /* Inspect the first part's var object for name, datatype, etc. */
+        dtype_id = vars[v].var_datatype == DOUBLE ? H5T_NATIVE_DOUBLE : H5T_NATIVE_INT;
+        // hid_t fspace_id = H5Scopy(vars[v].var_centering == ZONAL ? fspace_zonal_id : fspace_nodal_id);
+        fspace_id = H5Screate_simple(4, dimens_4d, NULL);
+
+        dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
+
+        /* Create the file dataset (using old-style H5Dcreate API here) */
+        ds_id = H5Dcreate1(h5file_id, vars[v].name, dtype_id, fspace_id, dcpl_id);
+
+        start_4d[0] = vars[v].first_block_offset;
+        start_4d[1] = 0;
+        start_4d[2] = 0;
+        start_4d[3] = 0;
+
+        stride_4d[0] = 1;
+        stride_4d[1] = 1;
+        stride_4d[2] = 1;
+        stride_4d[3] = 1;
+
+        count_4d[0] = vars[v].num_blocks;
+        count_4d[1] = vars[v].block_dimensions[0];
+        count_4d[2] = vars[v].block_dimensions[1];
+        count_4d[3] = vars[v].block_dimensions[2];
+
+        H5Sselect_hyperslab(fspace_id, H5S_SELECT_SET, start_4d,
+            stride_4d, count_4d, NULL);
+
+        /* Create memory space */
+
+        dimens_4d[0] = vars[v].num_blocks;
+
+        mspace_id = H5Screate_simple(4, dimens_4d, NULL);
+
+        H5Dwrite(ds_id, dtype_id, mspace_id, fspace_id, dxpl_id, vars[v].data);
+        H5Sclose(fspace_id);
+        H5Sclose(mspace_id);
+
+        H5Dclose(ds_id);
+    }
+
+    free(vars);
+
+    H5Fclose(h5file_id);
+    H5Pclose(dcpl_id);
+    H5Pclose(dxpl_id);
+    H5Pclose(fapl_id);
+}
+
 typedef struct _user_data {
     hid_t groupId;
 } user_data_t;
@@ -1257,7 +1483,7 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
         char const *varname = json_object_path_get_string(var_obj, "name");
         int ndims = json_object_extarr_ndims(data_obj);
         void const *buf = json_object_extarr_data(data_obj);
-        hid_t dtype_id = json_object_extarr_type(data_obj)==json_extarr_type_flt64? 
+        hid_t dtype_id = json_object_extarr_type(data_obj)==json_extarr_type_flt64?
                 H5T_NATIVE_DOUBLE:H5T_NATIVE_INT;
 
         for (j = 0; j < ndims; j++)
@@ -1265,7 +1491,7 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
 
         fspace_id = H5Screate_simple(ndims, var_dims, 0);
         dcpl_id = make_dcpl(compression_alg_str, compression_params_str, fspace_id, dtype_id);
-        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, dcpl_id); 
+        ds_id = H5Dcreate1(h5loc, varname, dtype_id, fspace_id, dcpl_id);
         H5Dwrite(ds_id, dtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
         H5Dclose(ds_id);
         H5Pclose(dcpl_id);
@@ -1303,7 +1529,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
     MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
-    
+
     h5File_ptr = (hid_t *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
     h5File = *h5File_ptr;
     h5Group = userData.groupId;
@@ -1318,7 +1544,7 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
         snprintf(domain_dir, sizeof(domain_dir), "domain_%07d",
             json_object_path_get_int(this_part, "Mesh/ChunkID"));
- 
+
         domain_group_id = H5Gcreate1(h5File, domain_dir, 0);
 
         write_mesh_part(domain_group_id, this_part);
