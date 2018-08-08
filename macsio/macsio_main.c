@@ -520,6 +520,8 @@ write_timings_file(char const *filename)
     }
 
     MACSIO_LOG_LogFinalize(timing_log);
+
+    return 0;
 }
 
 static int
@@ -527,7 +529,7 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
 {
     int rank = 0, dumpNum = 0, dumpCount = 0;
     unsigned long long problem_nbytes, dumpBytes = 0, summedBytes = 0;
-    char nbytes_str[32], seconds_str[32], bandwidth_str[32], seconds_str2[32];
+    char nbytes_str[32], seconds_str[32], bandwidth_str[32];
     double dumpTime = 0;
     double timer_dt;
     double bandwidth, summedBandwidth;
@@ -614,9 +616,9 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
             }
 
             /* log dump start */
-            if (!exercise_scr || scr_need_checkpoint_flag){
-                int scr_valid = 0;
+            if (!exercise_scr || scr_need_checkpoint_flag){                
 #ifdef HAVE_SCR
+                int scr_valid = 0;
                 if (exercise_scr)
                     SCR_Start_checkpoint();
 #endif
@@ -710,6 +712,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
         MACSIO_UTILS_StatFiles(j);
     }
     MACSIO_UTILS_CleanupFileStore();
+
+    return (0);
 }
 
 ////#warning DO WE REALLY CALL IT THE MAIN_OBJ HERE
@@ -756,6 +760,7 @@ main_read(int argi, int argc, char **argv, json_object *main_obj)
         fprintf(outf, "\"%s\"\n", json_object_to_json_string_ext(main_obj, JSON_C_TO_STRING_PRETTY));
         fclose(outf);
     }
+    return (0);
 }
 
 int
@@ -763,12 +768,10 @@ main(int argc, char *argv[])
 {
     json_object *main_obj = json_object_new_object();
     json_object *parallel_obj = json_object_new_object();
-    json_object *problem_obj = 0;
     json_object *clargs_obj = 0;
     MACSIO_TIMING_GroupMask_t main_grp;
     MACSIO_TIMING_TimerId_t main_tid;
     int i, argi, exercise_scr = 0;
-    int size = 1, rank = 0;
 
     /* quick pre-scan for scr cl flag */
     for (i = 0; i < argc && !exercise_scr; i++)
@@ -783,7 +786,7 @@ main(int argc, char *argv[])
         SCR_Init();
 #endif
     MPI_Comm_dup(MPI_COMM_WORLD, &MACSIO_MAIN_Comm);
-    MPI_Errhandler_set(MACSIO_MAIN_Comm, MPI_ERRORS_RETURN);
+    MPI_Comm_set_errhandler(MACSIO_MAIN_Comm, MPI_ERRORS_RETURN);
     MPI_Comm_size(MACSIO_MAIN_Comm, &MACSIO_MAIN_Size);
     MPI_Comm_rank(MACSIO_MAIN_Comm, &MACSIO_MAIN_Rank);
     mpi_errno = MPI_SUCCESS;

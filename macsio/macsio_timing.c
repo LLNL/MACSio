@@ -540,21 +540,21 @@ MACSIO_TIMING_ReduceTimers(
 
         lengths[0] = 9;
         types[0] = MPI_INT;
-        MPI_Address(&timerHashTable[0], offsets);
+        MPI_Get_address(&timerHashTable[0], offsets);
         lengths[1] = 7;
         types[1] = MPI_DOUBLE;
-        MPI_Address(&timerHashTable[0].total_time, offsets+1);
+        MPI_Get_address(&timerHashTable[0].total_time, offsets+1);
         lengths[2] = 1;
         types[2] = MPI_UNSIGNED_LONG_LONG;
-        MPI_Address(&timerHashTable[0].gmask, offsets+2);
+        MPI_Get_address(&timerHashTable[0].gmask, offsets+2);
         lengths[3] = 1;
         types[3] = str_32_mpi_type;
-        MPI_Address(&timerHashTable[0].__file__[0], offsets+3);
+        MPI_Get_address(&timerHashTable[0].__file__[0], offsets+3);
         lengths[4] = 1;
         types[4] = str_64_mpi_type;
-        MPI_Address(&timerHashTable[0].label[0], offsets+4);
+        MPI_Get_address(&timerHashTable[0].label[0], offsets+4);
         for (i = 4; i >= 0; offsets[i] -= offsets[0], i--);
-        MPI_Type_struct(5, lengths, offsets, types, &timerinfo_mpi_type);
+        MPI_Type_create_struct(5, lengths, offsets, types, &timerinfo_mpi_type);
         MPI_Type_commit(&timerinfo_mpi_type);
 
         first = 0;

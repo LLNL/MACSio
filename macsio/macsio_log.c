@@ -204,7 +204,7 @@ MACSIO_LOG_LogMsg(
     va_end(ptr);
     msg[log->log_line_length-1] = '\0';
 
-    while (i < strlen(msg) && i < log->log_line_length)
+    while (i < (int) strlen(msg) && i < log->log_line_length)
     {
         if (msg[i] == '\n')
             buf[i] = '!';
