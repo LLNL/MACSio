@@ -1023,10 +1023,14 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     return 0;
 }
 
+static int latest_rand_num = 0;
+
 static int choose_part_count(int K, int mod, int *R, int *Q)
 {
     /* We have either K or K+1 parts so randomly select that for each rank */
-    int retval = K + random() % mod;
+    srand(latest_rand_num);
+    latest_rand_num = rand();
+    int retval = K + latest_rand_num % mod;
     if (retval == K)
     {
         if (*R > 0)
@@ -1151,7 +1155,9 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
 
     rank = 0;
     chunk = 0;
-    srandom(0xDeadBeef); /* initialize for choose_part_count */
+
+    srand(0xDeadBeef); /* initialize for choose_part_count */
+    latest_rand_num = rand();
     parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
     for (ipart = 0; ipart < nx_parts; ipart++)
     {
@@ -1162,7 +1168,6 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                 if (!rank_owning_chunkId && rank == myrank)
                 {
                     int global_log_origin[3];
-
                     /* build mesh part on this rank */
                     MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
