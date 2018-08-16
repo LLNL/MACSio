@@ -1286,8 +1286,8 @@ static void main_dump_sif_hyperslab(json_object *main_obj, int dumpn, double dum
     hid_t h5file_id;
     MPI_Info mpiInfo;
     hid_t fapl_id = make_fapl();
-    hid_t dxpl_id ;
-    hid_t dcpl_id;
+    hid_t dxpl_id = H5Pcreate(H5P_DATASET_XFER);
+    hid_t dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
     hid_t ds_id;
     hid_t dtype_id;
     hid_t fspace_id;
