@@ -207,52 +207,70 @@ int MACSIO_MAIN_Rank = 0;
 
 static void handle_help_request_and_exit(int argi, int argc, char **argv)
 {
-    int i, n, *ids=0;;
+    int rank = 0, i, n, *ids=0;;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
 
-    MACSIO_IFACE_GetIds(&n, &ids);
-    for (i = 0; i < n; i++)
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+#endif
+
+    if (!rank)
     {
-        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
-        if (iface->processArgsFunc)
+        MACSIO_IFACE_GetIds(&n, &ids);
+        for (i = 0; i < n; i++)
         {
-            fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
-            (*(iface->processArgsFunc))(argi, argc, argv);
+            const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
+            if (iface->processArgsFunc)
+            {
+                fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
+                (*(iface->processArgsFunc))(argi, argc, argv);
+            }
         }
     }
+
 #ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
     }
 #endif
+
     exit(0);
 }
 
 static void handle_list_request_and_exit()
 {
-    int i, n, *ids = 0;
+    int rank = 0, i, n, *ids = 0;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
     char names_buf[1024];
 
-    names_buf[0] = '\0';
-    MACSIO_IFACE_GetIds(&n, &ids);
-    for (i = 0; i < n; i++)
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+#endif
+
+    if (!rank)
     {
-        char const *nm = MACSIO_IFACE_GetName(ids[i]);
-        strcat(names_buf, "\"");
-        strcat(names_buf, nm);
-        strcat(names_buf, "\", ");
-        if (!((i+1) % 10)) strcat(names_buf, "\n");
+        names_buf[0] = '\0';
+        MACSIO_IFACE_GetIds(&n, &ids);
+        for (i = 0; i < n; i++)
+        {
+            char const *nm = MACSIO_IFACE_GetName(ids[i]);
+            strcat(names_buf, "\"");
+            strcat(names_buf, nm);
+            strcat(names_buf, "\", ");
+            if (!((i+1) % 10)) strcat(names_buf, "\n");
+        }
+        fprintf(outFILE, "List of available I/O-library plugins...\n");
+        fprintf(outFILE, "%s\n", names_buf);
     }
-    fprintf(outFILE, "List of available I/O-library plugins...\n");
-    fprintf(outFILE, "%s\n", names_buf);
+
 #ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
     }
 #endif
+
     exit(0);
 }
 
@@ -475,7 +493,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     return mainJargs;
 }
 
-static int
+static void
 write_timings_file(char const *filename)
 {
     char **timer_strs = 0, **rtimer_strs = 0;
