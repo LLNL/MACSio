@@ -336,7 +336,7 @@ static void main_dump(
     int i, rank, numFiles;
     char fileName[256];
     FILE *myFile;
-    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE, JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
+    MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,(unsigned int) JsonGetInt(main_obj,"clargs/exercise_scr")&0x1};
     MACSIO_MIF_baton_t *bat;
     json_object *parts;
     json_object *part_infos = json_object_new_array();
@@ -392,7 +392,7 @@ static void main_dump(
     myFile = (FILE *) MACSIO_MIF_WaitForBaton(bat, fileName, 0);
 
     parts = json_object_path_get_array(main_obj, "problem/parts");
-    for (int i = 0; i < json_object_array_length(parts); i++)
+    for (i = 0; i < json_object_array_length(parts); i++)
     {
         json_object *this_part = json_object_array_get_idx(parts, i);
         json_object_array_add(part_infos, write_mesh_part(myFile, fileName, this_part));

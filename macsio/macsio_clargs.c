@@ -184,7 +184,6 @@ MACSIO_CLARGS_ProcessCmdline(
    va_list ap;
    json_object *ret_json_obj = 0;
    int depth;
-   int isgroup = 0;
 
 #ifdef HAVE_MPI
    {  int result;
@@ -608,7 +607,6 @@ MACSIO_CLARGS_ProcessCmdline(
       else
       {
 	 char *p = strrchr(argv[0], '/');
-	 FILE *outFILE = (isatty(2) ? stderr : stdout);
 	 p = p ? p+1 : argv[0];
 	 if (rank == 0)
              MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,

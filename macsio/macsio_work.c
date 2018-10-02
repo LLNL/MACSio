@@ -259,7 +259,6 @@ double square(double num)
 void MACSIO_WORK_LevelThree(double currentDt)
 {
     int N = 1024;			/* number of interior points per dim */
-    double epsilon = 1.0E-03;
     double *f;
     int i;
     int j;

@@ -34,7 +34,9 @@ static char const *iface_ext = "h5";
 static char *filename;
 
 static int no_collective = 0; /**< Controls whether collective I/O will be enabled in TyphonIO */
-
+static const char *romio_cb_write;
+static const char *romio_ds_write;
+static const char *striping_factor;
 
 char  errstr[TIO_STRLEN];
 TIO_t errnum;
@@ -67,10 +69,19 @@ static int process_args(
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
     MACSIO_CLARGS_ProcessCmdline(0, argFlags, argi, argc, argv,
+	"--romio_cb_write %s", MACSIO_CLARGS_NODEFAULT,
+	    "Explicitly set the mpi file hint for cb_write.",
+	    &romio_cb_write,
+	"--romio_ds_write %s", MACSIO_CLARGS_NODEFAULT,
+	    "Explicitly set the mpi file hint for ds write.",
+	    &romio_ds_write,
+	"--striping_factor %s", MACSIO_CLARGS_NODEFAULT,
+	    "Explicitly set the mpi file hint for striping factor.",
+	    &striping_factor,
         "--no_collective", "",
             "Use independent, not collective I/O calls in SIF mode.",
             &no_collective,
-        MACSIO_CLARGS_END_OF_ARGS);
+	MACSIO_CLARGS_END_OF_ARGS);
 
     return 0;
 }
@@ -1679,6 +1690,18 @@ static void main_dump_sif(
     char *date = (char*)getDate();
     MPI_Info mpiInfo = MPI_INFO_NULL;
 
+    if (romio_cb_write || romio_ds_write || striping_factor){
+	MPI_Info_create(&mpiInfo);
+	if (strcmp(romio_cb_write,"enable") || strcmp(romio_cb_write,"disable")){
+	    MPI_Info_set(mpiInfo, "romio_cb_write", romio_cb_write);
+	}
+	if (strcmp(romio_ds_write,"enable") || strcmp(romio_ds_write,"disable")){
+	    MPI_Info_set(mpiInfo, "romio_ds_write", romio_ds_write);
+	}
+	if (striping_factor){
+	    MPI_Info_set(mpiInfo, "striping_factor", striping_factor);
+	}
+    }
     int file_suffix = dumpn;
     sprintf(state_name, "state0");
 
@@ -1691,8 +1714,11 @@ static void main_dump_sif(
     MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
 
     TIO_Call( TIO_Create(fileName, &tiofile_id, TIO_ACC_REPLACE, "MACSio",
-        "1.0", date, fileName, MACSIO_MAIN_Comm, MPI_INFO_NULL, MACSIO_MAIN_Rank),
+        "1.0", date, fileName, MACSIO_MAIN_Comm, mpiInfo, MACSIO_MAIN_Rank),
     "File Creation Failed\n");
+    if (romio_cb_write || romio_ds_write || striping_factor){
+	MPI_Info_free(&mpiInfo);
+    }
     TIO_Call( TIO_Create_State(tiofile_id, state_name, &state_id, 1, (TIO_Time_t)0.0, "us"),
         "State Create Failed\n");
 
