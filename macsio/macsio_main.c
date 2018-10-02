@@ -538,8 +538,6 @@ write_timings_file(char const *filename)
     }
 
     MACSIO_LOG_LogFinalize(timing_log);
-
-    return 0;
 }
 
 static int
