@@ -35,7 +35,6 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string.h>
 #include <time.h>
 
-
 /*!
 \brief Support functions for Perlin noise
 @{
@@ -1023,32 +1022,37 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     return 0;
 }
 
+static int latest_rand_num = 0;
+static int run_seed = 0;
+
 static int choose_part_count(int K, int mod, int *R, int *Q)
 {
     /* We have either K or K+1 parts so randomly select that for each rank */
-    int retval = K + random() % mod;
+    srand(latest_rand_num);
+    latest_rand_num = rand();
+    int retval = K + latest_rand_num % mod;
     if (retval == K)
     {
         if (*R > 0)
         {
-            *R--;
+            (*R)--;
         }
         else if (*Q > 0)
         {
             retval = K+1;
-            *Q--;
+            (*Q)--;
         }
     }
     else
     {
         if (*Q > 0)
         {
-            *Q--;
+            (*Q)--;
         }
         else if (*R > 0)
         {
             retval = K;
-            *R--;
+            (*R)--;
         }
     }
     return retval;
@@ -1151,7 +1155,17 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
 
     rank = 0;
     chunk = 0;
-    srandom(0xDeadBeef); /* initialize for choose_part_count */
+
+    /* If we haven't set a seed for the run then take this from the clock.
+     * This should allow us to randomise the decomposition between runs but
+     * still use this overloaded function to identify chunk ownership within
+     * a single run
+     */
+    if (run_seed == 0){
+        run_seed = time(NULL);
+    }
+    srand(run_seed); /* initialize for choose_part_count */
+    latest_rand_num = rand();
     parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
     for (ipart = 0; ipart < nx_parts; ipart++)
     {
@@ -1162,7 +1176,6 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                 if (!rank_owning_chunkId && rank == myrank)
                 {
                     int global_log_origin[3];
-
                     /* build mesh part on this rank */
                     MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
