@@ -287,8 +287,8 @@ make_random_object_recurse(int nthings, int depth)
 json_object *
 MACSIO_DATA_MakeRandomObject(int nbytes)
 {
-    json_object *first_attempt = make_random_object_recurse(nbytes, 0);
-    /*nbytes = first_attempt->*/
+    /*json_object *first_attempt = make_random_object_recurse(nbytes, 0); */
+    return 0;
 }
 
 json_object *
@@ -296,6 +296,7 @@ MACSIO_DATA_MakeRandomTable(int nbytes)
 {
     int divisor = random() % 10 + 1;
     int nbytes_per_entry = random() % (nbytes / divisor) + 4;
+    return 0;
 }
 
 //#warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
