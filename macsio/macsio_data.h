@@ -45,9 +45,7 @@ extern "C" {
 MACSio creates and initializes several pseudo random number generators (PRNGs),
 all of which utilize the C standard library
 <a href="http://man7.org/linux/man-pages/man3/random.3.html">random()</a>
-method. The ids (e.g. handles) to each are stored in the main json object under
-the tag "random_generator_ids". Each generator has a different name and purpose
-and should be used accordingly.
+method.
 
 Pseudo Random Number Generator (PRNG) support is handled by maintaining
 a series of state vectors for calls to initstate/setstate of C library
@@ -73,13 +71,6 @@ The PRNGs MACSio creates are...
   consistently (e.g. collectively) across ranks. Otherwise indeterminent behavior
   may result.
 - "rank_invariant_tv": like rank_invariant except causes variation in randomization from run to run
-
-To use one of these PRNGs, you would do something like...
-
-\code{.c}
- int prng_id = JsonGetInt(main_obj, "random_generator_ids/naive") 
- long random_value = MACSIO_DATA_GetValPRNG(prng_id);
-\endcode
 
 If these PRNGs are not sufficient, developers are free to create other PRNGs for
 other specific purposes.
