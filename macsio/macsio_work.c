@@ -35,10 +35,11 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mpi.h>
 #endif
 
-#include <macsio_work.h>
+#include <macsio_data.h>
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_utils.h>
+#include <macsio_work.h>
 
 char *getTimestamp()
 {
@@ -163,12 +164,12 @@ void MACSIO_WORK_LevelTwo(double currentDt)
 	indx[ii] = ii;
     }
 
-    srand((unsigned int)time(NULL));
-    
+    /* we're using naive_rtv here for randomization meaning that each
+       rank is guaranteed to have different behavior */
     for (int ii=0; ii<nshuffle; ii++){
-	rnum = ((double)rand()/(double)(RAND_MAX));
+	rnum = ((double)MD_random_naive_rtv()/(double)((1u<<31)-1));
 	i1 = int(rnum*np);
-	rnum = ((double)rand()/(double)(RAND_MAX));
+	rnum = ((double)MD_random_naive_rtv()/(double)((1u<<31)-1));
 	i2 = int(rnum*np);
 	if (i1 < 1) i1 = 1;
 	if (i1 > np) i1=np;
@@ -181,7 +182,7 @@ void MACSIO_WORK_LevelTwo(double currentDt)
     
     
     for (int ii=0; ii<np; ii++){
-	rnum = ((double)rand()/(double)(RAND_MAX));
+	rnum = ((double)MD_random_naive_rtv()/(double)((1u<<31)-1));
 	i1 = int(rnum*nm);
 	if (i1 > nm) i1 = nm;
 	if (i1 <= 0) i1 = 1;
