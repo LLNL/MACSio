@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/macsio/badge/?version=latest)](https://macsio.readthedocs.io/en/latest/?badge=latest)
+
 # MACSio
 A Multi-purpose, Application-Centric, Scalable I/O Proxy Application
 
