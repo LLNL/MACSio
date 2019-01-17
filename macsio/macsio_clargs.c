@@ -289,7 +289,7 @@ MACSIO_CLARGS_ProcessCmdline(
              {
                  char *pnext = strchr(p, '\n');
                  int len = pnext ? pnext - p : strlen(p);
-	         fprintf(outFILE, "%*s%*.*s\n", 2*(depth+1), " ", len, len, p);
+	         fprintf(outFILE, "%*s%*.*s\n", 2*(depth+1)+2, " ", len, len, p);
                  p = pnext ? pnext+1 : 0;
              }
          }
@@ -304,7 +304,7 @@ MACSIO_CLARGS_ProcessCmdline(
 	     i = 0;
 	     while (i < n)
 	     {
-	        fprintf(outFILE, helpFmtStr, 2*(depth+1), " ", p);
+	        fprintf(outFILE, helpFmtStr, 2*(depth+1)+2, " ", p);
 	        p += terminalWidth;
 	        i += terminalWidth;
 	        if ((i < n) && (*p != ' '))

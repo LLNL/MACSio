@@ -29,12 +29,15 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <macsio_data.h>
 #include <macsio_utils.h>
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
 
+#define MACSIO_DATA_MAX_PRNGS 10
 
 /*!
 \brief Support functions for Perlin noise
@@ -127,176 +130,318 @@ static double noise(
                                    grad(p[BB+1], x-1, y-1, z-1 ))));
 }
 
-static json_object *
-make_random_int()
-{
-    return json_object_new_int(random() % 100000);
-}
+/* Pseudo Random Number Generator (PRNG) support */
+static     char *prng_state_vecs[MACSIO_DATA_MAX_PRNGS] = {0,0,0,0,0,0,0,0,0,0};
+static unsigned prng_state_seeds[MACSIO_DATA_MAX_PRNGS] = {0,0,0,0,0,0,0,0,0,0};
 
-static json_object *
-make_random_double()
+int MACSIO_DATA_CreatePRNG(unsigned seed)
 {
-     return json_object_new_double(
-         (double) (random() % 100000) / (random() % 100000 + 1));
-}
-
-static json_object *
-make_random_primitive()
-{
-    int rval = random() % 100;
-    if (rval < 33) /* favor doubles over ints 2:1 */
-        return make_random_int();
-    else
-        return make_random_double();
-}
-
-static json_object *
-make_random_string(int nthings)
-{
+    static size_t const veclen = 32;
     int i;
-    char *rval = (char *) malloc(nthings);
+
+    /* find an unused state vector */
+    for (i = 0; i < MACSIO_DATA_MAX_PRNGS && prng_state_vecs[i] != 0; i++);
+    assert(i < MACSIO_DATA_MAX_PRNGS);
+
+    /* create and populate a new state vector */
+    prng_state_vecs[i] = (char *) malloc(veclen);
+    assert(prng_state_vecs[i]);
+    prng_state_seeds[i] = seed;
+    initstate(prng_state_seeds[i], prng_state_vecs[i], veclen);
+
+    return i;
+}
+
+void MACSIO_DATA_ResetPRNG(int id)
+{
+    assert(id >= 0);
+    assert(id < MACSIO_DATA_MAX_PRNGS);
+    assert(prng_state_vecs[id]);
+    setstate(prng_state_vecs[id]);
+    srandom(prng_state_seeds[id]);
+}
+
+long MACSIO_DATA_GetValPRNG(int id)
+{
+    static int lastid = -1;
+
+    assert(id >= 0);
+    assert(id < MACSIO_DATA_MAX_PRNGS);
+    assert(prng_state_vecs[id]);
+
+    if (id != lastid)
+    {
+        setstate(prng_state_vecs[id]);
+        lastid = id;
+    }
+
+    return random();
+}
+
+void MACSIO_DATA_DestroyPRNG(int id)
+{
+    assert(id >= 0);
+    assert(id < MACSIO_DATA_MAX_PRNGS);
+    assert(prng_state_vecs[id]);
+    free(prng_state_vecs[id]);
+    prng_state_vecs[id] = 0;
+}
+
+void MACSIO_DATA_InitializePRNGs(unsigned rank, unsigned utime)
+{
+    unsigned nseed = 0xDeadBeef;     /* naive seed */
+    unsigned rseed = nseed ^ rank;   /* rank-variant seed */
+    unsigned tseed = nseed ^ utime;  /* time-variant seed */
+    unsigned rtseed = rseed ^ tseed; /* rank- and time-variant seed */
+
+    /* Note: order here must match int args to convenience macros in header */
+    MACSIO_DATA_CreatePRNG(nseed);  /* 0, naive */
+    MACSIO_DATA_CreatePRNG(tseed);  /* 1, naive_tv */
+    MACSIO_DATA_CreatePRNG(rseed);  /* 2, naive_rv */
+    MACSIO_DATA_CreatePRNG(rtseed); /* 3, naive_rtv */
+    MACSIO_DATA_CreatePRNG(nseed);  /* 4, rank_invariant */
+    MACSIO_DATA_CreatePRNG(tseed);  /* 5, rank_invariant_tv */
+}
+
+void MACSIO_DATA_FinalizePRNGs()
+{
+    /* Note: check that all ranks still agree on next rank-invariant PRNG value */
+    MACSIO_DATA_DestroyPRNG(0);
+    MACSIO_DATA_DestroyPRNG(1);
+    MACSIO_DATA_DestroyPRNG(2);
+    MACSIO_DATA_DestroyPRNG(3);
+    MACSIO_DATA_DestroyPRNG(4);
+    MACSIO_DATA_DestroyPRNG(5);
+}
+
+static json_object *
+make_random_bool(int *nused)
+{
+    *nused = 1;
+    if (MD_random() % 2)
+        return json_object_new_boolean(JSON_C_TRUE);
+    else
+        return json_object_new_boolean(JSON_C_FALSE);
+}
+
+static json_object *
+make_random_int(int *nused)
+{
+    *nused = 4;
+    return json_object_new_int(MD_random() % 100000);
+}
+
+static json_object *
+make_random_double(int *nused)
+{
+     *nused = 8;
+     return json_object_new_double(
+         (double) (MD_random() % 100000) / (MD_random() % 100000 + 1));
+}
+
+static json_object *
+make_random_string(int nbytes, unsigned maxds, int *nused)
+{
+    char const *chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+    int const charslen = strlen(chars);
+    int i;
+    int strsize;
+
+    if (maxds)
+        strsize = 2 + MD_random() % maxds;
+    else if (nbytes < 8)
+        strsize = nbytes;
+    else if (nbytes < 248)
+        strsize = MD_random() % nbytes + 8;
+    else
+        strsize = MD_random() % 248 + 8;
+
+    *nused = strsize;
+    char *rval = (char *) malloc(strsize);
     json_object *retval;
 
-    for (i = 0; i < nthings-1; i++)
-        rval[i] = 'A' + (random() % 61);
-    rval[nthings-1] = '\0';
+    for (i = 0; i < strsize-1; i++)
+        rval[i] = *(chars + MD_random() % charslen);
+    rval[strsize-1] = '\0';
     retval = json_object_new_string(rval);
     free(rval);
 
     return retval;
 }
 
+/* Makes a random array of fixed type (bool, int, double or string).
+   In particular, no array will have member sub-objects. */
 static json_object *
-make_random_array(int nthings)
+make_random_array(int nmeta, unsigned maxds, int *umeta)
 {
-    int i, rval = random() % 100;
+    int rval = MD_random() % 100; /* selects type of datums in array */
+    int rbyt = 1 + MD_random() % nmeta;
+    int rmax = 0;
+    int i = 0;
+
+    if (maxds)
+        rmax = 1 + MD_random() % maxds;
+
+    *umeta = 0;
     json_object *retval = json_object_new_array();
-    for (i = 0; i < nthings; i++)
+    while (*umeta < rbyt)
     {
-        if (rval < 33) /* favor double arrays over int arrays 2:1 */
-            json_object_array_add(retval, make_random_int());
-        else
-            json_object_array_add(retval, make_random_double());
+        int n;
+        if (rval < 5) /* 5% bools */
+            json_object_array_add(retval, make_random_bool(&n));
+        else if (rval < 45) /* 40% ints */
+            json_object_array_add(retval, make_random_int(&n));
+        else if (rval < 85) /* 40% doubles */
+            json_object_array_add(retval, make_random_double(&n));
+        else /* 15% strings */
+            json_object_array_add(retval, make_random_string(rbyt-*umeta,maxds,&n));
+        *umeta += n;
+        i++;
+        if (maxds && i >= rmax && i > 1) break;
     }
     return retval;
 }
 
 static json_object *
-make_random_extarr(int nthings)
+make_random_extarr(int nraw, unsigned maxds, int *uraw)
 {
     
-    int dims[2], ndims = random() % 2 + 1;
-    int rval = random() % 100;
+    int dims[2], ndims = MD_random() % 2 + 1;
+    int rval = MD_random() % 100;
+    int valsize = rval < 33 ? sizeof(int) : sizeof(double);
+    int nvals;
     json_extarr_type dtype;
     void *data;
 
-    dims[0] = nthings;
+    if (maxds)
+        nvals = 1 + MD_random() % (maxds-1);
+    else
+        nvals = MD_random() % (nraw / valsize) + 8;
+
+    dims[0] = nvals;
     if (ndims == 2)
-        MACSIO_UTILS_Best2DFactors(nthings, &dims[0], &dims[1]);
+        MACSIO_UTILS_Best2DFactors(nvals, &dims[0], &dims[1]);
 
     if (rval < 33) /* favor double arrays over int arrays 2:1 */
     {
-        int i, *vals = (int *) malloc(nthings * sizeof(int));
-        for (i = 0; i < nthings; i++)
-            vals[i] = i % 11 ? i : random() % nthings;
+        int i, *vals = (int *) malloc(nvals * sizeof(int));
+        for (i = 0; i < nvals; i++)
+            vals[i] = (i % 11) ? i : (MD_random() % nvals);
         dtype = json_extarr_type_int32;
         data = vals;
     }
     else
     {
         int i;
-        double *vals = (double *) malloc(nthings * sizeof(double));
-        for (i = 0; i < nthings; i++)
-            vals[i] = (double) (random() % 100000) / (random() % 100000 + 1);
+        double *vals = (double *) malloc(nvals * sizeof(double));
+        for (i = 0; i < nvals ; i++)
+            vals[i] = (i % 11) ? i : (double) (MD_random() % nvals) / nvals;
         dtype = json_extarr_type_flt64;
         data = vals;
     }
 
+    *uraw = nvals * valsize;
     return json_object_new_extarr(data, dtype, ndims, dims, 0);
 }
 
+/* A terminal is a json_object that will NOT have sub-objects */
 static json_object *
-make_random_object_recurse(int nthings, int depth)
+make_random_terminal(int nraw, int nmeta, unsigned maxds, int *uraw, int *umeta)
 {
-    int rval = random() % 100;
-    int prim_cutoff, string_cutoff, array_cutoff, extarr_cutoff;
+    int rval = MD_random() % 100;
+    int tbool = 0, tint = 0, tdbl = 0, tstr = 0, tarr = 0;
+    int nsum = nraw + nmeta ? nraw + nmeta : 1;
+    int tval = 100 * nmeta / nsum;
+    int dometa = rval < tval;
 
-    /* adjust cutoffs to affect odds of different kinds of objects depending on total size */
-    if (depth == 0 && nthings > 1)
+    if (nraw < 0)  dometa = 1;
+    if (nmeta < 0) dometa = 0;
+
+    /* set probability threshold percentages for... */
+    if (dometa) /* ...a meta terminal */
     {
-        prim_cutoff = 0; string_cutoff = 0; array_cutoff = 0; extarr_cutoff = 0;
-    }
-    else if (nthings > 10000)
-    {
-        prim_cutoff = 0; string_cutoff = 5; array_cutoff = 10; extarr_cutoff = 30;
-    }
-    else if (nthings > 1000)
-    {
-        prim_cutoff = 0; string_cutoff = 10; array_cutoff = 20; extarr_cutoff = 60;
-    }
-    else if (nthings > 100)
-    {
-        prim_cutoff = 0; string_cutoff = 25; array_cutoff = 55; extarr_cutoff = 85;
-    }
-    else if (nthings > 10)
-    {
-        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 80; extarr_cutoff = 92;
-    }
-    else if (nthings > 1)
-    {
-        prim_cutoff = 0; string_cutoff = 40; array_cutoff = 85; extarr_cutoff = 96;
-    }
+        if      (nmeta <=   1)  {tbool=100;}
+        else if (nmeta <=   4)  {tbool=50;tint=100;}
+        else if (nmeta <=   8)  {tbool=33;tint=66;tdbl=100;}
+        else if (nmeta <= 256)  {tbool=15;tint=30;tdbl=45;tstr=70;tarr=100;}
+        else                    {tbool=10;tint=20;tdbl=30;tstr=50;tarr=100;}
+    }           /* ...a raw terminal */
+    else                        {tbool=0;tint=0;tdbl=0;tstr=0;tarr=10;}
+
+
+    *uraw = 0;
+    *umeta = 0;
+    if (rval < tbool)
+        return make_random_bool(umeta);
+    else if (rval < tint)
+        return make_random_int(umeta);
+    else if (rval < tdbl)
+        return make_random_double(umeta);
+    else if (rval < tstr)
+        return make_random_string(nmeta, maxds, umeta);
+    else if (rval < tarr)
+        return make_random_array(dometa?nmeta:nraw, maxds, dometa?umeta:uraw);
     else
-    {
-        prim_cutoff = 100;
-    }
+        return make_random_extarr(nraw, maxds, uraw);
+}
 
-    if (rval < prim_cutoff)
-        return make_random_primitive();
-    else if (rval < string_cutoff)
-        return make_random_string(nthings);
-    else if (rval < array_cutoff)
-        return make_random_array(nthings);
-    else if (rval < extarr_cutoff)
-        return make_random_extarr(nthings);
-    else 
-    {
-        int i;
-        int nmembers = random() % (nthings > 100000 ? 500:
-                                  (nthings > 10000  ? 100:
-                                  (nthings > 1000   ?  25:
-                                  (nthings > 100    ?  10:
-                                  (nthings > 10     ?   3:
-                                   nthings)))));
-        json_object *obj = json_object_new_object();
+static int memberid = 0;
 
-        nthings -= nmembers;
-        depth++;
-        for (i = 0; i < nmembers; i++)
-        {
-            char name[32];
-            int nthings_member = random() % nthings;
-            snprintf(name, sizeof(name), "member%04d", i++);
-            json_object_object_add(obj, name, make_random_object_recurse(nthings_member, depth));
-            nthings -= nthings_member;
-            if (nthings <= 0) break;
-        }
-        return obj;
+static json_object *
+make_random_object_recurse(int maxdepth, int depth, int nraw, int nmeta, unsigned maxds, int *uraw, int *umeta)
+{
+    int dval = (100 * (maxdepth - depth)) / maxdepth;
+    int rval = MD_random() % 100;
+    json_object *obj;
+
+    /* Sometimes, randomly don't go any deeper in this tree */
+    if (depth > 0 && rval > dval)
+        return make_random_terminal(nraw, nmeta, maxds, uraw, umeta);
+
+    /* Start making this tree */
+    *uraw = 0;
+    *umeta = 0;
+    obj = json_object_new_object();
+    while (nraw > 0 || nmeta > 0)
+    {
+        char name[32];
+        int _uraw, _umeta;
+        /*snprintf(name, sizeof(name), "member%08d", nraw>0?(nmeta>0?nraw+nmeta:nraw):nmeta);*/
+        snprintf(name, sizeof(name), "member%08d", memberid++);
+        json_object_object_add(obj, name, make_random_object_recurse(maxdepth, depth+1,
+            nraw, nmeta, maxds, &_uraw, &_umeta));
+        nraw -= _uraw;
+        nmeta -= _umeta;
+       *uraw += _uraw;
+       *umeta += _umeta;
+
+        /* Sometimes, randomly, break out of this subtree early */
+        rval = MD_random() % 100;
+        if (depth > 0 && rval > dval && json_object_object_length(obj)>1) break;
     }
+    return obj;
 }
 
 json_object *
-MACSIO_DATA_MakeRandomObject(int nbytes)
+MACSIO_DATA_MakeRandomObject(int maxd, int nraw, int nmeta, unsigned maxds)
 {
-    json_object *first_attempt = make_random_object_recurse(nbytes, 0);
-    /*nbytes = first_attempt->*/
+    int dummy1, dummy2;
+    return make_random_object_recurse(maxd, 0, nraw, nmeta, maxds, &dummy1, &dummy2);
 }
 
 json_object *
-MACSIO_DATA_MakeRandomTable(int nbytes)
+MACSIO_DATA_MakeRandomTable(int nrecs, int totbytes)
 {
-    int divisor = random() % 10 + 1;
-    int nbytes_per_entry = random() % (nbytes / divisor) + 4;
+    int i;
+    int bpr = totbytes / nrecs;
+    json_object *retval = json_object_new_array();
+
+    json_object *one_rec = MACSIO_DATA_MakeRandomObject(1, -1, bpr, bpr/5);
+
+    for (i = 0; i < nrecs; i++)
+        json_object_array_add(retval, one_rec);
+
+    return retval;
 }
 
 //#warning NEED TO REPLACE STRINGS WITH KEYS FOR MESH PARAMETERS
@@ -796,16 +941,13 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
     valdp = (double *) json_object_extarr_data(data_obj);
     valip = (int *) json_object_extarr_data(data_obj);
 
-    srandom(time(NULL));
-
     int exp_random_type = -1;
     if (strstr(kind, "expansion")!=NULL){
-        exp_random_type = random()%8;
+        exp_random_type = MD_random()%8;
     }
 
     n = 0;
 //#warning PASS RANK OR RANDOM SEED IN HERE TO ENSURE DIFF PROCESSORS HAVE DIFF RANDOM DATA
-    srandom(0xBabeFace);
     for (k = 0; k < dims2[2]; k++)
     {
         for (j = 0; j < dims2[1]; j++)
@@ -817,7 +959,7 @@ make_scalar_var(int ndims, int const *dims, double const *bounds,
                 if (strstr(kind, "constant")!=NULL || exp_random_type == 1)
                     valdp[n++] = 1.0;
                 else if (strstr(kind, "random")!=NULL || exp_random_type == 2)
-                    valdp[n++] = (double) (random() % 1000) / 1000;
+                    valdp[n++] = (double) (MD_random() % 1000) / 1000;
                 else if (strstr(kind, "xramp")!=NULL || exp_random_type == 3)
                     valdp[n++] = bounds[0] + i * MACSIO_UTILS_XDelta(dims, bounds);
                 else if (strstr(kind, "spherical")!=NULL || exp_random_type == 4)
@@ -1023,32 +1165,39 @@ make_mesh_chunk(int chunkId, int ndims, int const *dims, double const *bounds, c
     return 0;
 }
 
-static int choose_part_count(int K, int mod, int *R, int *Q)
+static int latest_rand_num = 0;
+static int run_seed = 0;
+
+static int choose_part_count(int K, int mod, int *R, int *Q, int time_randomize)
 {
     /* We have either K or K+1 parts so randomly select that for each rank */
-    int retval = K + random() % mod;
+    if (time_randomize)
+        latest_rand_num = MD_random_rankinv_tv();
+    else
+        latest_rand_num = MD_random_rankinv();
+    int retval = K + latest_rand_num % mod;
     if (retval == K)
     {
         if (*R > 0)
         {
-            *R--;
+            (*R)--;
         }
         else if (*Q > 0)
         {
             retval = K+1;
-            *Q--;
+            (*Q)--;
         }
     }
     else
     {
         if (*Q > 0)
         {
-            *Q--;
+            (*Q)--;
         }
         else if (*R > 0)
         {
             retval = K;
-            *R--;
+            (*R)--;
         }
     }
     return retval;
@@ -1077,6 +1226,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
     double total_num_parts_d = size * avg_num_parts;
     int total_num_parts = (int) lround(total_num_parts_d);
     int myrank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
+    int time_randomize = JsonGetInt(main_obj, "clargs/time_randomize");
 
     int K = floor(avg_num_parts); /* some ranks get K parts */
     int K1 = K+1;                 /* some ranks get K+1 parts */
@@ -1151,8 +1301,17 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
 
     rank = 0;
     chunk = 0;
-    srandom(0xDeadBeef); /* initialize for choose_part_count */
-    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
+
+    /* If we haven't set a seed for the run then take this from the clock.
+     * This should allow us to randomise the decomposition between runs but
+     * still use this overloaded function to identify chunk ownership within
+     * a single run
+     */
+    if (time_randomize)
+        latest_rand_num = MD_random_rankinv_tv();
+    else
+        latest_rand_num = MD_random_rankinv();
+    parts_on_this_rank = choose_part_count(K,mod,&R,&Q,time_randomize);
     for (ipart = 0; ipart < nx_parts; ipart++)
     {
         for (jpart = 0; jpart < ny_parts; jpart++)
@@ -1162,7 +1321,6 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                 if (!rank_owning_chunkId && rank == myrank)
                 {
                     int global_log_origin[3];
-
                     /* build mesh part on this rank */
                     MACSIO_UTILS_SetBounds(part_bounds, (double) ipart, (double) jpart, (double) kpart,
                         (double) ipart+ipart_width, (double) jpart+jpart_width, (double) kpart+kpart_width);
@@ -1188,7 +1346,7 @@ MACSIO_DATA_GenerateTimeZeroDumpObject(json_object *main_obj, int *rank_owning_c
                 if (parts_on_this_rank == 0)
                 {
                     rank++;
-                    parts_on_this_rank = choose_part_count(K,mod,&R,&Q);
+                    parts_on_this_rank = choose_part_count(K,mod,&R,&Q,time_randomize);
                 }
             }
         }

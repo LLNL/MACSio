@@ -39,12 +39,6 @@ HDF5_CFLAGS = -I$(HDF5_HOME)/include
 
 HDF5_SOURCES = macsio_hdf5.c
 
-# Lindstrom's ZFP compression library
-ifneq ($(ZFP_HOME),)
-HDF5_CFLAGS += -DHAVE_ZFP -I$(ZFP_HOME)/include
-HDF5_LDFLAGS += -L$(ZFP_HOME)/lib -lzfp
-endif
-
 ifneq ($(SZIP_HOME),)
 HDF5_LDFLAGS += -L$(SZIP_HOME)/lib -lsz -Wl,-rpath,$(SZIP_HOME)/lib
 HDF5_CFLAGS += -DHAVE_SZIP

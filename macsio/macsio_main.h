@@ -40,8 +40,6 @@ extern int MACSIO_MAIN_Comm;
 extern int MACSIO_MAIN_Size;
 extern int MACSIO_MAIN_Rank;
 
-extern int MACSIO_MAIN_GetRankOwningPart(json_object *main_obj, int chunkId);
-
 #ifdef __cplusplus
 }
 #endif

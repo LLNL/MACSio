@@ -51,7 +51,27 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <hdf5.h>
 #include <H5Tpublic.h>
 
-/* Disable debugging messages */
+/* Convenience methods for H5Z-ZFP generic interface */
+#define H5Pset_zfp_rate_cdata(R, N, CD)          \
+do { if (N>=4) {double *p = (double *) &CD[2];   \
+CD[0]=CD[1]=CD[2]=CD[3]=0;                       \
+CD[0]=1; *p=R; N=4;}} while(0)
+
+#define H5Pset_zfp_precision_cdata(P, N, CD)  \
+do { if (N>=3) {CD[0]=CD[1]=CD[2];            \
+CD[0]=2;                 \
+CD[2]=P; N=3;}} while(0)
+
+#define H5Pset_zfp_accuracy_cdata(A, N, CD)      \
+do { if (N>=4) {double *p = (double *) &CD[2];   \
+CD[0]=CD[1]=CD[2]=CD[3]=0;                       \
+CD[0]=3; *p=A; N=4;}} while(0)
+
+#define H5Pset_zfp_expert_cdata(MiB, MaB, MaP, MiE, N, CD) \
+do { if (N>=6) { CD[0]=CD[1]=CD[2]=CD[3]=CD[4]=CD[5]=0;    \
+CD[0]=4;                                 \
+CD[2]=MiB; CD[3]=MaB; CD[4]=MaP;                           \
+CD[5]=(unsigned int)MiE; N=6;}} while(0)
 
 /*!
 \addtogroup plugins
@@ -62,615 +82,6 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 \addtogroup HDF5
 @{
 */
-
-#ifdef HAVE_ZFP
-/*!
-\addtogroup ZFP 
-\brief HDF5 Compression Filter
-
-Copyright (c) 2014-2015, RWTH Aachen University, JARA - Juelich Aachen Research Alliance.
-Produced at the RWTH Aachen University, Germany.
-Written by Jens Henrik Göbbert (goebbert@jara.rwth-aachen.de)
-All rights reserved.
-
-This file is part of the H5zfp library.
-For details, see http://www.jara.org/de/research/jara-hpc/.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-this list of conditions and the disclaimer below.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the disclaimer (as noted below) in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the University nor the names of its contributors may
-be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-@{
-*/
-
-#include <zfp.h>
-
-#define PUSH_ERR(func, minor, str)                                      \
-    H5Epush1(__FILE__, func, __LINE__, H5E_PLINE, minor, str)
-#define H5Z_class_t_vers 2
-#define ZFP_H5FILTER_ID 299
-
-static htri_t H5Z_can_apply_zfp(hid_t dcpl_id,          /* dataset creation property list */
-                                hid_t type_id,   /* datatype */
-                                hid_t space_id); /* a dataspace describing a chunk */
-
-static herr_t H5Z_set_local_zfp(hid_t dcpl_id,          /* dataset creation property list */
-                                hid_t type_id,   /* datatype */
-                                hid_t space_id); /* dataspace describing the chunk */
-
-static size_t H5Z_filter_zfp(unsigned int flags,
-                             size_t cd_nelmts,
-                             const unsigned int cd_values[],
-                             size_t nbytes,
-                             size_t *buf_size,
-                             void **buf);
-
-static int H5Z_register_zfp(void);
-
-/* write a 64 bit unsigned integer to a buffer in big endian order. */
-static void zfp_write_uint64(void* buf, uint64_t num) {
-    uint8_t* b = static_cast<uint8_t*>(buf);
-    uint64_t pow28 = (uint64_t)1 << 8;
-    for (int ii = 7; ii >= 0; ii--) {
-        b[ii] = num % pow28;
-        num = num / pow28;
-    }
-}
-
-/* read a 64 bit unsigned integer from a buffer big endian order. */
-static uint64_t zfp_read_uint64(void* buf) {
-    uint8_t* b = static_cast<uint8_t*>(buf);
-    uint64_t num = 0, pow28 = (uint64_t)1 << 8, cp = 1;
-    for (int ii = 7; ii >= 0; ii--) {
-        num += b[ii] * cp;
-        cp *= pow28;
-    }
-    return num;
-}
-
-/* write a 64 bit signed integer to a buffer in big endian order. */
-static void zfp_write_int64(void* buf, int64_t num) {
-    uint64_t pow2x = (uint64_t)1 << 63;
-    uint64_t num_uint = (num + pow2x);
-    zfp_write_uint64(buf, num_uint);
-}
-
-/* read a 64 bit signed integer from a buffer big endian order. */
-static int64_t zfp_read_int64(void* buf) {
-    uint64_t num_uint = zfp_read_uint64(buf);
-    uint64_t pow2x = (uint64_t)1 << 63;
-    return (num_uint -pow2x);
-}
-
-/* write a 32 bit unsigned integer to a buffer in big endian order. */
-static void zfp_write_uint32(void* buf, uint32_t num) {
-    uint8_t* b = static_cast<uint8_t*>(buf);
-    uint32_t pow28 = (uint32_t)1 << 8;
-    for (int ii = 3; ii >= 0; ii--) {
-        b[ii] = num % pow28;
-        num = num / pow28;
-    }
-}
-
-/* read a 32 bit unsigned integer from a buffer big endian order. */
-static uint32_t zfp_read_uint32(void* buf) {
-    uint8_t* b = static_cast<uint8_t*>(buf);
-    uint32_t num = 0, pow28 = (uint32_t)1 << 8, cp = 1;
-    for (int ii = 3; ii >= 0; ii--) {
-        num += b[ii] * cp;
-        cp *= pow28;
-    }
-    return num;
-}
-
-/* write a 32 bit signed integer to a buffer in big endian order. */
-static void zfp_write_int32(void* buf, int32_t num) {
-    uint32_t pow2x = (uint32_t)1 << 31;
-    uint32_t num_uint = (num + pow2x);
-    zfp_write_uint32(buf, num_uint);
-}
-
-/* read a 32 bit signed integer from a buffer big endian order. */
-static int32_t zfp_read_int32(void* buf) {
-    uint32_t num_uint = zfp_read_uint32(buf);
-    uint32_t pow2x = (uint32_t)1 << 31;
-    return (num_uint -pow2x);
-}
-
-const H5Z_class2_t ZFP_H5Filter[1] = {{
-    H5Z_CLASS_T_VERS,                         /* H5Z_class_t version          */
-    (H5Z_filter_t)(ZFP_H5FILTER_ID),          /* Filter id number             */
-    1,                                        /* encoder_present flag (set to true) */
-    1,                                        /* decoder_present flag (set to true) */
-    "Lindstrom-ZFP compression; See http://computation.llnl.gov/casc/zfp/",
-                                              /* Filter name for debugging    */
-    (H5Z_can_apply_func_t) H5Z_can_apply_zfp, /* The "can apply" callback     */
-    (H5Z_set_local_func_t) H5Z_set_local_zfp, /* The "set local" callback     */
-    (H5Z_func_t) H5Z_filter_zfp,              /* The actual filter function   */
-}};
-
-/*!
-\brief Is filter valid for this dataset?
-
-Before a dataset is created 'can_apply' callback for any filter
-used in the dataset creation property list are called.
-
-\return valid: non-negative
-\return invalid: zero
-\return error: negative
-*/
-static herr_t
-H5Z_can_apply_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
-{
-    hid_t dclass;
-    size_t dsize;
-    hid_t dntype;
-    size_t ndims;
-    unsigned int flags;
-
-    size_t cd_nelmts_in = 5;
-    unsigned int cd_values_in[]  = {0,0,0,0,0};
-
-    /* check object identifier */
-    /* ----------------------- */
-
-    /* Check if object exists as datatype - try to get pointer to memory referenced by id */
-    if(H5Iis_valid(type_id)) {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid type");
-      return -1;
-    }
-
-#if 0
-    /* TODO: print datatype name if debug-mode */
-    ssize_t dname_size = 0;
-    if(0 >= (dname_size = H5Iget_name(type_id, NULL, 0))) {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid datatype name");
-      return -1;
-    }
-    dname_size = dname_size+1;
-    char dname[dname_size];
-    H5Iget_name( type_id, (char *)(&dname), (size_t)dname_size );
-    fprintf(stdout,"   H5Z_can_apply_zfp: dname = %d, '%.*s' \n",(int)dname_size, (int)dname_size, dname);
-#endif
-
-    /* check datatype ( which describes elements of a dataset ) */
-    /* -------------- */
-
-    /* check datatype's class - try to get datatype class identifier
-     * typedef enum H5T_class_t {
-     * 		H5T_NO_CLASS = -1,  error
-     * 		H5T_INTEGER  = 0,   integer types
-     * 		H5T_FLOAT    = 1,   floating-point types
-     */
-    if(H5T_NO_CLASS == (dclass = H5Tget_class(type_id))) {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid datatype class");
-      return -1;
-    }
-#ifndef NDEBUG
-    fprintf(stdout,"   H5Z_can_apply_zfp: dclass = %d", dclass);
-    if(dclass != H5T_FLOAT) {
-      fprintf(stdout," ... NOT SUPPORTED => skip compression\n");
-      return 0;
-    };
-    fprintf(stdout,"\n");
-#else
-    if(dclass != H5T_FLOAT) {return 0;}; /* only support floats */
-#endif
-
-    /* check datatype's native-type - must be double or float */
-#if 0
-/*  TODO: this check results in register a new native type instead of test for a type
-    dntype = H5Tget_native_type(type_id, H5T_DIR_DESCEND); //H5T_DIR_ASCEND);
-    if(     H5T_NATIVE_FLOAT  == dntype) { fprintf(stdout,"\nzfp_h5_can_apply: dntype = %d \n", dntype); }
-    else if(H5T_NATIVE_DOUBLE == dntype) { fprintf(stdout,"\nzfp_h5_can_apply: dntype = %d \n", dntype); }
-    else {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid datatype type");
-    }
-*/
-#endif
-
-    /* check datatype's byte-size per value - must be single(==4) or double(==8) */
-    if(0 == (dsize = H5Tget_size(type_id))) {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid datatype size");
-      return -1;
-    }
-#ifndef NDEBUG
-    fprintf(stdout,"   H5Z_can_apply_zfp: dsize = %d ", (int)dsize);
-    if(dsize != 4 && dsize != 8) {
-      fprintf(stdout," ... NOT SUPPORTED => skip compression\n");
-      return 0;
-    }
-    fprintf(stdout,"\n");
-#else
-    if(dsize != 4 && dsize != 8) { return 0;}; /* only support 4byte and 8byte floats */
-#endif
-
-    /* check chunk    */
-    /* -------------- */
-
-    if(0 == (ndims = H5Sget_simple_extent_ndims(space_id))) {
-      PUSH_ERR("H5Z_can_apply_zfp", H5E_CALLBACK, "no valid no. space dimensions");
-      return -1;
-    }
-    hsize_t dims[ndims];
-    H5Sget_simple_extent_dims(space_id, dims, NULL);
-
-#ifndef NDEBUG
-    fprintf(stdout,"   H5Z_can_apply_zfp: ndims = %d ", (int)ndims);
-    for (size_t ii=0; ii < ndims; ii++) { fprintf(stdout," %d,",(int)dims[ii]); }
-    if(ndims != 1 && ndims != 2 && ndims != 3) {
-      fprintf(stdout," ... NOT SUPPORTED => skip compression\n");
-      return 0;
-    }
-    fprintf(stdout,"\n");
-#else
-    if(ndims != 1 && ndims != 2 && ndims != 3) { return 0;}; /* only support 1d, 2d and 3d arrays */
-#endif
-
-    /* check filter */
-    /* ------------ */
-
-    /* get current filter values */
-    if(H5Pget_filter_by_id2(dcpl_id, ZFP_H5FILTER_ID,
-                            &flags, &cd_nelmts_in, cd_values_in,
-                            0, NULL, NULL) < 0) { return -1; }
-
-    /* check no. elements    */
-    /* -------------- */
-    long dcount = 1;
-    int dcount_threshold = cd_values_in[4];
-    if(dcount_threshold <= 0) { dcount_threshold = 64; }
-    for ( size_t ii=0; ii < ndims; ii++) { dcount = dcount *dims[ii]; }
-
-#ifndef NDEBUG
-    fprintf(stdout,"   H5Z_can_apply_zfp: dcount = %ld ", dcount);
-    if(dcount < dcount_threshold) {
-      fprintf(stdout," ... TOO SMALL => skip compression\n");
-      return 0;
-    }
-    fprintf(stdout,"\n");
-#else
-    if(dcount < dcount_threshold) { return 0; } /* only support datasets with count >= threshold */
-#endif
-
-#ifndef NDEBUG
-    fprintf(stdout,"   H5Z_can_apply_zfp: cd_values = [");
-    for (size_t ii=0; ii < cd_nelmts_in; ii++) { fprintf(stdout," %d,",cd_values_in[ii]); }
-    fprintf(stdout,"]\n");
-#endif
-    return 1;
-
- cleanupAndFail:
-    return 0;
-}
-
-/*!
-\brief Set compression parameters
-
-Only called on compression, not on reverse.
-
-\return Success: Non-negative
-\return Failure: Negative
-*/
-static herr_t
-H5Z_set_local_zfp(hid_t dcpl_id, hid_t type_id, hid_t space_id)
-{
-    size_t dsize;
-    size_t ndims;
-
-    unsigned int flags;
-    size_t cd_nelmts = 5;
-    size_t cd_nelmts_max = 12;
-    unsigned int cd_values_in[]  = {0,0,0,0,0};
-    unsigned int cd_values_out[] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    hsize_t dims[6];
-
-    /* check datatype's byte-size per value - must be single(==4) or double(==8) */
-    if(0 == (dsize = H5Tget_size(type_id))) {
-      PUSH_ERR("H5Z_set_local_zfp", H5E_CALLBACK, "no valid datatype size");
-      return -1;
-    }
-
-    /* check chunk    */
-    /* -------------- */
-
-    if(0 == (ndims = H5Sget_simple_extent_ndims(space_id))) {
-      PUSH_ERR("H5Z_set_local_zfp", H5E_CALLBACK, "no valid no. space dimensions");
-      return -1;
-    }
-    H5Sget_simple_extent_dims(space_id, dims, NULL);
-
-    /* check filter */
-    /* ------------ */
-
-    /* get current filter values */
-    if(H5Pget_filter_by_id2(dcpl_id, ZFP_H5FILTER_ID,
-                            &flags, &cd_nelmts, cd_values_in, /*cd_nelmts (inout) */
-                            0, NULL, NULL) < 0) { return -1; }
-
-    /* correct number of parameters and fill missing with defaults
-          ignore value-ids larger 5
-          add zero for non-existent value-ids <= 4
-          add default threshold for value-id == 5 */
-    if(cd_nelmts != 5) {
-        if(cd_nelmts < 5) cd_values_in[4] = 64;    /* set default threshold = 64 (already used and not required any more) */
-        if(cd_nelmts < 4) cd_values_in[3] = -1074; /* set default minexp    = -1074 */
-        if(cd_nelmts < 3) cd_values_in[2] = 0;     /* set default maxprec   = 0  (set default in compression filter) */
-        if(cd_nelmts < 2) cd_values_in[1] = 0;     /* set default maxbits   = 0  (set default in compression filter) */
-        if(cd_nelmts < 1) cd_values_in[0] = 0;     /* set default minbits   = 0  (set default in compression filter) */
-        cd_nelmts = 5;
-    }
-
-    /* modify cd_values to pass them to filter-func */
-    /* -------------------------------------------- */
-
-    /* First 4+ndims slots reserved. Move any passed options to higher addresses. */
-    size_t valshift = 4 +ndims;
-    for (size_t ii = 0; ii < cd_nelmts && ii +valshift < cd_nelmts_max; ii++) {
-        cd_values_out[ii + valshift] = cd_values_in[ii];
-    }
-
-    int16_t version = ZFP_VERSION;
-    cd_values_out[0] = version >> 4;      /* major version */
-    cd_values_out[1] = version & 0x000f;  /* minor version */
-    cd_values_out[2] = dsize;             /* bytes per element */
-    cd_values_out[3] = ndims;             /* number of dimensions */
-    for (size_t ii = 0; ii < ndims; ii++)
-      cd_values_out[ii +4] = dims[ii];    /* size of dimensions */
-
-    cd_nelmts = cd_nelmts + valshift;
-
-    if(H5Pmodify_filter(dcpl_id, ZFP_H5FILTER_ID, flags, cd_nelmts, cd_values_out)) {
-      PUSH_ERR("H5Z_set_local_zfp", H5E_CALLBACK, "modify filter not possible");
-      return -1;
-    }
-
-    return 1;
-
- cleanupAndFail:
-    return 0;
-}
-
-/*!
-\brief Only called if data in dataset (not if only zeros)
-
-\return Zero on failure
-*/
-static size_t
-H5Z_filter_zfp(unsigned int flags,
-               size_t cd_nelmts,               /* config data elements */
-               const unsigned int cd_values[], /* config data values */
-               size_t nbytes,                  /* number of bytes */
-               size_t *buf_size,               /* buffer size */
-               void **buf)                     /* buffer */
-{
-    unsigned int zfp_major_ver, zfp_minor_ver;
-    size_t dsize;
-    size_t ndims;
-
-    size_t buf_size_out = -1;
-    size_t nbytes_out = -1;
-    bool dp = false;
-
-    void* tmp_buf = NULL;
-    void* zfp_buf = NULL;
-    void* out_buf = NULL;
-
-    /* get config values
-      - from H5Z_set_local_zfp(..) on compression
-      - from chunk-header on reverse */
-    if (cd_nelmts < 4) {
-        PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "Not enough parameters.");
-        return 0;
-    }
-    zfp_major_ver = cd_values[0];  /* not used - we could add it to the header ? */
-    zfp_minor_ver = cd_values[1];  /* not used - we could add it to the header ? */
-    dsize         = cd_values[2];  /* bytes per element */
-    ndims         = cd_values[3];  /* number of dimensions */
-    hsize_t dims[ndims];
-    for (size_t ii = 0; ii < ndims; ii++)
-      dims[ii] = cd_values[ii +4]; /* size of dimensions */
-
-    /* get size of out_buf
-    -----------------------*/
-
-    /* size of floating-point type in bytes */
-    if(dsize == 8) { dp = true; }
-    else if(dsize == 4) {dp = false; }
-    else {
-      PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "unknown precision type");
-      return 0;
-    }
-    size_t typesize = dp ? sizeof(double) : sizeof(float);
-
-    /* effective array dimensions */
-    uint nx = 0;
-    uint ny = 0;
-    uint nz = 0;
-    if(ndims > 0) nx = dims[0];
-    if(ndims > 1) ny = dims[1];
-    if(ndims > 2) nz = dims[2];
-
-    /* initialize zfp parameters */
-    zfp_params params;
-    zfp_init(&params);
-    zfp_set_type(&params, dp ? ZFP_TYPE_DOUBLE : ZFP_TYPE_FLOAT);
-    if(ndims > 0) zfp_set_size_1d(&params, nx);
-    if(ndims > 1) zfp_set_size_2d(&params, nx, ny);
-    if(ndims > 2) zfp_set_size_3d(&params, nx, ny, nz);
-
-    /* decompress data */
-    if (flags & H5Z_FLAG_REVERSE) {
-
-        /* read 16byte header = (minbits, maxbits, maxprec, minexp) */
-        tmp_buf = *buf;
-        params.minbits = zfp_read_uint32((char*) tmp_buf + 0);
-        params.maxbits = zfp_read_uint32((char*) tmp_buf + 4);
-        params.maxprec = zfp_read_uint32((char*) tmp_buf + 8);
-        params.minexp  = zfp_read_int32 ((char*) tmp_buf +12);
-
-        /* allocate for uncompressed */
-        size_t buf_size_in = std::max(params.nx, 1u)
-                           * std::max(params.ny, 1u)
-                           * std::max(params.nz, 1u)
-                           * ((params.type == ZFP_TYPE_DOUBLE) ? sizeof(double) : sizeof(float));
-        out_buf = malloc(buf_size_in);
-        if (out_buf == NULL) {
-          PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "Could not allocate output buffer.");
-          return 0;
-        }
-
-#ifndef NDEBUG
-        fprintf(stdout, "   H5Z_filter_zfp: decompress: [%d, (%d, %d, %d), %d, %d, %d, %d] = %d \n",
-                dp, nx, ny, nz,
-                params.minbits, params.maxbits, params.maxprec, params.minexp,
-                (int)buf_size_in);
-#endif
-
-        /* buf[16+] -> out_buf */
-        zfp_buf = (char*) tmp_buf +16;
-
-#if 0
-        /* decompress 1D, 2D, or 3D floating-point array */
-        // int                         /* nonzero on success */
-        // zfp_decompress(
-        //   const zfp_params* params, /* array meta data and compression parameters */
-        //   void* out,                /* decompressed floating-point data */
-        //   const void* in,           /* compressed stream */
-        //   size_t insize             /* bytes allocated for compressed stream */
-        // );
-#endif
-        if (zfp_decompress(&params, out_buf, zfp_buf, buf_size_in) == 0) {
-           PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "decompression failed");
-           free(out_buf);
-           return 0;
-        }
-        nbytes_out = buf_size_in;
-
-      /* compress data */
-      } else {
-
-        /* compression parameter (0 == no compression) */
-        uint minbits = cd_values[4+ndims +0]; /* minimum number of bits per 4^d values in d dimensions (= maxbits for fixed rate) */
-        uint maxbits = cd_values[4+ndims +1]; /* maximum number of bits per 4^d values in d dimensions */
-        uint maxprec = cd_values[4+ndims +2]; /* maximum number of bits of precision per value (0 for fixed rate) */
-        int  minexp  = cd_values[4+ndims +3]; /* minimum bit plane coded (soft error tolerance = 2^minexp; -1024 for fixed rate) */
-
-        /* correct compression parameters if zero initialized */
-        uint blocksize = 1u << (2 * ndims); // number of floating-point values per block
-        if(minbits <= 0 || minbits > 4096) minbits = blocksize * CHAR_BIT * typesize;    /* {1, ..., 4096}     == 12 bits */
-        if(maxbits <= 0 || maxbits > 4096) maxbits = blocksize * CHAR_BIT * typesize;    /* {1, ..., 4096}     == 12 bits */
-        if(maxprec <= 0 || maxprec > 64)   maxprec = CHAR_BIT * typesize;                /* {1, ..., 64}       ==  6 bits */
-        if(minexp  < -1074) minexp = -1074;                                              /* {-1074, ..., 1023} ==  12 bits */
-        if(minexp  >  1023) minexp =  1023;
-
-        /* set compression parameters */
-        params.minbits = minbits;
-        params.maxbits = maxbits;
-        params.maxprec = maxprec;
-        params.minexp  = minexp;
-
-        /* max.(!) size of compressed data */
-        size_t buf_size_maxout = zfp_estimate_compressed_size(&params);
-        if (buf_size_maxout == 0) {
-          std::cerr << "invalid compression parameters" << std::endl;
-          return 0;
-        }
-
-        /* allocate for header + compressed data */
-        tmp_buf = malloc(buf_size_maxout +16);
-        if (tmp_buf == NULL) {
-          PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "Could not allocate output buffer.");
-          return 0;
-        }
-
-        /* ptr to data (skipping header) */
-        zfp_buf = (char*) tmp_buf +16;
-
-#if 0
-        /* compress 1D, 2D, or 3D floating-point array */
-        // size_t                      /* byte size of compressed stream (0 on failure) */
-        // zfp_compress(
-        //  const zfp_params* params, /* array meta data and compression parameters */
-        //  const void* in,           /* uncompressed floating-point data */
-        //  void* out,                /* compressed stream (must be large enough) */
-        //  size_t outsize            /* bytes allocated for compressed stream */
-        // );
-#endif
-        buf_size_out = zfp_compress(&params, *buf, zfp_buf, buf_size_maxout);
-        if (buf_size_out == 0) {
-          PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "compression failed");
-          free(out_buf);
-          return 0;
-        }
-
-#ifndef NDEBUG
-        fprintf(stdout, "   H5Z_filter_zfp: compress(out): [%d, (%d, %d, %d), %d, %d, %d, %d] = %d \n",
-                dp, nx, ny, nz,
-                params.minbits, params.maxbits, params.maxprec, params.minexp,
-                (int)buf_size_out);
-#endif
-
-        /* add 32byte header = (minbits, maxbits, maxprec, minexp) */
-        zfp_write_uint32((char*) tmp_buf + 0, (uint32_t) minbits);
-        zfp_write_uint32((char*) tmp_buf + 4, (uint32_t) maxbits);
-        zfp_write_uint32((char*) tmp_buf + 8, (uint32_t) maxprec);
-        zfp_write_int32 ((char*) tmp_buf +12, ( int32_t) minexp);
-
-        nbytes_out = buf_size_out +16;
-
-        /* realloc (free partly) if required */
-        if(buf_size_out < buf_size_maxout) {
-          out_buf = realloc(tmp_buf, nbytes_out); /* free out_buf partly (which was not used by ZFP::compress(..)) */
-          if (out_buf == NULL) {
-            PUSH_ERR("H5Z_filter_zfp", H5E_CALLBACK, "Could not reallocate output buffer.");
-            return 0;
-          }
-        } else {
-            out_buf = tmp_buf;
-        }
-    }
-
-    /* flip buffer and return
-    -------------------------*/
-    free(*buf);
-    *buf = out_buf;
-    *buf_size = nbytes_out;
-
-    return nbytes_out;
-}
-
-static int
-H5Z_register_zfp(void)
-{
-    H5Zregister(ZFP_H5Filter);
-}
-
-/*!@}*/
-
-#endif /* HAVE_ZFP */
-
-
 
 /* the name you want to assign to the interface */
 static char const *iface_name = "hdf5";
@@ -847,38 +258,24 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
             H5Pset_shuffle(retval);
         H5Pset_deflate(retval, gzip_level!=-1?gzip_level:9);
     }
-#ifdef HAVE_ZFP
-    else if (!strncasecmp(alg_str, "lindstrom-zfp", 13))
+    else if (!strncasecmp(alg_str, "zfp", 3))
     {
-        int i;
-        zfp_params params;
-        unsigned int cd_values[32];
+        unsigned int cd_values[10];
+        int cd_nelmts = 10;
 
-        /* We don't shuffle zfp. That is handled internally to zfp */
-
-        zfp_init(&params);
-        params.type = H5Tget_size(dtype_id) == 4 ? ZFP_TYPE_FLOAT : ZFP_TYPE_DOUBLE;
-        if (ndims >= 1) params.nx = dims[0];
-        if (ndims >= 2) params.ny = dims[1];
-        if (ndims >= 3) params.nz = dims[2];
+        /* Setup ZFP filter and add to HDF5 pipeline using generic interface. */
         if (zfp_rate != -1)
-            zfp_set_rate(&params, (double) zfp_rate);
+            H5Pset_zfp_rate_cdata(zfp_rate, cd_nelmts, cd_values);
         else if (zfp_precision != -1)
-            zfp_set_precision(&params, zfp_precision);
+            H5Pset_zfp_precision_cdata(zfp_precision, cd_nelmts, cd_values);
         else if (zfp_accuracy != -1)
-            zfp_set_accuracy(&params, (double) zfp_accuracy);
+            H5Pset_zfp_accuracy_cdata(zfp_accuracy, cd_nelmts, cd_values);
         else
-            zfp_set_rate(&params, 0.0); /* default rate-constrained */
+            H5Pset_zfp_rate_cdata(0.0, cd_nelmts, cd_values); /* to get ZFP library defaults */
 
-        i = 0;
-        cd_values[i++] = (unsigned int) params.minbits;
-        cd_values[i++] = (unsigned int) params.maxbits;
-        cd_values[i++] = (unsigned int) params.maxprec;
-        cd_values[i++] = (unsigned int) params.minexp;
-        cd_values[i++] = (unsigned int) minsize;
-        H5Pset_filter(retval, ZFP_H5FILTER_ID, H5Z_FLAG_OPTIONAL, i, cd_values);
+        /* Add filter to the pipeline via generic interface */
+        H5Pset_filter(retval, 32013, H5Z_FLAG_MANDATORY, cd_nelmts, cd_values);
     }
-#endif
     else if (!strncasecmp(alg_str, "szip", 4))
     {
 #ifdef HAVE_SZIP
@@ -946,19 +343,25 @@ static int process_args(int argi, int argc, char *argv[])
             "'param1=val1,param2=val2,param3=val3. The various algorithm names and\n"
             "their parameter meanings are described below. Note that some parameters are\n"
             "not specific to any algorithm. Those are described first followed by\n"
-            "individual algorithm-specific parameters.\n"
+            "individual algorithm-specific parameters for those algorithms available\n"
+            "in the current build.\n"
             "\n"
             "minsize=%d : min. size of dataset (in terms of a count of values)\n"
             "    upon which compression will even be attempted. Default is 1024.\n"
             "shuffle=<int>: Boolean (zero or non-zero) to indicate whether to use\n"
             "    HDF5's byte shuffling filter *prior* to compression. Default depends\n"
-            "    on algorithm. By default, shuffling is NOT used for lindstrom-zfp but IS\n"
+            "    on algorithm. By default, shuffling is NOT used for zfp but IS\n"
             "    used with all other algorithms.\n"
             "\n"
-#ifdef HAVE_ZFP
-            "\"lindstrom-zfp\"\n"
+            "Available compression algorithms...\n"
+            "\n"
+            "\"zfp\"\n"
             "    Use Peter Lindstrom's ZFP compression (computation.llnl.gov/casc/zfp)\n"
-            "    The following options are *mutually*exclusive*. In any command-line\n"
+            "    Note: Whether this compression is available is determined entirely at\n"
+            "    run-time using the H5Z-ZFP compresser as a generic filter. This means\n"
+            "    all that is necessary is to specify the HDF5_PLUGIN_PATH environnment\n" 
+            "    variable with a path to the shared lib for the filter.\n"
+            "    The following ZFP options are *mutually*exclusive*. In any command-line\n"
             "    specifying more than one of the following options, only the last\n"
             "    specified will be honored.\n"
             "        rate=%f : target # bits per compressed output datum. Fractional values\n"
@@ -972,7 +375,7 @@ static int process_args(int argi, int argc, char *argv[])
             "            tolerance while 'accuracy' represents an absolute tolerance.\n"
             "            See http://en.wikipedia.org/wiki/Accuracy_and_precision.\n"
             "\n"
-#endif
+#ifdef HAVE_SZIP
             "\"szip\"\n"
             "    method=%s : specify 'ec' for entropy coding or 'nn' for nearest\n"
             "        neighbor. Default is 'nn'\n"
@@ -982,6 +385,7 @@ static int process_args(int argi, int argc, char *argv[])
             "    chunk=%d:%d : colon-separated dimensions specifying chunk size in\n"
             "        each dimension higher than the first (fastest varying) dimension.\n"
             "\n"
+#endif
             "\"gzip\"\n"
             "    level=%d : A value in the range [1,9], inclusive, trading off time to\n"
             "        compress with amount of compression. Level=1 results in best speed\n"
@@ -989,7 +393,7 @@ static int process_args(int argi, int argc, char *argv[])
             "        but worst speed. Values outside [1,9] are clamped. Default is 9.\n"
             "\n"
             "Examples:\n"
-            "    --compression lindstrom-zfp rate=18.5\n"
+            "    --compression zfp rate=18.5\n"
             "    --compression gzip minsize=1024,level=9\n"
             "    --compression szip shuffle=0,options=nn,pixels_per_block=16\n"
             "\n",
@@ -1420,9 +824,6 @@ static int register_this_interface()
 
     /* Register custom compression methods with HDF5 library */
     H5dont_atexit();
-#ifdef HAVE_ZFP
-    H5Z_register_zfp();
-#endif
 
     /* Register this plugin */
     if (!MACSIO_IFACE_Register(&iface))

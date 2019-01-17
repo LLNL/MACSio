@@ -207,52 +207,70 @@ int MACSIO_MAIN_Rank = 0;
 
 static void handle_help_request_and_exit(int argi, int argc, char **argv)
 {
-    int i, n, *ids=0;;
+    int rank = 0, i, n, *ids=0;;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
 
-    MACSIO_IFACE_GetIds(&n, &ids);
-    for (i = 0; i < n; i++)
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+#endif
+
+    if (!rank)
     {
-        const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
-        if (iface->processArgsFunc)
+        MACSIO_IFACE_GetIds(&n, &ids);
+        for (i = 0; i < n; i++)
         {
-            fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
-            (*(iface->processArgsFunc))(argi, argc, argv);
+            const MACSIO_IFACE_Handle_t *iface = MACSIO_IFACE_GetById(ids[i]);
+            if (iface->processArgsFunc)
+            {
+                fprintf(outFILE, "\nOptions specific to the \"%s\" I/O plugin\n", iface->name);
+                (*(iface->processArgsFunc))(argi, argc, argv);
+            }
         }
     }
+
 #ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
     }
 #endif
+
     exit(0);
 }
 
 static void handle_list_request_and_exit()
 {
-    int i, n, *ids = 0;
+    int rank = 0, i, n, *ids = 0;
     FILE *outFILE = (isatty(2) ? stderr : stdout);
     char names_buf[1024];
 
-    names_buf[0] = '\0';
-    MACSIO_IFACE_GetIds(&n, &ids);
-    for (i = 0; i < n; i++)
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MACSIO_MAIN_Comm, &rank);
+#endif
+
+    if (!rank)
     {
-        char const *nm = MACSIO_IFACE_GetName(ids[i]);
-        strcat(names_buf, "\"");
-        strcat(names_buf, nm);
-        strcat(names_buf, "\", ");
-        if (!((i+1) % 10)) strcat(names_buf, "\n");
+        names_buf[0] = '\0';
+        MACSIO_IFACE_GetIds(&n, &ids);
+        for (i = 0; i < n; i++)
+        {
+            char const *nm = MACSIO_IFACE_GetName(ids[i]);
+            strcat(names_buf, "\"");
+            strcat(names_buf, nm);
+            strcat(names_buf, "\", ");
+            if (!((i+1) % 10)) strcat(names_buf, "\n");
+        }
+        fprintf(outFILE, "List of available I/O-library plugins...\n");
+        fprintf(outFILE, "%s\n", names_buf);
     }
-    fprintf(outFILE, "List of available I/O-library plugins...\n");
-    fprintf(outFILE, "%s\n", names_buf);
+
 #ifdef HAVE_MPI
     {   int result;
         if ((MPI_Initialized(&result) == MPI_SUCCESS) && result)
             MPI_Finalize();
     }
 #endif
+
     exit(0);
 }
 
@@ -443,9 +461,9 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "Specify variable names to read. \"all\" means all variables. If listing more\n"
             "than one, be sure to either enclose space separated list in quotes or\n"
             "use a comma-separated list with no spaces",
-        "--time_randomize_seeds", "",
+        "--time_randomize", "",
             "Make randomness in MACSio vary from dump to dump and run to run by\n"
-            "time-modulating all random number seeding.",
+            "using PRNGs seeded by time.",
 #if 0
         MACSIO_CLARGS_LAST_ARG_SEPERATOR(plugin_args)
 #endif
@@ -475,7 +493,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     return mainJargs;
 }
 
-static int
+static void
 write_timings_file(char const *filename)
 {
     char **timer_strs = 0, **rtimer_strs = 0;
@@ -520,8 +538,6 @@ write_timings_file(char const *filename)
     }
 
     MACSIO_LOG_LogFinalize(timing_log);
-
-    return 0;
 }
 
 static int
@@ -541,6 +557,8 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
     double work_dt = json_object_path_get_double(main_obj, "clargs/compute_time");
 
     /* Sanity check args */
+
+    MACSIO_DATA_MakeRandomTable(100, 10000);
 
     /* Generate a static problem object to dump on each dump */
     json_object *problem_obj = MACSIO_DATA_GenerateTimeZeroDumpObject(main_obj,0);
@@ -763,6 +781,36 @@ main_read(int argi, int argc, char **argv, json_object *main_obj)
     return (0);
 }
 
+static void InitializePRNGs(void)
+{
+    double currtime = MT_Time();
+    unsigned ucurrtim = ((unsigned *)&currtime)[0] ^ ((unsigned *)&currtime)[1];
+
+    /* ensure all procs have same ucurrtim */
+#ifdef HAVE_MPI
+    MPI_Bcast(&ucurrtim, 1, MPI_UNSIGNED, 0, MACSIO_MAIN_Comm);
+#endif
+
+    /* Initialize the PRNGs */
+    MACSIO_DATA_InitializePRNGs((unsigned) MACSIO_MAIN_Rank, ucurrtim);
+}
+
+static void FinalizePRNGs()
+{
+#ifdef HAVE_MPI
+    /* Lets confirm the rank-invariant PRNGs agree and issue a message if not */
+    unsigned rand_check[2] = {MD_random_rankinv(), MD_random_rankinv_tv()};
+    unsigned rand_check_r[2];
+    MPI_Reduce(rand_check, rand_check_r, 2, MPI_UNSIGNED, MPI_BXOR, 0, MACSIO_MAIN_Comm);
+    if (MACSIO_MAIN_Rank == 0 && (rand_check_r[0] != 0 || rand_check_r[1] != 0))
+    {
+        MACSIO_LOG_MSG(Warn, ("rank-invariant PRNGs failed sanity check"));
+    }
+#endif
+
+    MACSIO_DATA_FinalizePRNGs();
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -772,6 +820,8 @@ main(int argc, char *argv[])
     MACSIO_TIMING_GroupMask_t main_grp;
     MACSIO_TIMING_TimerId_t main_tid;
     int i, argi, exercise_scr = 0;
+    double currtime;
+    unsigned ucurrtim;
 
     /* quick pre-scan for scr cl flag */
     for (i = 0; i < argc && !exercise_scr; i++)
@@ -793,10 +843,11 @@ main(int argc, char *argv[])
 #endif
     errno = 0;
 
+    /* Start Timing Package */
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
+    InitializePRNGs();
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
@@ -805,6 +856,7 @@ main(int argc, char *argv[])
     strncpy(MACSIO_UTILS_UnitsPrefixSystem, JsonGetStr(clargs_obj, "units_prefix_system"),
         sizeof(MACSIO_UTILS_UnitsPrefixSystem));
 
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
         JsonGetStr(clargs_obj, "log_file_name"),
         JsonGetInt(clargs_obj, "log_line_length"),
@@ -837,6 +889,8 @@ main(int argc, char *argv[])
         write_timings_file(JsonGetStr(clargs_obj, "timings_file_name"));
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
+
+    FinalizePRNGs();
 
 ////#warning ATEXIT THESE
     if (json_object_put(main_obj) != 1)

@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/macsio/badge/?version=latest)](https://macsio.readthedocs.io/en/latest/?badge=latest)
+
 # MACSio
 A Multi-purpose, Application-Centric, Scalable I/O Proxy Application
 
@@ -31,7 +33,7 @@ The name "MACSio" is pronounced max-eee-oh.
 The easiest way to get MACSio is to install using the Spack package manager (see [https://spack.readthedocs.io](https://spack.readthedocs.io/en/latest/)).
 Installing with Spack is as simple as `spack install macsio`.
 
-Alternatively, see the [INSTALLING](/INSTALLING) file for manual installation instructions.
+Alternatively, see the [INSTALLING](/INSTALLING.md) file for manual installation instructions.
 
 
 ## Release
