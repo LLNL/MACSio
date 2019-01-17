@@ -60,6 +60,13 @@ extern "C" {
 #include <mpi.h>
 #endif
 
+#ifdef HAVE_CALIPER
+#include <caliper/cali.h>
+#ifdef HAVE_MPI
+#include <caliper/cali-mpi.h>
+#endif
+#endif
+
 /*!
  * \mainpage
  *
@@ -826,6 +833,14 @@ main(int argc, char *argv[])
     /* quick pre-scan for scr cl flag */
     for (i = 0; i < argc && !exercise_scr; i++)
         exercise_scr = !strcmp("exercise_scr", argv[i]);
+
+#ifdef HAVE_CALIPER
+#ifdef HAVE_MPI
+    /* Ensures Caliper's MPI runtime lib is loaded */
+    cali_mpi_init();
+#endif
+    cali_config_preset("CALI_LOG_VERBOSITY", "0");
+#endif
 
 ////#warning SHOULD WE BE USING MPI-3 API
 #ifdef HAVE_MPI
