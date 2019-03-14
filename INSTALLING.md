@@ -16,6 +16,7 @@
     - Build TyphonIO Plugin:  -DENABLE_TYPHONIO_PLUGIN=ON -DWITH_TYPHONIO_PREFIX=[path to typhonio]
     - Build PDB Plugin:       -DENABLE_PBD_PLUGIN=ON
     - Build Exodus Plugin:    -DENABLE_EXODUS_PLUGIN=ON -DWITH_EXODUS_PREFIX=[path to exodus]
+    - Caliper support:        -DENABLE_CALIPER=ON -Dcaliper_DIR=[caliper-install-dir]/share/cmake/caliper
 4. MACSio has default values for all command-line arguments. So if you
 just run the command './macsio', it will do something but probably
 not what you want. Here are some example command-lines. . .
@@ -62,3 +63,11 @@ not what you want. Here are some example command-lines. . .
     env HDF5_PLUGIN_PATH=<path-to-plugin-dir> mpirun -np 4 ./macsio/macsio --interface hdf5 --parallel_file_mode MIF 2 --avg_num_parts 2.5 --part_size 40000 --part_dim 2 --part_type rectilinear --num_dumps 2 --filebase macsio_mif --fileext h5 --debug_level 1 --plugin_args --compression zfp rate=4
     ```
     where `path-to-plugin-dir` is the path to the directory containing `libh5zzfp.{a,so,dylib}`
+  - When enabled, Caliper can be used to collect performance profiles or traces. Configure
+    Caliper through its environment variables or config file. For example, to print a basic
+    runtime profile (serial or MPI):
+    ```shell
+    CALI_CONFIG_PROFILE=runtime-report macsio
+    CALI_CONFIG_PROFILE=mpi-runtime-report mpirun -np 128 macsio
+    ```
+    See https://github.com/LLNL/Caliper for more information.

@@ -31,6 +31,10 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mpi.h>
 #endif
 
+#ifdef HAVE_CALIPER
+#include <caliper/cali.h>
+#endif
+
 #include <cfloat>
 #include <climits>
 #include <math.h>
@@ -191,12 +195,20 @@ typedef struct _timerInfo_t
 
     char __file__[32];               /**< Source file name for StartTimer call */
     char label[64];                  /**< User defined label given to the timer */
-
 } timerInfo_t;
 
 static timerInfo_t timerHashTable[MACSIO_TIMING_HASH_TABLE_SIZE];
 #ifdef HAVE_MPI
 static timerInfo_t reducedTimerTable[MACSIO_TIMING_HASH_TABLE_SIZE];
+#endif
+
+#ifdef HAVE_CALIPER
+typedef struct _caliperAttributeInfo_t {
+    cali_id_t attr;                  /**< Caliper attribute id for the timer */
+    cali_id_t iter_attr;             /**< Caliper attribute id for the iteration */
+} caliperAttributeInfo_t;
+
+static caliperAttributeInfo_t caliperAttributeInfo[MACSIO_TIMING_HASH_TABLE_SIZE];
 #endif
 
 MACSIO_TIMING_TimerId_t MACSIO_TIMING_StartTimer(
@@ -214,6 +226,10 @@ MACSIO_TIMING_TimerId_t MACSIO_TIMING_StartTimer(
     MACSIO_TIMING_TimerId_t tid = MACSIO_UTILS_BJHash((unsigned char*)_label, len2, 0) % MACSIO_TIMING_HASH_TABLE_SIZE;
     int inc = (tid > MACSIO_TIMING_HASH_TABLE_SIZE / 2) ? -1 : 1;
 
+#ifdef HAVE_CALIPER
+    char* _cali_iter_label = NULL;
+#endif
+    
     free(_label);
 
     /* Find the timer's slot in the hash table */
@@ -241,6 +257,20 @@ MACSIO_TIMING_TimerId_t MACSIO_TIMING_StartTimer(
 
             timerHashTable[tid].depth = 0;
             timerHashTable[tid].start_time = get_current_time();
+
+#ifdef HAVE_CALIPER
+            _cali_iter_label = (char*) malloc(5 + 1 + strlen(label));
+            snprintf(_cali_iter_label, len, "iter#%s", label);
+
+            caliperAttributeInfo[tid].attr = cali_find_attribute("annotation");
+            caliperAttributeInfo[tid].iter_attr =
+                cali_create_attribute(_cali_iter_label, CALI_TYPE_INT, CALI_ATTR_ASVALUE | CALI_ATTR_SKIP_EVENTS);
+
+            free(_cali_iter_label);
+
+            cali_begin_int(caliperAttributeInfo[tid].iter_attr, timerHashTable[tid].iter_num);
+            cali_begin_string(caliperAttributeInfo[tid].attr, timerHashTable[tid].label);
+#endif
             return tid;
         }
 
@@ -257,6 +287,12 @@ MACSIO_TIMING_TimerId_t MACSIO_TIMING_StartTimer(
             else
                 timerHashTable[tid].iter_num = iter_num;
             timerHashTable[tid].start_time = get_current_time();
+
+#ifdef HAVE_CALIPER
+            cali_begin_int(caliperAttributeInfo[tid].iter_attr, timerHashTable[tid].iter_num);
+            cali_begin_string(caliperAttributeInfo[tid].attr, timerHashTable[tid].label);
+#endif
+            
             return tid;
         }
 
@@ -283,6 +319,11 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
 
     if (tid >= MACSIO_TIMING_HASH_TABLE_SIZE) return DBL_MAX;
 
+#ifdef HAVE_CALIPER
+    cali_end(caliperAttributeInfo[tid].attr);
+    cali_end(caliperAttributeInfo[tid].iter_attr);
+#endif
+    
     if (timerHashTable[tid].is_restart)
     {
         timerHashTable[tid].total_time_this_iter += timer_time;
