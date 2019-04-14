@@ -43,16 +43,14 @@ extern "C" {
 #define MACSIO_MIF_MIFMAX -1
 #define MACSIO_MIF_MIFAUTO -2
 
-/*!
-\addtogroup MACSIO_MIF
-@{
-*/
-
+/*! \struct _MACSIO_MIF_baton_t */
 typedef struct _MACSIO_MIF_baton_t
 {
     MACSIO_MIF_ioFlags_t ioFlags; /**< Various flags controlling behavior. */
 #ifdef HAVE_MPI
     MPI_Comm mpiComm;           /**< The MPI communicator being used */
+#else
+    int mpiComm;                /**< Dummy MPI communicator */
 #endif
     int commSize;               /**< The size of the MPI comm */
     int rankInComm;             /**< Rank of this processor in the MPI comm */
@@ -73,56 +71,27 @@ typedef struct _MACSIO_MIF_baton_t
     void *clientData;           /**< Client data to be passed around in calls */
 } MACSIO_MIF_baton_t;
 
-/*!
-\brief Initialize MACSIO_MIF for a MIF I/O operation
-
-Creates and returns a MACSIO_MIF \em baton object establishing the mapping
-between MPI ranks and file groups for a MIF I/O operation.
-
-All processors in the \c mpiComm communicator must call this function
-collectively with identical values for \c numFiles, \c ioFlags, and \c mpiTag.
-
-The resultant \em baton object is used in subsequent calls to WaitFor and
-HandOff the baton to the next processor in each group.
-
-The \c createCb, \c openCb, \c closeCb callback functions are used by MACSIO_MIF
-to execute baton waits and handoffs during which time a group's file will be
-closed by the HandOff function and opened by the WaitFor method except for the
-first processor in each group which will create the file.
-
-Processors in the \c mpiComm communicator are broken into \c numFiles groups.
-If there is a remainder, \em R, after dividing the communicator size into
-\c numFiles groups, then the first \em R groups will have one additional
-processor.
-
-\returns The MACSIO_MIF \em baton object
-*/
+//#warning ENSURE DIFFERENT INSTANCES USE DIFFERENT MPI TAGS
 //#warning ADD A THROTTLE OPTION HERE FOR TOT FILES VS CONCURRENT FILES
 //#warning FOR AUTO MODE, MUST HAVE A CALL TO QUERY FILE COUNT
-MACSIO_MIF_baton_t *MACSIO_MIF_Init(
-    int numFiles,                   /**< [in] Number of resultant files. Note: this is entirely independent of
-                                         number of processors. Typically, this number is chosen to match
-                                         the number of independent I/O pathways between the nodes the
-                                         application is executing on and the filesystem. Pass MACSIO_MIF_MAX for
-                                         file-per-processor. Pass MACSIO_MIF_AUTO (currently not supported) to
-                                         request that MACSIO_MIF determine and use an optimum file count. */
-    MACSIO_MIF_ioFlags_t ioFlags,   /**< [in] See MACSIO_MIF_ioFlags_t for meaning of flags. */
+MACSIO_MIF_baton_t *
+MACSIO_MIF_Init(
+    int numFiles,
+    MACSIO_MIF_ioFlags_t ioFlags,
 #ifdef HAVE_MPI
-    MPI_Comm mpiComm,               /**< [in] The MPI communicator containing all the MPI ranks that will
-                                         marshall data in the MIF I/O operation. */
+    MPI_Comm mpiComm,
 #else
-    int      mpiComm,               /**< [in] Dummy arg (ignored) for MPI communicator */
+    int      mpiComm,
 #endif
-    int mpiTag,                     /**< [in] MPI message tag MACSIO_MIF will use in all MPI messages for
-                                         this MIF I/O operation. */
-    MACSIO_MIF_CreateCB createCb,   /**< [in] Callback MACSIO_MIF should use to create a group's file */
-    MACSIO_MIF_OpenCB openCb,       /**< [in] Callback MACSIO_MIF should use to open a group's file */
-    MACSIO_MIF_CloseCB closeCb,     /**< [in] Callback MACSIO_MIF should use to close a group's file */
-    void *clientData                /**< [in] Optional, client specific data MACSIO_MIF will pass to callbacks */
+    int mpiTag,
+    MACSIO_MIF_CreateCB createCb,
+    MACSIO_MIF_OpenCB openCb,
+    MACSIO_MIF_CloseCB closeCb,
+    void *clientData
 )
 {
     int numGroups = numFiles;
-    int commSize, rankInComm;
+    int commSize=1, rankInComm=0;
     int groupSize, numGroupsWithExtraProc, commSplit,
         groupRank, rankInGroup, procBeforeMe, procAfterMe;
     MACSIO_MIF_baton_t *ret = 0;
@@ -130,8 +99,10 @@ MACSIO_MIF_baton_t *MACSIO_MIF_Init(
     procBeforeMe = -1;
     procAfterMe = -1;
 
+#ifdef HAVE_MPI
     MPI_Comm_size(mpiComm, &commSize);
     MPI_Comm_rank(mpiComm, &rankInComm);
+#endif
 
     groupSize              = commSize / numGroups;
     numGroupsWithExtraProc = commSize % numGroups;
@@ -185,54 +156,50 @@ MACSIO_MIF_baton_t *MACSIO_MIF_Init(
     return ret;
 }
 
-/*!
-\brief End a MACSIO_MIF I/O operation and free resources
-*/
-void MACSIO_MIF_Finish(
-    MACSIO_MIF_baton_t *bat /**< [in] The MACSIO_MIF baton handle */
+void
+MACSIO_MIF_Finish(
+    MACSIO_MIF_baton_t *bat
 )
 {
     free(bat);
 }
 
-/*!
-\brief Wait for exclusive access to the group's file
-
-All processors call this function collectively. For the first processor in each
-group, this call returns immediately. For all others in the group, it blocks,
-waiting for the processor \em before it to finish its work on the group's file
-and call the HandOff function.
-
-\returns A void pointer to whatever data instance the \c createCb or \c openCb
-methods return. The caller must cast this returned pointer to the correct type.
-
-*/
-void * MACSIO_MIF_WaitForBaton(
-    MACSIO_MIF_baton_t *Bat, /**< [in] The MACSIO_MIF baton handle */
-    char const *fname,       /**< [in] The filename */
-    char const *nsname       /**< [in] The namespace within the file to be used for objects in this code block.  */
+void *
+MACSIO_MIF_WaitForBaton(
+    MACSIO_MIF_baton_t *Bat,
+    char const *fname,
+    char const *nsname
 )
 {
     if (Bat->procBeforeMe != -1)
     {
+        int mpi_err;
+#ifdef HAVE_MPI
         MPI_Status mpi_stat;
         int baton;
-        int mpi_err = MPI_Recv(&baton, 1, MPI_INT, Bat->procBeforeMe,
-            Bat->mpiTag, Bat->mpiComm, &mpi_stat);
+        mpi_err = MPI_Recv(&baton, 1, MPI_INT, Bat->procBeforeMe,
+                           Bat->mpiTag, Bat->mpiComm, &mpi_stat);
         if (mpi_err == MPI_SUCCESS && baton != MACSIO_MIF_BATON_ERR)
+#else
+        if (1)
+#endif
         {
-#ifdef HAVE_SCR
-            char scr_filename[SCR_MAX_FILENAME];
             if (Bat->ioFlags.use_scr)
             {
+#ifdef HAVE_SCR
+                char scr_filename[SCR_MAX_FILENAME];
                 if (SCR_Route_file(fname, scr_filename) == SCR_SUCCESS)
                     return Bat->openCb(scr_filename, nsname, Bat->ioFlags, Bat->clientData);
                 else
                     return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+#else
+                return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+#endif
             }
             else
-#endif
+            {
                 return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+            }
         }
         else
         {
@@ -245,72 +212,75 @@ void * MACSIO_MIF_WaitForBaton(
     {
         if (Bat->ioFlags.do_wr)
         {
-#ifdef HAVE_SCR
-            char scr_filename[SCR_MAX_FILENAME];
             if (Bat->ioFlags.use_scr)
             {
-                SCR_Route_file(fname, scr_filename);
-                return Bat->createCb(scr_filename, nsname, Bat->clientData);
+#ifdef HAVE_SCR
+                char scr_filename[SCR_MAX_FILENAME];
+                if (SCR_Route_file(fname, scr_filename) == SCR_SUCCESS)
+                    return Bat->createCb(scr_filename, nsname, Bat->clientData);
+                else
+                    return Bat->createCb(fname, nsname, Bat->clientData);
+#else
+                return Bat->createCb(fname, nsname, Bat->clientData);
+#endif
             }
             else
-#endif
+            {
                 return Bat->createCb(fname, nsname, Bat->clientData);
+            }
         }
         else
         {
-#ifdef HAVE_SCR
-            char scr_filename[SCR_MAX_FILENAME];
             if (Bat->ioFlags.use_scr)
             {
+#ifdef HAVE_SCR
+                char scr_filename[SCR_MAX_FILENAME];
                 if (SCR_Route_file(fname, scr_filename) == SCR_SUCCESS)
                     return Bat->openCb(scr_filename, nsname, Bat->ioFlags, Bat->clientData);
                 else
                     return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+#else
+                return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+#endif
             }
             else
-#endif
+            {
                 return Bat->openCb(fname, nsname, Bat->ioFlags, Bat->clientData);
+            }
         }
     }
 }
 
-/*!
-\brief Release exclusive access to the group's file
-
-This function closes the group's file for this processor and hands off control
-to the next processor in the group.
-
-*/
-void MACSIO_MIF_HandOffBaton(
-    MACSIO_MIF_baton_t const *Bat, /**< [in] The MACSIO_MIF baton handle */ 
-    void *file                     /**< [in] A void pointer to the group's file handle */
+int
+MACSIO_MIF_HandOffBaton(
+    MACSIO_MIF_baton_t const *Bat,
+    void *file
 )
 {
-    Bat->closeCb(file, Bat->clientData);
+    int retval = Bat->closeCb(file, Bat->clientData);
     if (Bat->procAfterMe != -1)
     {
+        int mpi_err;
+#ifdef HAVE_MPI
         int baton = Bat->mifErr;
-        int mpi_err = MPI_Ssend(&baton, 1, MPI_INT, Bat->procAfterMe,
-            Bat->mpiTag, Bat->mpiComm);
+        mpi_err = MPI_Ssend(&baton, 1, MPI_INT, Bat->procAfterMe,
+                            Bat->mpiTag, Bat->mpiComm);
         if (mpi_err != MPI_SUCCESS)
+#else
+        if (0)
+#endif
         {
             Bat->mifErr = MACSIO_MIF_BATON_ERR;
             Bat->mpiErr = mpi_err;
         }
     }
+    return retval;
 }
 
-/*!
-\brief Rank of the group in which a given (global) rank exists.
-
-Given the rank of a processor in \c mpiComm used in the MACSIO_MIF_Init()
-call, this function returns the rank of the \em group in which the given
-processor exists. This function can be called from any rank and will
-return correct values for any rank it is passed.
-*/
-int MACSIO_MIF_RankOfGroup(
-    MACSIO_MIF_baton_t const *Bat, /**< [in] The MACSIO_MIF baton handle */
-    int rankInComm                 /**< [in] The (global) rank of a proccesor for which rank in group is desired */
+int
+MACSIO_MIF_RankOfGroup(
+    MACSIO_MIF_baton_t const *Bat,
+    int rankInComm
 )
 {
     int retval;
@@ -328,17 +298,10 @@ int MACSIO_MIF_RankOfGroup(
     return retval;
 }
 
-/*!
-\brief Rank within a group of a given (global) rank
-
-Given the rank of a processor in \c mpiComm used in the MACSIO_MIF_Init()
-call, this function returns its rank within its group. This function can
-be called from any rank and will return correct values for any rank it is
-passed.
-*/
-int MACSIO_MIF_RankInGroup(
-    MACSIO_MIF_baton_t const *Bat, /**< [in] The MACSIO_MIF baton handle */
-    int rankInComm                 /**< [in] The (global) rank of a processor for which the rank within it's group is desired */
+int
+MACSIO_MIF_RankInGroup(
+    MACSIO_MIF_baton_t const *Bat,
+    int rankInComm
 )
 {
     int retval;
@@ -354,5 +317,3 @@ int MACSIO_MIF_RankInGroup(
 
     return retval;
 }
-
-/*!@}*/

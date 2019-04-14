@@ -70,7 +70,9 @@ extern void   MACSIO_MSF_Finish(MACSIO_MSF_baton_t *bat);
 extern int    MACSIO_MSF_RankOfGroup(const MACSIO_MSF_baton_t *Bat, int rankInComm);
 extern int    MACSIO_MSF_RankInGroup(const MACSIO_MSF_baton_t *Bat, int rankInComm);
 extern int    MACSIO_MSF_SizeOfGroup(const MACSIO_MSF_baton_t *Bat);
+#ifdef HAVE_MPI
 extern MPI_Comm MACSIO_MSF_CommOfGroup(MACSIO_MSF_baton_t const *Bat);
+#endif
 extern int MACSIO_MSF_RootOfGroup(MACSIO_MSF_baton_t const *Bat);
 
 #ifdef __cplusplus

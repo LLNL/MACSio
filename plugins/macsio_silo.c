@@ -343,11 +343,12 @@ static void *OpenSiloFile(const char *fname, const char *nsname, MACSIO_MIF_ioFl
     return (void *) siloFile;
 }
 
-static void CloseSiloFile(void *file, void *userData)
+static int CloseSiloFile(void *file, void *userData)
 {
     DBfile *siloFile = (DBfile *) file;
     if (siloFile)
-        DBClose(siloFile);
+        return DBClose(siloFile);
+    return -1;
 }
 
 static void write_quad_mesh_part(DBfile *dbfile, json_object *part, int silo_mesh_type)
@@ -710,7 +711,9 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
 //#warning CONFIRM THIS IS STILL NEEDED
+#ifdef HAVE_MPI
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
+#endif
 
     /* process cl args */
     process_args(argi, argc, argv);

@@ -37,7 +37,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <sys/time.h>
 #include <time.h>
 
-#define MACSIO_DATA_MAX_PRNGS 10
+#define MACSIO_DATA_MAX_PRNGS 20
 
 /*!
 \brief Support functions for Perlin noise
@@ -120,14 +120,14 @@ static double noise(
     A = p[X  ]+Y; AA = p[A]+Z; AB = p[A+1]+Z;
     B = p[X+1]+Y; BA = p[B]+Z; BB = p[B+1]+Z;
 
-    return lerp(w, lerp(v, lerp(u, grad(p[AA  ], x  , y  , z   ),
-                                   grad(p[BA  ], x-1, y  , z   )),
-                           lerp(u, grad(p[AB  ], x  , y-1, z   ),
-                                   grad(p[BB  ], x-1, y-1, z   ))),
-                   lerp(v, lerp(u, grad(p[AA+1], x  , y  , z-1 ),
-                                   grad(p[BA+1], x-1, y  , z-1 )),
-                           lerp(u, grad(p[AB+1], x  , y-1, z-1 ),
-                                   grad(p[BB+1], x-1, y-1, z-1 ))));
+    return lerp(w, lerp(v, lerp(u, grad(p[AA  ], x  , y  , z  ),
+                                   grad(p[BA  ], x-1, y  , z  )),
+                           lerp(u, grad(p[AB  ], x  , y-1, z  ),
+                                   grad(p[BB  ], x-1, y-1, z  ))),
+                   lerp(v, lerp(u, grad(p[AA+1], x  , y  , z-1),
+                                   grad(p[BA+1], x-1, y  , z-1)),
+                           lerp(u, grad(p[AB+1], x  , y-1, z-1),
+                                   grad(p[BB+1], x-1, y-1, z-1))));
 }
 
 /* Pseudo Random Number Generator (PRNG) support */
@@ -187,7 +187,7 @@ void MACSIO_DATA_DestroyPRNG(int id)
     prng_state_vecs[id] = 0;
 }
 
-void MACSIO_DATA_InitializePRNGs(unsigned rank, unsigned utime)
+void MACSIO_DATA_InitializeDefaultPRNGs(unsigned rank, unsigned utime)
 {
     unsigned nseed = 0xDeadBeef;     /* naive seed */
     unsigned rseed = nseed ^ rank;   /* rank-variant seed */
@@ -203,7 +203,7 @@ void MACSIO_DATA_InitializePRNGs(unsigned rank, unsigned utime)
     MACSIO_DATA_CreatePRNG(tseed);  /* 5, rank_invariant_tv */
 }
 
-void MACSIO_DATA_FinalizePRNGs()
+void MACSIO_DATA_FinalizeDefaultPRNGs()
 {
     /* Note: check that all ranks still agree on next rank-invariant PRNG value */
     MACSIO_DATA_DestroyPRNG(0);

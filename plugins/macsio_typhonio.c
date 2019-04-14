@@ -169,12 +169,13 @@ static void *OpenTyphonIOFile(
 
 This implments the MACSIO_CloseFile callback needed for a MIF mode plugin.
 */
-static void CloseTyphonIOFile(
+static int CloseTyphonIOFile(
     void *file,         /**< [in] A void pointer to the plugin specific file handle */
     void *userData)     /**< [in] Optional plugin specific user-defined data */
 {
     TIO_Call( TIO_Close(*(TIO_File_t*)file),
               "File Close Failed\n");
+    return 0;
 }
 
 /*!

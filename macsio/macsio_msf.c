@@ -52,6 +52,8 @@ typedef struct _MACSIO_MSF_baton_t
     MACSIO_MSF_ioFlags_t ioFlags; /**< Various flags controlling behavior. */
 #ifdef HAVE_MPI
     MPI_Comm mpiComm;           /**< The MPI communicator being used */
+#else
+    int mpiComm;                /**< Dummy MPI communicator */
 #endif
     int commSize;               /**< The size of the MPI comm */
     int rankInComm;             /**< Rank of this processor in the MPI comm */
@@ -93,8 +95,10 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
     procBeforeMe = -1;
     procAfterMe = -1;
 
+#ifdef HAVE_MPI
     MPI_Comm_size(mpiComm, &commSize);
     MPI_Comm_rank(mpiComm, &rankInComm);
+#endif
 
     if (commSize < numGroups){
         MACSIO_LOG_MSG(Die, ("More files than ranks!"));
@@ -123,15 +127,16 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
         procBeforeMe = rankInComm - 1;
 
     /* Create group communicator */
+    int groupRootRank;
+    int *groupRanks = (int*)malloc(sizeof(int) * groupSize);
+#ifdef HAVE_MPI
     MPI_Comm groupComm;
     MPI_Comm_split(mpiComm, groupRank, rankInGroup, &groupComm);
  
     /* Gather the ranks of each process in this group */
-    int *groupRanks = (int*)malloc(sizeof(int) * groupSize);
     MPI_Allgather(&rankInComm, 1, MPI_INT, groupRanks, 1, MPI_INT, groupComm);
 
     /* Broadcast the rank from the group root to rest of group */
-    int groupRootRank;
     int amIRoot = rankInGroup == 0 ? rankInComm : -1;
     int *rankArray = (int*)malloc(sizeof(int) * groupSize);
     MPI_Allgather(&amIRoot, 1, MPI_INT, rankArray, 1, MPI_INT, groupComm);
@@ -141,6 +146,7 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
             break;
         }
     }
+#endif
 
     ret = (MACSIO_MSF_baton_t *) malloc(sizeof(MACSIO_MSF_baton_t));
     ret->ioFlags = ioFlags;
@@ -159,11 +165,11 @@ MACSIO_MSF_baton_t *MACSIO_MSF_Init(
     ret->MSFErr = MACSIO_MSF_BATON_OK;
 #ifdef HAVE_MPI
     ret->mpiErr = MPI_SUCCESS;
+    ret->mpiComm = groupComm;
 #else
     ret->mpiErr = 0;
 #endif
     ret->mpiTag = mpiTag;
-    ret->mpiComm = groupComm;
     ret->clientData = clientData;
 
     return ret;
@@ -173,7 +179,9 @@ void MACSIO_MSF_Finish(
     MACSIO_MSF_baton_t *bat
 )
 {
+#ifdef HAVE_MPI
     MPI_Comm_free(&(bat->mpiComm));
+#endif
     free(bat);
 }
 
@@ -223,12 +231,14 @@ int MACSIO_MSF_SizeOfGroup(
     return Bat->groupSize;
 }
 
+#ifdef HAVE_MPI
 MPI_Comm MACSIO_MSF_CommOfGroup(
     MACSIO_MSF_baton_t const *Bat
 )
 {
     return Bat->mpiComm;
 }
+#endif
 
 int MACSIO_MSF_RootOfGroup(
     MACSIO_MSF_baton_t const *Bat

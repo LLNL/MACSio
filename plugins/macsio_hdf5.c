@@ -51,22 +51,25 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <hdf5.h>
 #include <H5Tpublic.h>
 
-/* Convenience methods for H5Z-ZFP generic interface */
+/*! \brief H5Z-ZFP generic interface for setting rate mode */
 #define H5Pset_zfp_rate_cdata(R, N, CD)          \
 do { if (N>=4) {double *p = (double *) &CD[2];   \
 CD[0]=CD[1]=CD[2]=CD[3]=0;                       \
 CD[0]=1; *p=R; N=4;}} while(0)
 
+/*! \brief H5Z-ZFP generic interface for setting precision mode */
 #define H5Pset_zfp_precision_cdata(P, N, CD)  \
 do { if (N>=3) {CD[0]=CD[1]=CD[2];            \
 CD[0]=2;                 \
 CD[2]=P; N=3;}} while(0)
 
+/*! \brief H5Z-ZFP generic interface for setting accuracy mode */
 #define H5Pset_zfp_accuracy_cdata(A, N, CD)      \
 do { if (N>=4) {double *p = (double *) &CD[2];   \
 CD[0]=CD[1]=CD[2]=CD[3]=0;                       \
 CD[0]=3; *p=A; N=4;}} while(0)
 
+/*! \brief H5Z-ZFP generic interface for setting expert mode */
 #define H5Pset_zfp_expert_cdata(MiB, MaB, MaP, MiE, N, CD) \
 do { if (N>=6) { CD[0]=CD[1]=CD[2]=CD[3]=CD[4]=CD[5]=0;    \
 CD[0]=4;                                 \
@@ -79,23 +82,25 @@ CD[5]=(unsigned int)MiE; N=6;}} while(0)
 */
 
 /*!
-\addtogroup HDF5
+\defgroup MACSIO_PLUGIN_HDF5 MACSIO_PLUGIN_HDF5
 @{
 */
 
-/* the name you want to assign to the interface */
+/*! \brief name of this plugin */
 static char const *iface_name = "hdf5";
+
+/*! \brief file extension for files managed by this plugin */
 static char const *iface_ext = "h5";
 
-static int use_log = 0;
-static int no_collective = 0;
-static int no_single_chunk = 0;
-static int silo_block_size = 0;
-static int silo_block_count = 0;
-static int sbuf_size = -1;
-static int mbuf_size = -1;
-static int rbuf_size = -1;
-static int lbuf_size = 0;
+static int use_log = 0; /**< Use HDF5's logging fapl */
+static int no_collective = 0; /**< Use HDF5 independent (e.g. not collective) I/O */
+static int no_single_chunk = 0; /**< disable single chunking */
+static int silo_block_size = 0; /**< block size for silo block-based VFD */
+static int silo_block_count = 0; /**< block count for silo block-based VFD */
+static int sbuf_size = -1; /**< HDF5 library sieve buf size */
+static int mbuf_size = -1; /**< HDF5 library meta blocck size */
+static int rbuf_size = -1; /**< HDF5 library small data block size */
+static int lbuf_size = 0;  /**< HDF5 library log flags */
 static const char *filename;
 static hid_t fid;
 static hid_t dspc = -1;
@@ -103,6 +108,7 @@ static int show_errors = 0;
 static char compression_alg_str[64];
 static char compression_params_str[512];
 
+/*! \brief create HDF5 library file access property list */
 static hid_t make_fapl()
 {
     hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -163,8 +169,24 @@ static hid_t make_fapl()
     return fapl_id;
 }
 
+/*!
+\brief Utility to parse compression string command-line args
+
+Does a case-insensitive search of \c src_str for \c token_to_match
+not including the trailing format specifier. Upon finding a match, 
+performs a scanf at the location of the match into temporary 
+memory confirming the scan will actually succeed. Then, performs
+the scanf again, storying the result to the memory indicated in
+\c val_ptr.
+
+\returns 0 on error, 1 on success
+*/
 static int
-get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
+get_tokval(
+    char const *src_str, /**< CL arg string to be parsed */
+    char const *token_to_match, /**< a token in the string to be matched including a trailing scanf format specifier */
+    void *val_ptr /**< Pointer to memory where parsed value should be placed */
+)
 {
     int toklen;
     char dummy[16];
@@ -186,7 +208,23 @@ get_tokval(char const *src_str, char const *token_to_match, void *val_ptr)
     return 1;
 }
 
-static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_id, hid_t dtype_id)
+/*!
+\brief create HDF5 library dataset creation property list
+
+If the dataset size is below the \c minsize threshold, no special
+storage layout or compression action is taken.
+
+Chunking is initially set to \em single-chunk. However, for szip
+compressor, chunking can be set by command-line arguments.
+
+*/
+static hid_t
+make_dcpl(
+    char const *alg_str, /**< compression algorithm string */
+    char const *params_str, /**< compression params string */
+    hid_t space_id, /**< HDF5 dataspace id for the dataset */
+    hid_t dtype_id /**< HDF5 datatype id for the dataset */
+)
 {
     int shuffle = -1;
     int minsize = -1;
@@ -274,7 +312,8 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
             H5Pset_zfp_rate_cdata(0.0, cd_nelmts, cd_values); /* to get ZFP library defaults */
 
         /* Add filter to the pipeline via generic interface */
-        H5Pset_filter(retval, 32013, H5Z_FLAG_MANDATORY, cd_nelmts, cd_values);
+        if (H5Pset_filter(retval, 32013, H5Z_FLAG_MANDATORY, cd_nelmts, cd_values) < 0)
+            MACSIO_LOG_MSG(Warn, ("Unable to set up H5Z-ZFP compressor"));
     }
     else if (!strncasecmp(alg_str, "szip", 4))
     {
@@ -326,7 +365,14 @@ static hid_t make_dcpl(char const *alg_str, char const *params_str, hid_t space_
     return retval;
 }
 
-static int process_args(int argi, int argc, char *argv[])
+/*!
+\brief Process command-line arguments an set local variables */
+static int
+process_args(
+    int argi, /**< argument index to start processing \c argv */
+    int argc, /**< \c argc from main */
+    char *argv[] /**< \c argv from main */
+)
 {
     const MACSIO_CLARGS_ArgvFlags_t argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOMEM};
 
@@ -429,7 +475,13 @@ static int process_args(int argi, int argc, char *argv[])
     return 0;
 }
 
-static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
+/*! \brief Single shared file implementation of main dump */
+static void
+main_dump_sif(
+    json_object *main_obj, /**< main json data object to dump */
+    int dumpn, /**< dump number (like a cycle number) */
+    double dumpt /**< dump time */
+)
 {
 #ifdef HAVE_MPI
     int ndims;
@@ -594,14 +646,25 @@ static void main_dump_sif(json_object *main_obj, int dumpn, double dumpt)
 #endif
 }
 
+/*! \brief User data for MIF callbacks */
 typedef struct _user_data {
-    hid_t groupId;
+    hid_t groupId; /**< HDF5 hid_t of current group */
 } user_data_t;
 
-static void *CreateHDF5File(const char *fname, const char *nsname, void *userData)
+/*! \brief MIF create file callback for HDF5 MIF mode */
+static void *
+CreateHDF5File(
+    const char *fname, /**< file name */
+    const char *nsname, /**< curent task namespace name */
+    void *userData /**< user data specific to current task */
+)
 {
     hid_t *retval = 0;
-    hid_t h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t h5File;
+    hid_t fapl = H5Pcreate(H5P_FILE_ACCESS);
+    H5Pset_fclose_degree(fapl, H5F_CLOSE_SEMI);
+    h5File = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
+    H5Pclose(fapl);
     if (h5File >= 0)
     {
 //#warning USE NEWER GROUP CREATION SETTINGS OF HDF5
@@ -616,11 +679,21 @@ static void *CreateHDF5File(const char *fname, const char *nsname, void *userDat
     return (void *) retval;
 }
 
-static void *OpenHDF5File(const char *fname, const char *nsname,
-                   MACSIO_MIF_ioFlags_t ioFlags, void *userData)
+/*! \brief MIF Open file callback for HFD5 plugin MIF mode */
+static void *
+OpenHDF5File(
+    const char *fname, /**< filename */
+    const char *nsname, /**< namespace name for current task */
+    MACSIO_MIF_ioFlags_t ioFlags, /* io flags */
+    void *userData /**< task specific user data for current task */
+) 
 {
     hid_t *retval;
-    hid_t h5File = H5Fopen(fname, ioFlags.do_wr ? H5F_ACC_RDWR : H5F_ACC_RDONLY, H5P_DEFAULT);
+    hid_t h5File;
+    hid_t fapl = H5Pcreate(H5P_FILE_ACCESS);
+    H5Pset_fclose_degree(fapl, H5F_CLOSE_SEMI);
+    h5File = H5Fopen(fname, ioFlags.do_wr ? H5F_ACC_RDWR : H5F_ACC_RDONLY, fapl);
+    H5Pclose(fapl);
     if (h5File >= 0)
     {
         if (ioFlags.do_wr && nsname && userData)
@@ -634,18 +707,39 @@ static void *OpenHDF5File(const char *fname, const char *nsname,
     return (void *) retval;
 }
 
-static void CloseHDF5File(void *file, void *userData)
+/*! \brief MIF close file callback for HDF5 plugin MIF mode */
+static int
+CloseHDF5File( 
+    void *file, /**< void* to hid_t of file to cose */
+    void *userData /**< task specific user data */
+)
 {
+    const unsigned int obj_flags = H5F_OBJ_LOCAL | H5F_OBJ_DATASET |
+        H5F_OBJ_GROUP | H5F_OBJ_DATATYPE | H5F_OBJ_ATTR;
+    int noo;
+    herr_t close_retval;
+
     if (userData)
     {
         user_data_t *ud = (user_data_t *) userData;
         H5Gclose(ud->groupId);
     }
-    H5Fclose(*((hid_t*) file));
+
+    /* Check for any open objects in this file */
+    noo = H5Fget_obj_count(fid, obj_flags);
+    close_retval = H5Fclose(*((hid_t*) file));
     free(file);
+
+    if (noo > 0) return -1;
+    return (int) close_retval;
 }
 
-static void write_mesh_part(hid_t h5loc, json_object *part_obj)
+/*! \brief Write individual mesh part in MIF mode */
+static void
+write_mesh_part(
+    hid_t h5loc, /**< HDF5 group id into which to write */
+    json_object *part_obj /**< JSON object for the mesh part to write */
+)
 {
 //#warning WERE SKPPING THE MESH (COORDS) OBJECT PRESENTLY
     int i;
@@ -677,7 +771,14 @@ static void write_mesh_part(hid_t h5loc, json_object *part_obj)
     }
 }
 
-static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double dumpt)
+/*! \brief Main dump output for HDF5 plugin MIF mode */
+static void
+main_dump_mif( 
+   json_object *main_obj, /**< main data object to dump */
+   int numFiles, /**< MIF file count */
+   int dumpn, /**< dump number (like a cycle number) */
+   double dumpt /**< dump time */
+)
 {
     int size, rank;
     hid_t *h5File_ptr;
@@ -746,15 +847,29 @@ static void main_dump_mif(json_object *main_obj, int numFiles, int dumpn, double
 
 }
 
-static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
-    int dumpn, double dumpt)
+/*!
+\brief Main dump callback for HDF5 plugin
+
+Selects between MIF and SSF output.
+*/
+static void
+main_dump(
+    int argi, /**< arg index at which to start processing \c argv */
+    int argc, /**< \c argc from main */
+    char **argv, /**< \c argv from main */
+    json_object *main_obj, /**< main json data object to dump */
+    int dumpn, /**< dump number */
+    double dumpt /**< dump time */
+)
 {
     int rank, size, numFiles;
 
 //#warning SET ERROR MODE OF HDF5 LIBRARY
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
+#ifdef HAVE_MPI
     mpi_errno = MPI_Barrier(MACSIO_MAIN_Comm);
+#endif
 
     /* process cl args */
     process_args(argi, argc, argv);
@@ -807,7 +922,9 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj,
     }
 }
 
-static int register_this_interface()
+/*! \brief Function called during static initialization to register the plugin */
+static int
+register_this_interface()
 {
     MACSIO_IFACE_Handle_t iface;
 
@@ -832,13 +949,16 @@ static int register_this_interface()
     return 0;
 }
 
-/* this one statement is the only statement requiring compilation by
-   a C++ compiler. That is because it involves initialization and non
-   constant expressions (a function call in this case). This function
-   call is guaranteed to occur during *initialization* (that is before
-   even 'main' is called) and so will have the effect of populating the
-   iface_map array merely by virtue of the fact that this code is linked
-   with a main. */
+/*! \brief Static initializer statement to cause plugin registration at link time
+
+this one statement is the only statement requiring compilation by
+a C++ compiler. That is because it involves initialization and non
+constant expressions (a function call in this case). This function
+call is guaranteed to occur during *initialization* (that is before
+even 'main' is called) and so will have the effect of populating the
+iface_map array merely by virtue of the fact that this code is linked
+with a main.
+*/
 static int dummy = register_this_interface();
 
 /*!@}*/

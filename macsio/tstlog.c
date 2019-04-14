@@ -43,6 +43,11 @@ int main (int argc, char **argv)
     int i;
     int rank=0, size=1;
     int num_cols = 128, num_rows = 20, extra_lines = 20;
+#ifdef HAVE_MPI
+    MPI_Comm comm = MPI_COMM_WORLD;
+#else
+    int comm = 0;
+#endif
 
     for (i = 0; i < argc; i++)
     {
@@ -56,13 +61,13 @@ int main (int argc, char **argv)
 
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
 #endif
 
     MACSIO_LOG_DebugLevel = 2; /* should only see debug messages level 1 and 2 */
-    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MPI_COMM_WORLD, "tstlog.log", num_cols, num_rows, extra_lines);
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MPI_COMM_WORLD, 0, 0, 0, 0);
+    MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(comm, "tstlog.log", num_cols, num_rows, extra_lines);
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(comm, 0, 0, 0, 0);
 
     if (rank == 1)
     {
@@ -77,7 +82,12 @@ int main (int argc, char **argv)
     else if (rank == 0)
     {
         errno = EOVERFLOW;
+#ifdef HAVE_MPI_
         mpi_errno = MPI_ERR_COMM;
+#else
+        mpi_errno = 0;
+#endif
+
         MACSIO_LOG_MSG(Err, ("I am here on proc 0"));
     }
     else

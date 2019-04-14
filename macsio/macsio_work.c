@@ -369,7 +369,9 @@ void MACSIO_WORK_LevelThree(double currentDt)
 
     step = 0;
     /* Begin timing. */
+#ifdef HAVE_MPI
     start = MPI_Wtime ( );
+#endif
     /* Begin iteration. */
     do {
 	jacobi (N, f, u, u_new, i_min, i_max, left_proc, right_proc);
@@ -389,8 +391,10 @@ void MACSIO_WORK_LevelThree(double currentDt)
 		}
 	    }
 	}
+#ifdef HAVE_MPI
 	MPI_Allreduce ( &my_change, &change, 1, MPI_DOUBLE, MPI_SUM, MACSIO_MAIN_Comm );
 	MPI_Allreduce ( &my_n, &n, 1, MPI_INT, MPI_SUM, MACSIO_MAIN_Comm );
+#endif
 
 	if ( n != 0 ){
 	    change = change / n;
@@ -402,9 +406,11 @@ void MACSIO_WORK_LevelThree(double currentDt)
 
 	/* Because we are aiming to loop for a set time, we need to let the root process
 	 * measure the time elapsed to ensure everyone does the same number of steps */ 
+#ifdef HAVE_MPI
 	end = MPI_Wtime();
 	wall_time = end-start;
 	MPI_Bcast(&wall_time, 1, MPI_DOUBLE, 0, MACSIO_MAIN_Comm);
+#endif
     } while (wall_time < currentDt);
 
     free ( f );
@@ -416,14 +422,17 @@ void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max,
     double h;
     int i;
     int j;
+#ifdef HAVE_MPI
     MPI_Request request[4];
-    int requests;
     MPI_Status status[4];
+#endif
+    int requests;
     /* H is the lattice spacing. */
     h = 1.0 / ( double ) ( N + 1 );
     /* Update ghost layers using non-blocking send/receive */
     requests = 0;
 
+#ifdef HAVE_MPI
     if ( left_proc[MACSIO_MAIN_Rank] >= 0 && left_proc[MACSIO_MAIN_Rank] < MACSIO_MAIN_Size ) {
 	MPI_Irecv ( u + INDEX(i_min[MACSIO_MAIN_Rank] - 1, 1), N, MPI_DOUBLE,
 		left_proc[MACSIO_MAIN_Rank], 0, MACSIO_MAIN_Comm,
@@ -443,6 +452,8 @@ void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max,
 		right_proc[MACSIO_MAIN_Rank], 0, MACSIO_MAIN_Comm,
 		request + requests++ );
     }
+#endif
+
     /* Jacobi update for internal vertices in my domain */
     for ( i = i_min[MACSIO_MAIN_Rank] + 1; i <= i_max[MACSIO_MAIN_Rank] - 1; i++ ){
 	for ( j = 1; j <= N; j++ ){
@@ -453,7 +464,9 @@ void jacobi (int N, double *f, double *u, double *u_new, int *i_min, int *i_max,
 	}
     }
     /*  Wait for all non-blocking communications to complete. */
+#ifdef HAVE_MPI
     MPI_Waitall ( requests, request, status );
+#endif
     /* Jacobi update for boundary vertices in my domain. */
     i = i_min[MACSIO_MAIN_Rank];
     for ( j = 1; j <= N; j++ ){

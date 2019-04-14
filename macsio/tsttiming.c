@@ -24,9 +24,14 @@ this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+#include <math.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
 
 #include <macsio_log.h>
 #include <macsio_timing.h>
@@ -35,15 +40,23 @@ int MACSIO_MAIN_Rank;
 int MACSIO_MAIN_Size;
 int MACSIO_MAIN_Comm;
 
+static void dsleep(double delay)
+{
+    double dsec = floor(delay);
+    long nsec = (long) ((delay - dsec) * 1e+9);
+    time_t sec = (time_t) dsec;
+    struct timespec ts = {sec, nsec};
+    nanosleep(&ts, 0);
+}
+
 void func2();
 
 void func4()
 {
     static int iter = 0;
-    int nanoSecsOfSleeps = random() % 200000;
-    struct timespec ts = {0, nanoSecsOfSleeps};
+    double delay = (random() % 1000) / (double) 10000; /* random up to 1/10th second of sleep */
     MACSIO_TIMING_TimerId_t tid = MT_StartTimer("func4", MACSIO_TIMING_ALL_GROUPS, iter++);
-    nanosleep(&ts, 0);
+    dsleep(delay);
     MT_StopTimer(tid);
 }
 
@@ -60,7 +73,7 @@ void func2()
 {
     static int iter = 0;
     MACSIO_TIMING_TimerId_t tid = MT_StartTimer("func2", MACSIO_TIMING_ALL_GROUPS, iter++);
-    sleep(2);
+    dsleep(0.02);
     MT_StopTimer(tid);
 }
 
@@ -71,7 +84,7 @@ void func1()
     MACSIO_TIMING_TimerId_t tid2;
 
     func2();
-    sleep(1);
+    dsleep(0.01);
     tid2 = MT_StartTimer("call to func3 from func1", MACSIO_TIMING_ALL_GROUPS, iter++);
     func3();
     MT_StopTimer(tid2);
@@ -100,13 +113,10 @@ int main(int argc, char **argv)
     {
         if (!rank)
             fprintf(stderr, "This test only appropriate for 8 or fewer processors\n");
+#ifdef HAVE_MPI
         MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    if (!rank)
-    {
-        fprintf(stderr, "Note: This test involves several calls to "
-            "sleep. It takes ~9 seconds to complete\n");
+#endif
+        exit(1);
     }
 
     a = MT_StartTimer("main", MACSIO_TIMING_ALL_GROUPS, 0);
@@ -144,6 +154,7 @@ int main(int argc, char **argv)
     }
     free(timer_strs);
 
+#ifdef HAVE_MPI
     MACSIO_TIMING_ReduceTimers(MPI_COMM_WORLD, 0);
     if (!rank)
     {
@@ -156,6 +167,7 @@ int main(int argc, char **argv)
         }
         free(timer_strs);
     }
+#endif
 
     MACSIO_LOG_LogFinalize(MACSIO_LOG_MainLog);
 

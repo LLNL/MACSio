@@ -64,7 +64,7 @@ char const *MACSIO_IFACE_GetName(int i)
     return iface_table[i].name;
 }
 
-void MACSIO_IFACE_GetIdsMatchingFileExtension(int *cnt, int **ids, char const *ext)
+void MACSIO_IFACE_GetIdsMatchingFileExtension(char const *ext, int *cnt, int **ids)
 {
     int i, n, pass;
     for (pass = 0; pass < (ids?2:1); pass++)
@@ -87,7 +87,7 @@ void MACSIO_IFACE_GetIdsMatchingFileExtension(int *cnt, int **ids, char const *e
 
 void MACSIO_IFACE_GetIds(int *cnt, int **ids)
 {
-    return MACSIO_IFACE_GetIdsMatchingFileExtension(cnt, ids, 0);
+    return MACSIO_IFACE_GetIdsMatchingFileExtension(0, cnt, ids);
 }
 
 MACSIO_IFACE_Handle_t const *MACSIO_IFACE_GetById(int i)

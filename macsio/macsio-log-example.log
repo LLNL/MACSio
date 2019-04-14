@@ -1,0 +1,94 @@
+--------------------------------------------------------Processor 000000-------------------------------------------------------
+Info:"macsio_main.c":674:Dump 00 BW:   1.4365 Mi/140.9565 msecs =  10.1907 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 00 Stat BW:   4.5891 Mi/140.9565 msecs =  32.5569 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 01 BW:   1.4365 Mi/147.8431 msecs =   9.7161 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 01 Stat BW:   4.5892 Mi/147.8431 msecs =  31.0409 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 02 BW:   1.4365 Mi/159.3053 msecs =   9.0170 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 02 Stat BW:   4.5892 Mi/159.3053 msecs =  28.8075 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 03 BW:   1.4365 Mi/149.3391 msecs =   9.6187 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 03 Stat BW:   4.5892 Mi/149.3391 msecs =  30.7300 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 04 BW:   1.4365 Mi/144.7278 msecs =   9.9252 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 04 Stat BW:   4.5892 Mi/144.7278 msecs =  31.7091 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 05 BW:   1.4365 Mi/147.3098 msecs =   9.7512 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 05 Stat BW:   4.5892 Mi/147.3098 msecs =  31.1533 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 06 BW:   1.4365 Mi/148.6737 msecs =   9.6618 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 06 Stat BW:   4.5891 Mi/148.6737 msecs =  30.8669 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 07 BW:   1.4365 Mi/143.8988 msecs =   9.9824 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 07 Stat BW:   4.5891 Mi/143.8988 msecs =  31.8912 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 08 BW:   1.4365 Mi/156.9266 msecs =   9.1536 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 08 Stat BW:   4.5891 Mi/156.9266 msecs =  29.2436 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 09 BW:   1.4365 Mi/146.4480 msecs =   9.8086 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 09 Stat BW:   4.5891 Mi/146.4480 msecs =  31.3360 Mi/sec:::                                      
+Info:"macsio_main.c":705:Overall BW:  14.3645 Mi/  1.4854 secs =   9.6703 Mi/sec:::                                            
+Info:"macsio_main.c":723:Summed  BW:  38.4024 Mi/sec:::                                                                        
+Info:"macsio_main.c":727:Total Bytes:  57.4580 Mi; Last finisher - First starter =   1.5012 secs; BW =  38.2758 Mi/sec:::      
+Warn:"macsio_main.c":807:rank-invariant PRNGs failed sanity check:::                                                           
+                                                                                                                               
+--------------------------------------------------------Processor 000001-------------------------------------------------------
+Info:"macsio_main.c":674:Dump 00 BW:   1.4365 Mi/146.5789 msecs =   9.7998 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 00 Stat BW:   4.5682 Mi/146.5789 msecs =  31.1656 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 01 BW:   1.4365 Mi/155.2239 msecs =   9.2541 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 01 Stat BW:   4.5683 Mi/155.2239 msecs =  29.4304 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 02 BW:   1.4365 Mi/157.8433 msecs =   9.1005 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 02 Stat BW:   4.5682 Mi/157.8433 msecs =  28.9415 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 03 BW:   1.4365 Mi/144.5113 msecs =   9.9401 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 03 Stat BW:   4.5682 Mi/144.5113 msecs =  31.6115 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 04 BW:   1.4365 Mi/148.0660 msecs =   9.7014 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 04 Stat BW:   4.5682 Mi/148.0660 msecs =  30.8526 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 05 BW:   1.4365 Mi/148.9778 msecs =   9.6420 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 05 Stat BW:   4.5683 Mi/148.9778 msecs =  30.6643 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 06 BW:   1.4365 Mi/146.9006 msecs =   9.7784 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 06 Stat BW:   4.5682 Mi/146.9006 msecs =  31.0974 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 07 BW:   1.4365 Mi/148.6581 msecs =   9.6628 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 07 Stat BW:   4.5683 Mi/148.6581 msecs =  30.7303 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 08 BW:   1.4365 Mi/150.0052 msecs =   9.5760 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 08 Stat BW:   4.5682 Mi/150.0052 msecs =  30.4538 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 09 BW:   1.4365 Mi/152.6813 msecs =   9.4082 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 09 Stat BW:   4.5682 Mi/152.6813 msecs =  29.9200 Mi/sec:::                                      
+Info:"macsio_main.c":705:Overall BW:  14.3645 Mi/  1.4994 secs =   9.5799 Mi/sec:::                                            
+                                                                                                                               
+--------------------------------------------------------Processor 000002-------------------------------------------------------
+Info:"macsio_main.c":674:Dump 00 BW:   1.4365 Mi/149.2629 msecs =   9.6236 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 00 Stat BW:   4.5095 Mi/149.2629 msecs =  30.2118 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 01 BW:   1.4365 Mi/152.9750 msecs =   9.3901 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 01 Stat BW:   4.5094 Mi/152.9750 msecs =  29.4781 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 02 BW:   1.4365 Mi/158.0414 msecs =   9.0891 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 02 Stat BW:   4.5094 Mi/158.0414 msecs =  28.5331 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 03 BW:   1.4365 Mi/144.5061 msecs =   9.9404 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 03 Stat BW:   4.5094 Mi/144.5061 msecs =  31.2057 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 04 BW:   1.4365 Mi/148.0238 msecs =   9.7042 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 04 Stat BW:   4.5094 Mi/148.0238 msecs =  30.4641 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 05 BW:   1.4365 Mi/148.8822 msecs =   9.6482 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 05 Stat BW:   4.5094 Mi/148.8822 msecs =  30.2885 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 06 BW:   1.4365 Mi/147.0188 msecs =   9.7705 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 06 Stat BW:   4.5094 Mi/147.0188 msecs =  30.6724 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 07 BW:   1.4365 Mi/148.5274 msecs =   9.6713 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 07 Stat BW:   4.5094 Mi/148.5274 msecs =  30.3608 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 08 BW:   1.4365 Mi/150.3812 msecs =   9.5521 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 08 Stat BW:   4.5094 Mi/150.3812 msecs =  29.9866 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 09 BW:   1.4365 Mi/152.4305 msecs =   9.4236 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 09 Stat BW:   4.5094 Mi/152.4305 msecs =  29.5834 Mi/sec:::                                      
+Info:"macsio_main.c":705:Overall BW:  14.3645 Mi/  1.5000 secs =   9.5760 Mi/sec:::                                            
+                                                                                                                               
+--------------------------------------------------------Processor 000003-------------------------------------------------------
+Info:"macsio_main.c":674:Dump 00 BW:   1.4365 Mi/148.8397 msecs =   9.6510 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 00 Stat BW:   4.5245 Mi/148.8397 msecs =  30.3984 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 01 BW:   1.4365 Mi/153.0944 msecs =   9.3828 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 01 Stat BW:   4.5245 Mi/153.0944 msecs =  29.5536 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 02 BW:   1.4365 Mi/158.4763 msecs =   9.0641 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 02 Stat BW:   4.5245 Mi/158.4763 msecs =  28.5500 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 03 BW:   1.4365 Mi/144.6807 msecs =   9.9284 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 03 Stat BW:   4.5245 Mi/144.6807 msecs =  31.2722 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 04 BW:   1.4365 Mi/147.9047 msecs =   9.7120 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 04 Stat BW:   4.5245 Mi/147.9047 msecs =  30.5906 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 05 BW:   1.4365 Mi/148.6462 msecs =   9.6636 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 05 Stat BW:   4.5245 Mi/148.6462 msecs =  30.4380 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 06 BW:   1.4365 Mi/147.1848 msecs =   9.7595 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 06 Stat BW:   4.5245 Mi/147.1848 msecs =  30.7402 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 07 BW:   1.4365 Mi/148.4905 msecs =   9.6737 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 07 Stat BW:   4.5245 Mi/148.4905 msecs =  30.4699 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 08 BW:   1.4365 Mi/150.1453 msecs =   9.5671 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 08 Stat BW:   4.5245 Mi/150.1453 msecs =  30.1341 Mi/sec:::                                      
+Info:"macsio_main.c":674:Dump 09 BW:   1.4365 Mi/152.5587 msecs =   9.4157 Mi/sec:::                                           
+Info:"macsio_main.c":679:Dump 09 Stat BW:   4.5245 Mi/152.5587 msecs =  29.6574 Mi/sec:::                                      
+Info:"macsio_main.c":705:Overall BW:  14.3645 Mi/  1.5000 secs =   9.5762 Mi/sec:::                                            

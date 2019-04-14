@@ -35,15 +35,25 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <macsio_log.h>
 
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
+
 /*!
 \addtogroup MACSIO_LOG
 @{
 */
 
+#ifndef DOXYGEN_IGNORE_THIS /*[*/
+#ifdef HAVE_MPI
 int                     mpi_errno = MPI_SUCCESS;
+#else
+int                     mpi_errno = 0;
+#endif
 int                     MACSIO_LOG_DebugLevel = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_MainLog = 0;
 MACSIO_LOG_LogHandle_t *MACSIO_LOG_StdErr = 0;
+#endif /*] DOXYGEN_IGNORE_THIS */
 
 typedef struct _log_flags_t
 {
@@ -260,7 +270,11 @@ MACSIO_LOG_LogMsgWithDetails(
 )
 {
     char _sig[512], _msg[512], _err[512];
+#ifdef HAVE_MPI
     char _mpistr[MPI_MAX_ERROR_STRING+1], _mpicls[MPI_MAX_ERROR_STRING+1];
+#else
+    char _mpistr[2048+1], _mpicls[2048+1];
+#endif
     _sig[0] = _msg[0] = _err[0] = _mpistr[0] = _mpicls[0] = '\0';
     if (sevVal <= MACSIO_LOG_MsgDbg3 && sevVal >= MACSIO_LOG_DebugLevel)
         return;
@@ -279,13 +293,12 @@ MACSIO_LOG_LogMsgWithDetails(
         _mpistr[len] = '\0';
     }
 #endif
-//#warning CLEAN UP SO ONLY PRINT NON-EMPTY STRINGS
     MACSIO_LOG_LogMsg(log, "%s:%s:%s:%s:%s", _sig, _msg, _err, _mpistr, _mpicls);
     if (sevVal == MACSIO_LOG_MsgDie)
 #ifdef HAVE_MPI
-        MPI_Abort(MPI_COMM_WORLD, 0);
+        MPI_Abort(MPI_COMM_WORLD, mpiErrno==MPI_SUCCESS?sysErrno:mpiErrno);
 #else
-        abort(sysErrno);
+        exit(sysErrno);
 #endif
 }
 

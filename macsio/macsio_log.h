@@ -38,54 +38,6 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 \defgroup MACSIO_LOG MACSIO_LOG
 \brief Message logging utilities
 
-MACSIO_LOG is a small utility for logging various kinds of messages from processors. This
-includes debugging messages, warnings and errors.
-
-A MACSIO_LOG is a single text file that is divided into groups of message lines. Each processor
-gets its own group of lines within the file it may write to. Rank 0 gets the first group
-of lines. Rank 1, the next group of lines and so forth. Each line has a maximum length too.
-
-When a MACSIO_LOG is created with \c MACSIO_LOG_InitLog(), the caller specifies the MPI communicator
-the log will be used for, the number of message lines per MPI task to allocate plus a count of 
-extra lines for rank 0 and the maximum length of any message. Rank 0 initializes the text file
-with all space characters except for header lines to distinguish each processor's group of lines
-in the file. Note that for a large run on say 10^5 processors, it may take rank 0 several seconds
-to create this file.
-
-Messages are restricted to a single line of text. Any embedded new-line characters are removed
-from a message and replaced with a '!' character. If a processor's message is longer than the
-maximum length of a line for the log, the message is truncated to fit within the line. As
-processors issue messages, they are written to the processors group of lines in round-robin 
-fashion. As the set of messages issued from a processor reaches the end of its group of lines
-within the file, it starts issuing new messages at the beginning of the group. So, older messages
-can wind up getting overwritten by newer messages. However, all the most recent messages prior
-to any significant error will at least be captured in the log.
-
-Parallelism in writing to a MACSIO_LOG file is achieved by ensuring no two processor attempt
-to write data in overlapping regions in the file \em by using \c pwrite() to do the actual
-writes.
-
-MACSIO's main creates a default log, \c MACSIO_LOG_MainLog, on the \c MACSIO_MAIN_Comm. That
-log is probably the only log needed by MACSIO proper or any of its plugins. The convenience macro,
-\c MACSIO_LOG_MSG(SEV, MSG), is the only method one need to worry about to log messages to the
-main log. That macro will also capture more detailed information regarding error states around
-the time the message issue issued including the file and line number, the system errno and the
-most recent MPI error state.
-
-If you use \c MACSIO_LOG_MSG, messages are allowed one of several severities; Dbg1, Dbg2, Dbg3,
-Warn, Err and Die. A severity of Die causes an abort. Depending on the current debug level
-setting, Dbg1-3 messages may or may not be recorded to a log.
-
-MACSIO's main also creates a log for issuing messages to stderr, \c MACSIO_LOG_StdErr. However,
-there is no convenience macro like \c MACSIO_LOG_MSG() for logging messages to \c MACSIO_LOG_StdErr.
-A caller simply has to use the MACSIO_LOG interface methods to issue messages to \c MACSIO_LOG_StdErr.
-
-However, any plugin or other portion of MACSIO may, optionally, create its own, private, log using
-\c MACSIO_LOG_InitLog(). Once a log is created, any processor can independently issue messages
-to the log. There is no parallel communication involved in issuing messages to logs.
-
-Examples of the use of MACSIO_LOG can be found in tstlog.c
-
 @{
 */
 
@@ -126,12 +78,18 @@ do{                                                                             
 #define MACSIO_LOG_DEFAULT_LINE_LENGTH 128
 
 /*!
+\def __BASEFILE__
+\brief Same as \c basename(__FILE__)
+Used to strip unnecessary path terms from \c __FILE__ in messages
+*/
+#define __BASEFILE__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
+/*!
 \def MACSIO_LOG_MSG
 \brief Convenience macro for logging a message to the main log
 \param [in] SEV Abbreviated message severity (e.g. 'Dbg1', 'Warn')
 \param [in] MSG Caller's sprintf-style message enclosed in parenthises (e.g. '("Rank %d failed",rank))'
 */
-#define __BASEFILE__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define MACSIO_LOG_MSG(SEV, MSG) MACSIO_LOG_MSG2(MACSIO_LOG_MainLog, MSG, MACSIO_LOG_Msg ## SEV, #SEV, errno, mpi_errno, __BASEFILE__, __LINE__)
 
 /*!
@@ -197,7 +155,7 @@ typedef enum _MACSIO_LOG_MsgSeverity_t
     MACSIO_LOG_MsgDbg3,  /**< Debug level 3: For fine grained debugging messages (most likely effects performance) */
     MACSIO_LOG_MsgInfo,  /**< Informational messages */
     MACSIO_LOG_MsgWarn,  /**< Warnings of minor problems that can be recovered from without undue effects */
-    MACSIO_LOG_MsgErr,   /**< Error conditions that result in a change in expected/anticipated behavior */
+    MACSIO_LOG_MsgErr,   /**< Error conditions that result in unexpected behavior */
     MACSIO_LOG_MsgDie    /**< Unrecoverable errors */
 } MACSIO_LOG_MsgSeverity_t;
 

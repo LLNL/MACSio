@@ -198,9 +198,7 @@ typedef struct _timerInfo_t
 } timerInfo_t;
 
 static timerInfo_t timerHashTable[MACSIO_TIMING_HASH_TABLE_SIZE];
-#ifdef HAVE_MPI
 static timerInfo_t reducedTimerTable[MACSIO_TIMING_HASH_TABLE_SIZE];
-#endif
 
 #ifdef HAVE_CALIPER
 typedef struct _caliperAttributeInfo_t {
@@ -370,14 +368,22 @@ double MACSIO_TIMING_StopTimer(MACSIO_TIMING_TimerId_t tid)
     return timer_time;
 }
 
-static double get_timer(timerInfo_t const *table, MACSIO_TIMING_TimerId_t tid, char const *field)
+static double
+get_timer_datum(
+    timerInfo_t const *table,
+    MACSIO_TIMING_TimerId_t tid,
+    char const *field)
 {
-    if (tid >= MACSIO_TIMING_HASH_TABLE_SIZE) return DBL_MAX;
+    if (tid >= MACSIO_TIMING_HASH_TABLE_SIZE) return -1;
 
     if      (!strncmp(field, "__line__", 8))
         return table[tid].__line__;
+    else if (!strncmp(field, "start_time", 10))
+        return table[tid].start_time;
     else if (!strncmp(field, "iter_count", 10))
         return table[tid].iter_count;
+    else if (!strncmp(field, "iter_time", 9))
+        return table[tid].total_time_this_iter;
     else if (!strncmp(field, "min_iter", 8))
         return table[tid].min_iter;
     else if (!strncmp(field, "max_iter", 8))
@@ -401,17 +407,17 @@ static double get_timer(timerInfo_t const *table, MACSIO_TIMING_TimerId_t tid, c
     else if (!strncmp(field, "running_var", 11))
         return table[tid].running_var;
 
-    return DBL_MAX;
+    return -1;
 }
 
-double MACSIO_TIMING_GetTimer(MACSIO_TIMING_TimerId_t tid, char const *field)
+double MACSIO_TIMING_GetTimerDatum(MACSIO_TIMING_TimerId_t tid, char const *field)
 {
-    return get_timer(timerHashTable, tid, field);
+    return get_timer_datum(timerHashTable, tid, field);
 }
 
-double MACSIO_TIMING_GetReducedTimer(MACSIO_TIMING_TimerId_t tid, char const *field)
+double MACSIO_TIMING_GetReducedTimerDatum(MACSIO_TIMING_TimerId_t tid, char const *field)
 {
-    return get_timer(reducedTimerTable, tid, field);
+    return get_timer_datum(reducedTimerTable, tid, field);
 }
 
 static void

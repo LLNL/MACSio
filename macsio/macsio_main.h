@@ -28,6 +28,22 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <json-cwx/json_object.h>
 
+/*!
+\defgroup MACSIO_MAIN MACSIO_MAIN
+\brief MACSio Main Program
+
+\tableofcontents
+
+MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
+
+It is designed to support a number of goals with respect to parallel I/O performance benchmarking
+including the ability to test and compare various I/O libraries and I/O paradigms, to predict
+scalable performance of real applications and to help identify where improvements in application
+I/O performance can be made.
+
+@{
+*/
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,5 +59,7 @@ extern int MACSIO_MAIN_Rank;
 #ifdef __cplusplus
 }
 #endif
+
+/*!@}*/
 
 #endif /* MACSIO_MAIN_H */

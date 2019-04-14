@@ -30,6 +30,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #ifdef HAVE_MPI
@@ -118,64 +119,21 @@ add_param_to_json_retobj(json_object *retobj, char const *key, json_object *addo
     }
 }
 
-/*---------------------------------------------------------------------------------------------------------------------------------
- * Audience:	Private
- * Chapter:	Example and Test Utilities	
- * Purpose:	Parse and assign command-line arguments	
- *
- * Description:	This routine is designed to do parsing of simple command-line arguments and assign values associated with
- *		them to caller-supplied scalar variables. It is used in the following manner.
- *
- *		   MACSIO_ProccessCommandLine(argc, argv,
- *		      "-multifile",
- *		         "if specified, use a file-per-timestep",
- *		         &doMultifile,
- *		      "-numCycles %d",
- *		         "specify the number of cycles to run",
- *		         &numCycles,
- *		      "-dims %d %f %d %f",
- *		         "specify size (logical and geometric) of mesh",
- *		         &Ni, &Xi, &Nj, &Xj
- *		      MACSIO_CLARGS_END_OF_ARGS);
- *
- *		After the argc,argv arguments, the remaining arguments come in groups of 3. The first of the three is a
- *		argument format specifier much like a printf statement. It indicates the type of each parameter to the
- *		argument and the number of parameters. Presently, it understands only %d, %f and %s types. the second
- *		of the three is a help line for the argument. Note, you can make this string as long as the C-compiler
- *		will permit. You *need*not* embed any '\n' charcters as the print routine will do that for you.
- *
- *		Command line arguments for which only existence of the argument is tested assume a caller-supplied return
- *		value of int and will be assigned `1' if the argument exists and `0' otherwise.
- *
- *		Do not name any argument with a substring `help' as that is reserved for obtaining help. Also, do not
- *		name any argument with the string `end_of_args' as that is used to indicate the end of the list of
- *		arguments passed to the function.
- *
- *		If any argument on the command line has the substring `help', help will be printed by processor 0 and then
- *		this function calls MPI_Finalize() (in parallel) and exit().
- *
- * Parallel:    This function must be called collectively in MPI_COMM_WORLD. Parallel and serial behavior is identical except in
- *		the
- *
- * Return:	MACSIO_CLARGS_OK, MACSIO_CLARGS_ERROR or MACSIO_CLARGS_HELP
- *
- * Programmer:	Mark Miller, LLNL, Thu Dec 19, 2001 
- *---------------------------------------------------------------------------------------------------------------------------------
- */
 int
 MACSIO_CLARGS_ProcessCmdline(
-   void **retobj,       /* returned object (for cases that need it) */
-   MACSIO_CLARGS_ArgvFlags_t flags, /* flag to indicate what to do if encounter an unknown argument (FATAL|WARN) */
-   int argi,            /* first arg index to start processing at */
-   int argc,		/* argc from main */
-   char **argv,		/* argv from main */
-   ...			/* a comma-separated list of 1) argument name and format specifier,  2) help-line for argument,
-			   3) caller-supplied scalar variables to set */
+   void **retobj,
+   MACSIO_CLARGS_ArgvFlags_t flags,
+   int argi,
+   int argc,
+   char **argv,
+   ...
 )
 {
+   FILE *outFILE;
    char *argvStr = NULL;
    int i, rank = 0;
    int helpWasRequested = 0;
+   int strictIsDisabled = 0;
    int invalidArgTypeFound = 0;
    int firstArg;
    int terminalWidth = 120 - 10;
@@ -184,13 +142,13 @@ MACSIO_CLARGS_ProcessCmdline(
    va_list ap;
    json_object *ret_json_obj = 0;
    int depth;
+   MACSIO_LOG_MsgSeverity_t msgSeverity = flags.error_mode?MACSIO_LOG_MsgDie:MACSIO_LOG_MsgErr;
 
 #ifdef HAVE_MPI
    {  int result;
       if ((MPI_Initialized(&result) != MPI_SUCCESS) || !result)
       { 
-         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
-             flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr, msgSeverity,
              ("MPI is not initialized"));
          return MACSIO_CLARGS_ERROR;
       }
@@ -198,25 +156,47 @@ MACSIO_CLARGS_ProcessCmdline(
    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-   /* quick check for a help request */
+   /* quick check for special args (--help, --no-strict) */
    if (rank == 0)
    {
       for (i = 0; i < argc; i++)
       {
-	 if (strstr(argv[i], "help") != NULL)
-	 {
-	    char *s;
+	 if (strcasestr(argv[i], "--no-strict") != NULL)
+             msgSeverity = MACSIO_LOG_MsgWarn;
+	 if (strcasestr(argv[i], "--help") != NULL)
 	    helpWasRequested = 1;
-            if ((s=getenv("COLUMNS")) && isdigit(*s))
-	       terminalWidth = (int)strtol(s, NULL, 0) - 10;
-	    break;
-	 }
+      }
+      if (helpWasRequested)
+      {
+         char cmd[64];
+	 char *s;
+         if ((s=getenv("COLUMNS")) && isdigit(*s))
+	    terminalWidth = (int)strtol(s, NULL, 0) - 8;
+         else
+         {
+            struct winsize ws;
+            if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1 && errno == 0)
+               terminalWidth = ws.ws_col;
+            else if (ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) != -1 && errno == 0)
+               terminalWidth = ws.ws_col;
+            else
+               terminalWidth = 80; /* best we can do is assume */
+         }
+         snprintf(cmd, sizeof(cmd), "fmt -w %d", terminalWidth);
+         outFILE = popen(cmd, "w");
+         if (!outFILE)
+	     outFILE = (isatty(2) ? stderr : stdout);
       }
    }
 
 #ifdef HAVE_MPI
-//#warning DO JUST ONE BCAST HERE
-   MPI_Bcast(&helpWasRequested, 1, MPI_INT, 0, MPI_COMM_WORLD);
+   /* Ensure all tasks agree on these flags */
+   {
+      int tmp[2] = {helpWasRequested, msgSeverity};
+      MPI_Bcast(&tmp, sizeof(tmp)/sizeof(tmp[0]), MPI_INT, 0, MPI_COMM_WORLD);
+      helpWasRequested = tmp[0];
+      msgSeverity = (MACSIO_LOG_MsgSeverity_t) tmp[1];
+   }
 #endif
 
    /* everyone builds the command line parameter list */
@@ -261,15 +241,14 @@ MACSIO_CLARGS_ProcessCmdline(
       /* print this arg's help string from proc 0 if help was requested */
       if (helpWasRequested && rank == 0)
       {
-	 static int first = 1;
+         static int first = 1;
 	 char helpFmtStr[32];
-	 FILE *outFILE = (isatty(2) ? stderr : stdout);
          int has_embedded_newlines = strchr(helpStr, '\n') != 0;
          int help_str_len = strlen(helpStr);
 
 	 if (first)
 	 {
-	    first = 0;
+            first = 0;
 	    fprintf(outFILE, "Usage and Help for \"%s\"\n", argv[0]);
 	    fprintf(outFILE, "Defaults, if any, in square brackets after argument definition\n");
 	 }
@@ -415,8 +394,7 @@ MACSIO_CLARGS_ProcessCmdline(
    if (invalidArgTypeFound)
    {
       if (rank == 0)
-          MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
-              flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+          MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr, msgSeverity,
               ("invalid argument type encountered at position %d",invalidArgTypeFound));
 //#warning FIX WARN FAILURE BEHAVIOR HERE
       return MACSIO_CLARGS_ERROR;
@@ -424,7 +402,11 @@ MACSIO_CLARGS_ProcessCmdline(
 
    /* exit if help was requested */
    if (helpWasRequested)
+   {
+      if (rank == 0 && outFILE != stderr && outFILE != stdout)
+          pclose(outFILE);
       return MACSIO_CLARGS_HELP;
+   }
 
    /* ok, now broadcast the whole argc, argv data */ 
 #ifdef HAVE_MPI
@@ -516,7 +498,10 @@ MACSIO_CLARGS_ProcessCmdline(
 	    for (j = 0; j < p->paramCount; j++)
 	    {
                if (i == argc - 1)
-                   MACSIO_LOG_MSGL(MACSIO_LOG_StdErr, Die, ("too few arguments for command-line options"));
+               {
+                   MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr, msgSeverity, ("too few arguments for command-line options"));
+                   break;
+               }
 	       switch (p->paramTypes[j])
 	       {
 	          case 'd':
@@ -529,8 +514,7 @@ MACSIO_CLARGS_ProcessCmdline(
                      tmpDbl = tmpInt * ndbl;
                      if ((int)tmpDbl != tmpDbl)
                      {
-                         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
-                             flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+                         MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr, msgSeverity,
                              ("integer overflow (%.0f) for arg \"%s\"",tmpDbl,argv[i-1]));
                      }
                      else
@@ -608,9 +592,12 @@ MACSIO_CLARGS_ProcessCmdline(
       {
 	 char *p = strrchr(argv[0], '/');
 	 p = p ? p+1 : argv[0];
+         errno = EINVAL; /* if dieing, ensure executable returns useful error code */
+#ifdef HAVE_MPI
+         mpi_errno = MPI_SUCCESS;
+#endif
 	 if (rank == 0)
-             MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr,
-                 flags.error_mode?MACSIO_LOG_MsgErr:MACSIO_LOG_MsgWarn,
+             MACSIO_LOG_MSGLV(MACSIO_LOG_StdErr, msgSeverity,
                  ("%s: unknown argument %s. Type %s --help for help",p,argv[i],p));
          return MACSIO_CLARGS_ERROR; 
       }

@@ -176,12 +176,14 @@ static void *OpenExodusFile(const char *fname, const char *nsname, MACSIO_MIF_io
     assert(!OpenExodusFile_should_never_be_called);
 }
 
-static void CloseExodusFile(void *file, void *userData)
+static int CloseExodusFile(void *file, void *userData)
 {
+    int retval = 0;
     int exoid = *((int*) file);
     if (exoid >= 0)
-        ex_close(exoid);
+        retval = ex_close(exoid);
     free(file);
+    return retval;
 }
 
 static void get_exodus_global_init_params(json_object *main_obj, int dumpn, double dumpt,

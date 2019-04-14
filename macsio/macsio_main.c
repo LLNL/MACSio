@@ -35,6 +35,11 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <sys/types.h>
 #include <unistd.h>
 
+/*!
+\addtogroup MACSIO_MAIN
+@{
+*/
+
 #ifdef HAVE_SCR
 #ifdef __cplusplus
 extern "C" {
@@ -66,138 +71,6 @@ extern "C" {
 #include <caliper/cali-mpi.h>
 #endif
 #endif
-
-/*!
- * \mainpage
- *
- * \tableofcontents
- *
- * MACSio is a Multi-purpose, Application-Centric, Scalable I/O proxy application.
- *
- * It is designed to support a number of goals with respect to parallel I/O performance benchmarking
- * including the ability to test and compare various I/O libraries and I/O paradigms, to predict
- * scalable performance of real applications and to help identify where improvements in I/O performance
- * can be made.
- *
- * For an overview of MACSio's design goals and outline of its design, please see
- * <A HREF="../../macsio_design_intro_final_html/macsio_design_intro_final.htm">this design document.</A>
- *
- * MACSio is capable of generating a wide variety of mesh and variable data and of amorphous metadata
- * typical of HPC multi-physics applications. Currently, the only supported mesh type in MACSio is
- * a rectilinear, multi-block type mesh in 2 or 3 dimensions. However, some of the functions to generate other
- * mesh types such as curvilinear, block-structured AMR, unstructured, unstructured-AMR and arbitrary
- * are already available. In addition, regardless of the particular type of mesh MACSio generates for
- * purposes of I/O performance testing, it stores and marshalls all of the resultant data in an uber
- * JSON-C object that is passed around witin MACSio and between MACSIO and its I/O plugins.
- *
- * MACSio employs a very simple algorithm to generate and then decompose a mesh in parallel. However, the
- * decomposition is also general enough to create multiple mesh pieces on individual MPI ranks and for
- * the number of mesh pieces vary to between MPI ranks. At present, there is no support to explicitly specify
- * a particular arrangement of mesh pieces and MPI ranks. However, such enhancement can be easily made at
- * a later date.
- *
- * MACSio's command-line arguments are designed to give the user control over the nominal I/O request sizes
- * emitted from MPI ranks for mesh bulk data and for amorphous metadata. The user specifies a size, in bytes,
- * for mesh pieces. MACSio then computes a mesh part size, in nodes, necessary to hit this target byte count for
- * double precision data. MACSio will determine an N dimensional logical size of a mesh piece that is a close
- * to equal dimensional as possible. In addition, the user specifies an average number of mesh pieces that will be
- * assigned to each MPI rank. This does not have to be a whole number. When it is a whole number, each MPI rank
- * has the same number of mesh pieces. When it is not, some processors have one more mesh piece than others.
- * This is common of HPC multi-physics applications. Together, the total processor count and average number of
- * mesh pieces per processor gives a total number of mesh pieces that comprise the entire mesh. MACSio then
- * finds an N dimensional arrangement (N=[1,2,3]) of the pieces that is as close to equal dimension as possible.
- * If mesh piece size or total count of pieces wind up being prime numbers, MACSio will only be able to factor
- * these into long, narrow shapes where 2 (or 3) of the dimensions are of size 1. That will make examination of
- * the resulting data using visualization tools like VisIt a little less convenient but is otherwise harmless
- * from the perspective of driving and assessing I/O performance.
- *
- * Once the global whole mesh shape is determined as a count of total pieces and as counts of pieces in each
- * of the logical dimensions, MACSio uses a very simple algorithm to assign mesh pieces to MPI ranks.
- * The global list of mesh pieces is numbered starting from 0. First, the number
- * of pieces to assign to rank 0 is chosen. When the average piece count is non-integral, it is a value
- * between K and K+1. So, MACSio randomly chooses either K or K+1 pieces but being carful to weight the
- * randomness so that once all pieces are assigned to all ranks, the average piece count per rank target
- * is achieved. MACSio then assigns the next K or K+1 numbered pieces to the next MPI rank. It continues
- * assigning pieces to MPI ranks, in piece number order, until all MPI ranks have been assigned pieces.
- * The algorithm runs indentically on all ranks. When the algorithm reaches the part assignment for the
- * rank on which its executing, it then generates the K or K+1 mesh pieces for that rank. Although the
- * algorithm is essentially a sequential algorithm with asymptotic behavior O(\#total pieces), it is primarily
- * a simple book-keeping loop which completes in a fraction of a second even for more than one million
- * pieces.
- *
- * Each piece of the mesh is a simple rectangular region of space. The spatial bounds of that region are
- * easily determined. Any variables to be placed on the mesh can be easily handled as long as the variable's
- * spatial variation can be described in the global goemetric space.
- *
- * \section sec_building Building MACSio
- *
- * The first step for building MACSio is to download and install json-cwx (json-c with extensions) from https://github.com/LLNL/json-cwx.
- *
- * Once json-cwx has been successfully installed, CMake is used to build MACSio and any of the desired plugins (builds with silo by default)
- * \code
-      % mkdir build
-      % cd build
-      % cmake -DCMAKE_INSTALL_PREFIX=[desired-install-location] \
-            -DWITH_JSON-CWX_PREFIX=[path to json-cwx] \
-            -DWITH_SILO_PREFIX=[path to silo] ..
-      % make
-      % make install
- * \endcode    
- *  NOTE: Some options for the cmake line:
- *     - <tt>Build docs</tt>:             -DBUILD_DOCS=ON   
- *     - <tt>Build HDF5 Plugin</tt>:      -DENABLE_HDF5_PLUGIN=ON -DWITH_HDF5_PREFIX=[path to hdf5]
- *     - <tt>Build TyphonIO Plugin</tt>:  -DENABLE_TYPHONIO_PLUGIN=ON -DWITH_TYPHONIO_PREFIX=[path to typhonio]
- *     - <tt>Build PDB Plugin</tt>:       -DENABLE_PBD_PLUGIN=ON
- *     - <tt>Build Exodus Plugin</tt>:    -DENABLE_EXODUS_PLUGIN=ON -DWITH_EXODUS_PREFIX=[path to exodus]
- *
- * Although MACSio is C Language, at a minimum it must be linked using a C++ linker due to
- * its use of non-constant expressions in static initializers to affect the static plugin
- * behavior. However, its conceivable that some C++'isms have crept into the code causing
- * warnings or outright errors with some C compilers.
- *
- * In addition, MACSio sources currently include a large number of \c \#warning statements
- * to help remind developers (namely me) of minor issues to be fixed. When compiling, these
- * produce a lot of sprurios output in stderr but are otherwise harmless.
- *
- * \subsection sec_building_plugins MACSio Plugins
- *
- * Each plugin is defined by a file such as \c macsio_foo.c
- * for a plugin named foo. \c macsio_foo.c implements the \c MACSIO_IFACE interface for the
- * foo plugin.
- *
- * MACSio does not use \c dlopen() to manage plugins. Instead, MACSio uses a \em static approach
- * to managing plugins. The set of plugins available in a \c macsio executable is determined at
- * the time the executable is linked simply by listing all the plugin object files to be linked
- * into the executable (along with their associated TPL(s)). MACSio exploits a feature in C++
- * which permits initialization of static variables via non-constant expressions. All symbols in
- * a plugin are defined with \c static scope. Every plugin defines an <tt>int registration(void)</tt>
- * function and initializes a static dummy integer to the result of \c registration() like so...
- *
- * \code
-   static int register_this_interface(void)
-   {
-     MACSIO_IFACE_Handle_t iface;
-
-     strcpy(iface.name, iface_name);
-     strcpy(iface.ext, iface_ext);
-
-     if (!MACSIO_IFACE_Register(&iface))
-         MACSIO_LOG_MSG(Die, ("Failed to register interface \"%s\"", iface.name));
-   }
-   static int dummy = register_this_interface();
- * \endcode
- *
- * At the time the executable loads, the \c register_this_interface() method is called. Note that
- * this is called long before even \c main() is called. The
- * call to \c MACSIO_IFACE_Register() from within \c register_this_interface() winds up
- * adding the plugin to MACSio's global list of plugins. This happens for each plugin. The order
- * in which they are added to MACSio doesn't matter because plugins are identified by their
- * (unique) names. If MACSio encounters a case where two different plugins have the same
- * name, then it will abort and inform the user of the problem. The remedy is to
- * adjust the name of one of the two plugins. MACSio is able to call \c static methods
- * defined within the plugin via function callback pointers registered with the interface.
- *
- */
 
 #define MAX(A,B) (((A)>(B))?(A):(B))
 
@@ -283,7 +156,9 @@ static void handle_list_request_and_exit()
 
 static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 {
-    MACSIO_CLARGS_ArgvFlags_t const argFlags = {MACSIO_CLARGS_WARN, MACSIO_CLARGS_TOJSON};
+    MACSIO_CLARGS_ArgvFlags_t const argFlags = {MACSIO_CLARGS_ERROR,
+                                                MACSIO_CLARGS_TOJSON,
+                                                MACSIO_CLARGS_ASSIGN_ON};
     json_object *mainJargs = 0;
     int plugin_args_start = -1;
     int cl_result;
@@ -294,7 +169,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
 ////#warning OPTION TO SET OUTPUT PRECISION TO FLOAT
 
     cl_result = MACSIO_CLARGS_ProcessCmdline((void**)&mainJargs, argFlags, 1, argc, argv,
-        "--units_prefix_system %s", "binary",
+        "--units_prefix_system %s", "\"binary\"",
             "Specify which SI units prefix system to use both in reporting performance\n"
             "data and in interpreting sizing modifiers to arguments. The options are\n"
             "\"binary\" and \"decimal\". For \"binary\" unit prefixes, sizes are reported\n"
@@ -359,7 +234,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "be depends on the mesh type. For rectilinear mesh it is 1. For\n"
             "curvilinear mesh it is the number of spatial dimensions and for\n"
             "unstructured mesh it is the number of spatial dimensions plus\n"
-            "2^number of topological dimensions. [50]",
+            "2^number of topological dimensions.",
         "--dataset_growth %f", MACSIO_CLARGS_NODEFAULT, 
             "The factor by which the volume of data will grow between dump iterations\n"
             "If no value is given or the value is <1.0 no dataset changes will take place.",
@@ -437,8 +312,7 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
             "of 3 will almost certainly effect performance. For debug level 3,\n"
             "MACSio will generate ascii json files from each processor for the main\n"
             "dump object prior to starting dumps.",
-        MACSIO_CLARGS_ARG_GROUP_BEG(Log File Options),
-            "Options to control size and shape of log file",
+        MACSIO_CLARGS_ARG_GROUP_BEG(Log File Options, Options to control size and shape of log file),
         "--log_file_name %s", "macsio-log.log",
             "The name of the log file.",
         "--log_line_cnt %d %d", "64 0",
@@ -490,12 +364,15 @@ static json_object *ProcessCommandLine(int argc, char *argv[], int *plugin_argi)
     if (!strcmp(json_object_path_get_string(mainJargs, "interface"), "list"))
         handle_list_request_and_exit();
 
+#if 0
     /* sanity check some values */
     if (!strcmp(json_object_path_get_string(mainJargs, "interface"), ""))
         MACSIO_LOG_MSG(Die, ("no io-interface specified"));
+#endif
 
     if (plugin_argi)
         *plugin_argi = plugin_args_start>-1?plugin_args_start+1:argc;
+
 
     return mainJargs;
 }
@@ -608,9 +485,9 @@ main_write(int argi, int argc, char **argv, json_object *main_obj)
    
     int doWork = 0;
     if (work_dt > 0){
-    doWork=1;
+        doWork=1;
     } else {
-    work_dt = 1;
+        work_dt = 1;
     }
 
     dt = work_dt;
@@ -788,7 +665,7 @@ main_read(int argi, int argc, char **argv, json_object *main_obj)
     return (0);
 }
 
-static void InitializePRNGs(void)
+static void InitializeDefaultPRNGs(void)
 {
     double currtime = MT_Time();
     unsigned ucurrtim = ((unsigned *)&currtime)[0] ^ ((unsigned *)&currtime)[1];
@@ -799,10 +676,10 @@ static void InitializePRNGs(void)
 #endif
 
     /* Initialize the PRNGs */
-    MACSIO_DATA_InitializePRNGs((unsigned) MACSIO_MAIN_Rank, ucurrtim);
+    MACSIO_DATA_InitializeDefaultPRNGs((unsigned) MACSIO_MAIN_Rank, ucurrtim);
 }
 
-static void FinalizePRNGs()
+static void FinalizeDefaultPRNGs()
 {
 #ifdef HAVE_MPI
     /* Lets confirm the rank-invariant PRNGs agree and issue a message if not */
@@ -811,11 +688,12 @@ static void FinalizePRNGs()
     MPI_Reduce(rand_check, rand_check_r, 2, MPI_UNSIGNED, MPI_BXOR, 0, MACSIO_MAIN_Comm);
     if (MACSIO_MAIN_Rank == 0 && (rand_check_r[0] != 0 || rand_check_r[1] != 0))
     {
-        MACSIO_LOG_MSG(Warn, ("rank-invariant PRNGs failed sanity check"));
+        MACSIO_LOG_MSG(Warn, ("rank-invariant PRNGs failed sanity check "
+            "suggesting non-collective use."));
     }
 #endif
 
-    MACSIO_DATA_FinalizePRNGs();
+    MACSIO_DATA_FinalizeDefaultPRNGs();
 }
 
 int
@@ -858,11 +736,15 @@ main(int argc, char *argv[])
 #endif
     errno = 0;
 
+    /* We need to init the error log pretty early in main for other
+       components to have a log to write high priority error messages */
+    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
+
     /* Start Timing Package */
     main_grp = MACSIO_TIMING_GroupMask("MACSIO main()");
     main_tid = MT_StartTimer("main", main_grp, MACSIO_TIMING_ITER_AUTO);
 
-    InitializePRNGs();
+    InitializeDefaultPRNGs();
 
     /* Process the command line and put the results in the problem */
     clargs_obj = ProcessCommandLine(argc, argv, &argi);
@@ -871,7 +753,6 @@ main(int argc, char *argv[])
     strncpy(MACSIO_UTILS_UnitsPrefixSystem, JsonGetStr(clargs_obj, "units_prefix_system"),
         sizeof(MACSIO_UTILS_UnitsPrefixSystem));
 
-    MACSIO_LOG_StdErr = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm, 0, 0, 0, 0);
     MACSIO_LOG_MainLog = MACSIO_LOG_LogInit(MACSIO_MAIN_Comm,
         JsonGetStr(clargs_obj, "log_file_name"),
         JsonGetInt(clargs_obj, "log_line_length"),
@@ -905,7 +786,7 @@ main(int argc, char *argv[])
 
     MACSIO_TIMING_ClearTimers(MACSIO_TIMING_ALL_GROUPS);
 
-    FinalizePRNGs();
+    FinalizeDefaultPRNGs();
 
 ////#warning ATEXIT THESE
     if (json_object_put(main_obj) != 1)
@@ -933,3 +814,5 @@ main(int argc, char *argv[])
 ////#warning FIX RETVAL OF MAIN TO BE NON-ZERO WHEN ERRORS OCCUR
     return (0);
 }
+
+/*!@}*/
