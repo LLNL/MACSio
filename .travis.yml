@@ -1,10 +1,9 @@
 language: C
 
 before_install:
-  - sudo apt-get -qq update -y
-  - sudo apt-get install -y mpich2
-  - sudo apt-get install -y cmake
-  - sudo apt-get install -y libhdf5-dev
+  - sudo apt-get update
+  - sudo apt-get -y install mpich libmpich-dev
+  - sudo apt-get -y install libhdf5-dev
   - pushd /tmp
 
   - wget https://github.com/LLNL/json-cwx/archive/0.12.tar.gz
@@ -18,8 +17,8 @@ before_install:
   - wget https://portal.nersc.gov/project/visit/releases/3.0.0b/third_party/silo-4.10.2.tar.gz
   - tar -xzf silo-4.10.2.tar.gz
   - pushd silo-4.10.2
-  - ./configure --disable-hzip --disable-fpzip --disable-fortran --enable-install-lite-headers --prefix=`pwd`/my_install DEFAULT_HDF5_LIBDIR=/tmp DEFAULT_HDF5_INCLUDE=/tmp --with-hdf5=yes
-  - make -j4 install 1>/dev/null 2>&1
+  - ./configure --disable-hzip --disable-fpzip --disable-fortran --enable-install-lite-headers --prefix=`pwd`/my_install --with-hdf5=/usr/include/hdf5/serial,/usr/lib/x86_64-linux-gnu/hdf5/serial
+  - make -j4 install
   - popd
 
   - popd
@@ -32,6 +31,6 @@ before_script:
 script:
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_C_COMPILER:PATH=`which mpicc` -DCMAKE_CXX_COMPILER:PATH=`which mpicxx` -DWITH_JSON-CWX_PREFIX=/tmp/json-cwx-0.12/json-cwx/my_install -DENABLE_HDF5_PLUGIN=ON -DENABLE_PDB_PLUGIN=ON -DENABLE_SILO_PLUGIN=ON -DWITH_SILO_PREFIX=/tmp/silo-4.10.2/my_install ../.
+  - cmake -DCMAKE_C_COMPILER:PATH=`which mpicc` -DCMAKE_CXX_COMPILER:PATH=`which mpicxx` -DHDF5_LIBRARIES=/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so -DHDF5_INCLUDE_DIRS=/usr/include/hdf5/serial -DWITH_JSON-CWX_PREFIX=/tmp/json-cwx-0.12/json-cwx/my_install -DENABLE_HDF5_PLUGIN=ON -DENABLE_PDB_PLUGIN=ON -DENABLE_SILO_PLUGIN=ON -DWITH_SILO_PREFIX=/tmp/silo-4.10.2/my_install ../.
   - make VERBOSE=1
   - ctest --force-new-ctest-process -VV --debug -E clargs
