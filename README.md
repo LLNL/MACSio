@@ -1,4 +1,4 @@
-![](https://readthedocs.org/projects/macsio/badge/?version=latest) ![](https://travis-ci.com/LLNL/MACSio.svg?branch=master)
+[![](https://readthedocs.org/projects/macsio/badge/?version=latest)](https://macsio.readthedocs.io/en/latest/) [![](https://travis-ci.com/LLNL/MACSio.svg?branch=master)](https://travis-ci.com/LLNL/MACSio)
 
 # MACSio
 A Multi-purpose, Application-Centric, Scalable I/O Proxy Application
