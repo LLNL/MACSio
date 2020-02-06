@@ -707,7 +707,7 @@ static void main_dump(int argi, int argc, char **argv, json_object *main_obj, in
     char fileName[256];
     MACSIO_MIF_baton_t *bat;
     MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
-        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
+        (unsigned int)JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
     /* Without this barrier, I get strange behavior with Silo's MACSIO_MIF interface */
 //#warning CONFIRM THIS IS STILL NEEDED
