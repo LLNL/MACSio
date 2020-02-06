@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # ReadTheDocs-Breathe documentation build configuration file, created by
@@ -24,16 +24,16 @@ import os
 # hack for readthedocs to cause it to run doxygen first
 # https://github.com/rtfd/readthedocs.org/issues/388
 if os.environ.get('READTHEDOCS'):
-  from subprocess import call 
-  call(['doxygen', 'macsio.doxygen.rtd'])
+  from subprocess import run 
+  run(['doxygen', 'macsio.doxygen.rtd'])
   if not os.environ.get('DONT_INSTALL_BREATHE'):
-    call(['pip', 'install', 'breathe'])
+    run(['pip', 'install', 'breathe'])
 
 
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+needs_sphinx = '2.3'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
