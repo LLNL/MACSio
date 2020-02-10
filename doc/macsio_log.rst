@@ -63,8 +63,8 @@ Logging API
 Example (tstlog.c)
 ^^^^^^^^^^^^^^^^^^
 
-.. include:: ../macsio/tstlog.c
-   :code: c
-   :start-line: 27
-   :number-lines:
+.. literalinclude:: ../macsio/tstlog.c
+   :language: c
+   :start-after: end-of-copyright-header
+   :linenos:
 

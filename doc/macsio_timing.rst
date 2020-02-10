@@ -68,7 +68,7 @@ Timing API
 Example (tsttiming.c)
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. include:: ../macsio/tsttiming.c
-   :code: c
-   :start-line: 27
-   :number-lines:
+.. literalinclude:: ../macsio/tsttiming.c
+   :language: c
+   :start-after: end-of-copyright-header
+   :linenos:

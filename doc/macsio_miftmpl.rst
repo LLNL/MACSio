@@ -41,7 +41,7 @@ pointers.
 
 .. doxygenfile:: macsio_miftmpl.c
 
-.. include:: ../plugins/macsio_miftmpl.c
-   :code: c
-   :start-line: 27
-   :number-lines:
+.. literalinclude:: ../plugins/macsio_miftmpl.c
+   :language: c
+   :start-after: end-of-copyright-header
+   :linenos:

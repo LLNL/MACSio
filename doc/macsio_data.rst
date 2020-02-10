@@ -121,7 +121,7 @@ PRNG API
 PRNG Example (tstprng.c)
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. include:: ../macsio/tstprng.c
-   :code: c
-   :start-line: 27
-   :number-lines:
+.. literalinclude:: ../macsio/tstprng.c
+   :language: c
+   :start-after: end-of-copyright-header
+   :linenos:

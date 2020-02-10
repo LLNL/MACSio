@@ -283,7 +283,7 @@ Here is an example of doing that.
 Example 
 """""""
 
-.. include:: ../macsio/weak_scaling.sh
+.. literalinclude:: ../macsio/weak_scaling.sh
    :code: shell
 
 Which when run, results in the following sequence of MACSio_ command-lines.
@@ -329,7 +329,7 @@ In the preceding *weak* scaling example, MACSio_ generated a *global* mesh of si
 as a *nominal* *global* mesh size, we can then use a given task count to determine part size
 and average part count to hit that target global size. We demonstrate this in the following code block...
 
-.. include:: ../macsio/strong_scaling.sh
+.. literalinclude:: ../macsio/strong_scaling.sh
    :code: shell
 
 When this shell code is run, it results in the following sequence of MACSio_ command-lines. Note that we cap
@@ -363,7 +363,7 @@ varies the part count to hit the target global size. Instead, we may want to do 
 scenario where we maintain just a single part per task and vary that single part's size to hit the
 target global size. This is demonstrated with following code...
 
-.. include:: ../macsio/strong_scaling_single_part.sh
+.. literalinclude:: ../macsio/strong_scaling_single_part.sh
    :code: shell
 
 which prodcues the following sequence of MACSio_ command-lines...
@@ -403,7 +403,7 @@ a dump. This information is captured in task 0's section (header) MACSio_'s main
 
 An example is shown below for 10 dumps from a 4 task run.
 
-.. include:: ../macsio/macsio-log-example.log
+.. literalinclude:: ../macsio/macsio-log-example.log
    :code: shell
 
 The key line in the file, for task 0, is the total bytes divided by the time between
