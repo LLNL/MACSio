@@ -37,6 +37,7 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <macsio_log.h>
 #include <macsio_main.h>
 #include <macsio_mif.h>
+#include <macsio_timing.h>
 #include <macsio_utils.h>
 
 #ifdef HAVE_MPI
@@ -49,7 +50,6 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <H5pubconf.h>
 #include <hdf5.h>
-#include <H5Tpublic.h>
 
 /*! \brief H5Z-ZFP generic interface for setting rate mode */
 #define H5Pset_zfp_rate_cdata(R, N, CD)          \
@@ -483,6 +483,10 @@ main_dump_sif(
     double dumpt /**< dump time */
 )
 {
+    MACSIO_TIMING_GroupMask_t main_dump_sif_grp = MACSIO_TIMING_GroupMask("main_dump_sif");
+    MACSIO_TIMING_TimerId_t main_dump_sif_tid;
+    double timer_dt;
+
 #ifdef HAVE_MPI
     int ndims;
     int i, v, p;
@@ -517,7 +521,9 @@ main_dump_sif(
         json_object_path_get_string(main_obj, "clargs/fileext"));
 
     MACSIO_UTILS_RecordOutputFiles(dumpn, fileName);
+    main_dump_sif_tid = MT_StartTimer("H5Fcreate", main_dump_sif_grp, dumpn);
     h5file_id = H5Fcreate(fileName, H5F_ACC_TRUNC, H5P_DEFAULT, fapl_id);
+    timer_dt = MT_StopTimer(main_dump_sif_tid);
 
     /* Create an HDF5 Dataspace for the global whole of mesh and var objects in the file. */
     ndims = json_object_path_get_int(main_obj, "clargs/part_dim");
@@ -573,7 +579,9 @@ main_dump_sif(
         /* Create the file dataset (using old-style H5Dcreate API here) */
 //#warning USING DEFAULT DCPL: LATER ADD COMPRESSION, ETC.
         
+        main_dump_sif_tid = MT_StartTimer("H5Dcreate", main_dump_sif_grp, dumpn);
         hid_t ds_id = H5Dcreate1(h5file_id, varName, dtype_id, fspace_id, dcpl_id); 
+        timer_dt = MT_StopTimer(main_dump_sif_tid);
         H5Sclose(fspace_id);
         H5Pclose(dcpl_id);
 
@@ -619,14 +627,18 @@ main_dump_sif(
 
                 /* set selection of filespace */
                 fspace_id = H5Dget_space(ds_id);
+                main_dump_sif_tid = MT_StartTimer("H5Sselect_hyperslab", main_dump_sif_grp, dumpn);
                 H5Sselect_hyperslab(fspace_id, H5S_SELECT_SET, starts, 0, counts, 0);
+                timer_dt = MT_StopTimer(main_dump_sif_tid);
 
                 /* set dataspace of data in memory */
                 mspace_id = H5Screate_simple(ndims, counts, 0);
                 buf = json_object_extarr_data(extarr_obj);
             }
 
+            main_dump_sif_tid = MT_StartTimer("H5Dwrite", main_dump_sif_grp, dumpn);
             H5Dwrite(ds_id, dtype_id, mspace_id, fspace_id, dxpl_id, buf);
+            timer_dt = MT_StopTimer(main_dump_sif_tid);
             H5Sclose(fspace_id);
             H5Sclose(mspace_id);
 
@@ -783,6 +795,10 @@ main_dump_mif(
    double dumpt /**< dump time */
 )
 {
+    MACSIO_TIMING_GroupMask_t main_dump_mif_grp = MACSIO_TIMING_GroupMask("main_dump_mif");
+    MACSIO_TIMING_TimerId_t main_dump_mif_tid;
+    double timer_dt;
+
     int size, rank;
     hid_t *h5File_ptr;
     hid_t h5File;
@@ -792,13 +808,15 @@ main_dump_mif(
     int *theData;
     user_data_t userData;
     MACSIO_MIF_ioFlags_t ioFlags = {MACSIO_MIF_WRITE,
-        JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
+        (unsigned)JsonGetInt(main_obj, "clargs/exercise_scr")&0x1};
 
 //#warning MAKE WHOLE FILE USE HDF5 1.8 INTERFACE
 //#warning SET FILE AND DATASET PROPERTIES
 //#warning DIFFERENT MPI TAGS FOR DIFFERENT PLUGINS AND CONTEXTS
+    main_dump_mif_tid = MT_StartTimer("MACSIO_MIF_INIT", main_dump_mif_grp, dumpn);
     MACSIO_MIF_baton_t *bat = MACSIO_MIF_Init(numFiles, ioFlags, MACSIO_MAIN_Comm, 3,
         CreateHDF5File, OpenHDF5File, CloseHDF5File, &userData);
+    timer_dt = MT_StopTimer(main_dump_mif_tid);
 
     rank = json_object_path_get_int(main_obj, "parallel/mpi_rank");
     size = json_object_path_get_int(main_obj, "parallel/mpi_size");
@@ -829,7 +847,9 @@ main_dump_mif(
  
         domain_group_id = H5Gcreate1(h5File, domain_dir, 0);
 
+        main_dump_mif_tid = MT_StartTimer("write_mesh_part", main_dump_mif_grp, dumpn);
         write_mesh_part(domain_group_id, this_part);
+        timer_dt = MT_StopTimer(main_dump_mif_tid);
 
         H5Gclose(domain_group_id);
     }
@@ -843,10 +863,14 @@ main_dump_mif(
     /* Hand off the baton to the next processor. This winds up closing
      * the file so that the next processor that opens it can be assured
      * of getting a consistent and up to date view of the file's contents. */
+    main_dump_mif_tid = MT_StartTimer("MACSIO_MIF_HandOffBaton", main_dump_mif_grp, dumpn);
     MACSIO_MIF_HandOffBaton(bat, h5File_ptr);
+    timer_dt = MT_StopTimer(main_dump_mif_tid);
 
     /* We're done using MACSIO_MIF, so finish it off */
+    main_dump_mif_tid = MT_StartTimer("MACSIO_MIF_Finish", main_dump_mif_grp, dumpn);
     MACSIO_MIF_Finish(bat);
+    timer_dt = MT_StopTimer(main_dump_mif_tid);
 
 }
 
@@ -865,6 +889,10 @@ main_dump(
     double dumpt /**< dump time */
 )
 {
+    MACSIO_TIMING_GroupMask_t main_dump_grp = MACSIO_TIMING_GroupMask("main_dump");
+    MACSIO_TIMING_TimerId_t main_dump_tid;
+    double timer_dt;
+
     int rank, size, numFiles;
 
 //#warning SET ERROR MODE OF HDF5 LIBRARY
@@ -890,12 +918,16 @@ main_dump(
 //#warning ERRORS NEED TO GO TO LOG FILES AND ERROR BEHAVIOR NEEDS TO BE HONORED
         if (!strcmp(json_object_get_string(modestr), "SIF"))
         {
+            main_dump_tid = MT_StartTimer("main_dump_sif", main_dump_grp, dumpn);
             main_dump_sif(main_obj, dumpn, dumpt);
+            timer_dt = MT_StopTimer(main_dump_tid);
         }
         else
         {
             numFiles = json_object_get_int(filecnt);
+            main_dump_tid = MT_StartTimer("main_dump_mif", main_dump_grp, dumpn);
             main_dump_mif(main_obj, numFiles, dumpn, dumpt);
+            timer_dt = MT_StopTimer(main_dump_tid);
         }
     }
     else
@@ -905,7 +937,11 @@ main_dump(
         {
             float avg_num_parts = json_object_path_get_double(main_obj, "clargs/avg_num_parts");
             if (avg_num_parts == (float ((int) avg_num_parts)))
+            {
+                main_dump_tid = MT_StartTimer("main_dump_sif", main_dump_grp, dumpn);
                 main_dump_sif(main_obj, dumpn, dumpt);
+                timer_dt = MT_StopTimer(main_dump_tid);
+            }
             else
             {
 //#warning CURRENTLY, SIF CAN WORK ONLY ON WHOLE PART COUNTS
@@ -921,7 +957,9 @@ main_dump(
             /* Call utility to determine optimal file count */
 //#warning ADD UTILIT TO DETERMINE OPTIMAL FILE COUNT
         }
+        main_dump_tid = MT_StartTimer("main_dump_mif", main_dump_grp, dumpn);
         main_dump_mif(main_obj, numFiles, dumpn, dumpt);
+        timer_dt = MT_StopTimer(main_dump_tid);
     }
 }
 
