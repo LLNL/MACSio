@@ -722,11 +722,14 @@ CloseHDF5File(
     if (userData)
     {
         user_data_t *ud = (user_data_t *) userData;
-        H5Gclose(ud->groupId);
+        if (H5Iis_valid(ud->groupId) > 0 && H5Iget_type(ud->groupId) == H5I_GROUP)
+            H5Gclose(ud->groupId);
     }
 
     /* Check for any open objects in this file */
-    noo = H5Fget_obj_count(fid, obj_flags);
+    if (fid == (hid_t)H5F_OBJ_ALL ||
+        (H5Iis_valid(fid) > 0) && H5Iget_type(fid) == H5I_FILE)
+        noo = H5Fget_obj_count(fid, obj_flags);
     close_retval = H5Fclose(*((hid_t*) file));
     free(file);
 
