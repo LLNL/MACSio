@@ -391,6 +391,7 @@ write_timings_file(char const *filename)
     rdata[0] = maxlen > rmaxlen ? maxlen : rmaxlen;
     rdata[1] = ntimers;
     rdata[2] = rntimers;
+    memcpy(rdata_out, rdata, sizeof(rdata));
 #ifdef HAVE_MPI
     MPI_Allreduce(rdata, rdata_out, 3, MPI_INT, MPI_MAX, MACSIO_MAIN_Comm);
 #endif

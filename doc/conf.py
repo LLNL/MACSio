@@ -24,11 +24,8 @@ import os
 # hack for readthedocs to cause it to run doxygen first
 # https://github.com/rtfd/readthedocs.org/issues/388
 if os.environ.get('READTHEDOCS'):
-  from subprocess import call
-  call(['doxygen', 'macsio.doxygen.rtd'])
-  if not os.environ.get('DONT_INSTALL_BREATHE'):
-    call(['pip', 'install', 'breathe'])
-
+  from subprocess import run 
+  run(['doxygen', 'macsio.doxygen.rtd'])
 
 # -- General configuration ------------------------------------------------
 
